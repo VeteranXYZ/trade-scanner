@@ -1,9 +1,11 @@
 import { describe, expect, it } from "vitest";
-import type { Candle } from "@/lib/exchanges/types";
+import type { Candle, Timeframe } from "@/lib/exchanges/types";
 import type { IndicatorSnapshot } from "@/lib/indicators";
 import { determineMarketPhase } from "./marketPhase";
+import { summarizeMultiTimeframe } from "./multiTimeframe";
 import { calculateScannerScores, clampScore } from "./scoring";
 import { deriveScannerSignal } from "./signal";
+import type { MarketPhase, ScannerSignalState, ScanResult } from "./types";
 
 describe("scanner phase classification", () => {
   it("classifies squeeze when width is low and averages converge", () => {
@@ -187,6 +189,35 @@ describe("scanner signal labels", () => {
   });
 });
 
+describe("multi-timeframe alignment", () => {
+  it("classifies 4H and 1D constructive structure as strong alignment", () => {
+    const summary = summarizeMultiTimeframe([
+      makeScanResult("1h", "WATCHLIST", "SQUEEZE"),
+      makeScanResult("4h", "TREND_CONTINUATION", "TRENDING"),
+      makeScanResult("1d", "TREND_CONTINUATION", "TRENDING"),
+      makeScanResult("7d", "NEUTRAL", "BASE_BUILDING"),
+      makeScanResult("1m", "NEUTRAL", "BASE_BUILDING"),
+    ]);
+
+    expect(summary.alignment).toBe("STRONG_ALIGNMENT");
+    expect(summary.constructiveCount).toBe(3);
+    expect(summary.riskCount).toBe(0);
+  });
+
+  it("classifies multiple higher-timeframe risks as high risk", () => {
+    const summary = summarizeMultiTimeframe([
+      makeScanResult("1h", "WATCHLIST", "SQUEEZE"),
+      makeScanResult("4h", "TREND_CONTINUATION", "TRENDING"),
+      makeScanResult("1d", "WEAK", "BREAKDOWN"),
+      makeScanResult("7d", "HIGH_RISK", "OVEREXTENDED"),
+      makeScanResult("1m", "NEUTRAL", "BASE_BUILDING"),
+    ]);
+
+    expect(summary.alignment).toBe("HIGH_RISK");
+    expect(summary.riskCount).toBe(2);
+  });
+});
+
 function makeSnapshot({
   close,
   ma20,
@@ -247,5 +278,47 @@ function makeCandle(): Candle {
     close: 100,
     volume: 1000,
     closeTime: 59_999,
+  };
+}
+
+function makeScanResult(
+  timeframe: Timeframe,
+  signalState: ScannerSignalState,
+  phase: MarketPhase,
+): ScanResult {
+  return {
+    exchange: "binance",
+    symbol: "BTCUSDT",
+    timeframe,
+    price: 100,
+    phase,
+    signal: {
+      state: signalState,
+      label: signalState,
+      summary: signalState,
+    },
+    opportunityScore: 50,
+    confirmationScore: 50,
+    riskScore: signalState === "HIGH_RISK" || signalState === "WEAK" ? 60 : 0,
+    rankScore: 50,
+    rsi14: 55,
+    bbWidthPercentile: 20,
+    volumeRatio: 1,
+    maStatus: {
+      aboveMA20: true,
+      aboveMA50: true,
+      aboveMA200: true,
+      ma20AboveMA50: true,
+      ma50AboveMA200: true,
+    },
+    reasons: [],
+    warnings: [],
+    nextConfirmation: [],
+    invalidation: [],
+    dataQuality: {
+      candleCount: 300,
+      sufficientHistory: true,
+      missingIndicators: [],
+    },
   };
 }

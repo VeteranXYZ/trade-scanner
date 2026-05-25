@@ -2,11 +2,11 @@ import { NextResponse } from "next/server";
 import { cacheKeys } from "@/lib/cache/keys";
 import { getCached } from "@/lib/cache/memory";
 import { getCandles } from "@/lib/exchanges/binance";
-import type { Candle, Timeframe } from "@/lib/exchanges/types";
+import { TIMEFRAMES, type Candle, type Timeframe } from "@/lib/exchanges/types";
 
 const DEFAULT_CANDLE_LIMIT = 300;
 const MAX_CANDLE_LIMIT = 1000;
-const SUPPORTED_TIMEFRAMES = new Set<Timeframe>(["1h", "4h", "1d"]);
+const SUPPORTED_TIMEFRAMES = new Set<Timeframe>(TIMEFRAMES);
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
@@ -27,7 +27,7 @@ export async function GET(request: Request) {
 
   if (!isTimeframe(timeframe)) {
     return NextResponse.json(
-      { error: "timeframe must be one of 1h, 4h, or 1d." },
+      { error: "timeframe must be one of 1h, 4h, 1d, 7d, or 1m." },
       { status: 400 },
     );
   }

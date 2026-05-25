@@ -1,6 +1,7 @@
 import type { MarketPhase, ScannerSignalState } from "@/lib/scanner/types";
 import { scannerSignalLabels, scannerSignalOrder } from "@/lib/scanner/signal";
 import type { ScannerFiltersState } from "./ScannerPageClient";
+import { TIMEFRAMES, timeframeLabels } from "@/lib/exchanges/types";
 
 export type ScannerSortKey =
   | "rankScore"
@@ -52,8 +53,11 @@ export function ScannerFilters({ filters, onChange }: ScannerFiltersProps) {
             }
             className="w-full rounded-md border border-[var(--border)] bg-[#0b0f14] px-3 py-2 text-[var(--foreground)]"
           >
-            <option value="4h">4h</option>
-            <option value="1d">1d</option>
+            {TIMEFRAMES.map((timeframe) => (
+              <option key={timeframe} value={timeframe}>
+                {timeframeLabels[timeframe]}
+              </option>
+            ))}
           </select>
         </label>
 

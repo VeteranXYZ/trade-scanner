@@ -3,15 +3,15 @@ import pLimit from "p-limit";
 import { cacheKeys, cacheTtls } from "@/lib/cache/keys";
 import { getCached, setCached } from "@/lib/cache/memory";
 import { getTopUsdtMarkets } from "@/lib/exchanges/binance";
-import type { Timeframe } from "@/lib/exchanges/types";
+import { TIMEFRAMES, type Timeframe } from "@/lib/exchanges/types";
 import { scanMarket } from "@/lib/scanner/scanMarket";
 import type { ScanResult } from "@/lib/scanner/types";
 
 const DEFAULT_SCAN_LIMIT = 100;
 const MAX_SCAN_LIMIT = 200;
 const SCAN_CONCURRENCY = 5;
-type ScanTimeframe = Extract<Timeframe, "4h" | "1d">;
-const SUPPORTED_TIMEFRAMES = new Set<ScanTimeframe>(["4h", "1d"]);
+type ScanTimeframe = Timeframe;
+const SUPPORTED_TIMEFRAMES = new Set<ScanTimeframe>(TIMEFRAMES);
 type ScanPayload = {
   exchange: "binance";
   timeframe: ScanTimeframe;
@@ -27,7 +27,7 @@ export async function GET(request: Request) {
 
   if (!isTimeframe(timeframe)) {
     return NextResponse.json(
-      { error: "timeframe must be either 4h or 1d for scanning." },
+      { error: "timeframe must be one of 1h, 4h, 1d, 7d, or 1m." },
       { status: 400 },
     );
   }

@@ -18,9 +18,14 @@ export const cacheTtls = {
     "1h": 2 * minute,
     "4h": 5 * minute,
     "1d": 15 * minute,
+    "7d": 60 * minute,
+    "1m": 6 * 60 * minute,
   } satisfies Record<Timeframe, number>,
   scan: {
+    "1h": 2 * minute,
     "4h": 5 * minute,
     "1d": 15 * minute,
-  } satisfies Partial<Record<Timeframe, number>>,
+    "7d": 60 * minute,
+    "1m": 6 * 60 * minute,
+  } satisfies Record<Timeframe, number>,
 };

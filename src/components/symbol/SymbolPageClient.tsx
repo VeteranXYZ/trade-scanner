@@ -1,6 +1,6 @@
 "use client";
 
-import { useQuery } from "@tanstack/react-query";
+import { useQueries } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
 import { CandleChart } from "@/components/chart/CandleChart";
 import { IndicatorLegend } from "@/components/chart/IndicatorLegend";
@@ -9,9 +9,20 @@ import { ReasonList } from "@/components/scanner/ReasonList";
 import { RiskBadge } from "@/components/scanner/RiskBadge";
 import { ScoreBadge } from "@/components/scanner/ScoreBadge";
 import { SignalBadge } from "@/components/scanner/SignalBadge";
-import type { Candle, Exchange, Timeframe } from "@/lib/exchanges/types";
+import {
+  TIMEFRAMES,
+  timeframeLabels,
+  type Candle,
+  type Exchange,
+  type Timeframe,
+} from "@/lib/exchanges/types";
 import { calculateIndicatorSnapshot } from "@/lib/indicators";
+import {
+  summarizeMultiTimeframe,
+  type MultiTimeframeSummary,
+} from "@/lib/scanner/multiTimeframe";
 import { scanCandles } from "@/lib/scanner/scanCandles";
+import type { ScanResult } from "@/lib/scanner/types";
 
 const EMPTY_CANDLES: Candle[] = [];
 
@@ -31,19 +42,32 @@ type CandlesApiResponse = {
 };
 
 export function SymbolPageClient({ exchange, symbol }: SymbolPageClientProps) {
-  const [timeframe, setTimeframe] = useState<Extract<Timeframe, "4h" | "1d">>(
-    "4h",
-  );
-  const candlesQuery = useQuery({
-    queryKey: ["candles", exchange, symbol, timeframe],
-    queryFn: () => fetchCandles(symbol, timeframe),
+  const [timeframe, setTimeframe] = useState<Timeframe>("4h");
+  const timeframeQueries = useQueries({
+    queries: TIMEFRAMES.map((option) => ({
+      queryKey: ["candles", exchange, symbol, option],
+      queryFn: () => fetchCandles(symbol, option),
+    })),
   });
+  const selectedTimeframeIndex = TIMEFRAMES.indexOf(timeframe);
+  const candlesQuery = timeframeQueries[selectedTimeframeIndex];
+  const isAnyTimeframeFetching = timeframeQueries.some((query) => query.isFetching);
   const candles = candlesQuery.data?.candles ?? EMPTY_CANDLES;
   const snapshot = useMemo(() => calculateIndicatorSnapshot(candles), [candles]);
   const scanResult = useMemo(
     () => (candles.length > 0 ? scanCandles(symbol, timeframe, candles) : null),
     [candles, symbol, timeframe],
   );
+  const multiTimeframeResults = TIMEFRAMES.flatMap((option, index) => {
+    const optionCandles = timeframeQueries[index]?.data?.candles ?? EMPTY_CANDLES;
+    return optionCandles.length > 0
+      ? [scanCandles(symbol, option, optionCandles)]
+      : [];
+  });
+  const multiTimeframeSummary =
+    multiTimeframeResults.length > 0
+      ? summarizeMultiTimeframe(multiTimeframeResults)
+      : null;
 
   return (
     <section className="mx-auto max-w-[1500px] px-4 py-6">
@@ -64,22 +88,25 @@ export function SymbolPageClient({ exchange, symbol }: SymbolPageClientProps) {
             <span className="mb-2 block">Timeframe</span>
             <select
               value={timeframe}
-              onChange={(event) =>
-                setTimeframe(event.target.value as Extract<Timeframe, "4h" | "1d">)
-              }
+              onChange={(event) => setTimeframe(event.target.value as Timeframe)}
               className="rounded-md border border-[var(--border)] bg-[#0b0f14] px-3 py-2 text-[var(--foreground)]"
             >
-              <option value="4h">4h</option>
-              <option value="1d">1d</option>
+              {TIMEFRAMES.map((option) => (
+                <option key={option} value={option}>
+                  {timeframeLabels[option]}
+                </option>
+              ))}
             </select>
           </label>
           <button
             type="button"
-            onClick={() => void candlesQuery.refetch()}
-            disabled={candlesQuery.isFetching}
+            onClick={() =>
+              void Promise.all(timeframeQueries.map((query) => query.refetch()))
+            }
+            disabled={isAnyTimeframeFetching}
             className="rounded-md border border-[var(--border)] px-3 py-2 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-60"
           >
-            {candlesQuery.isFetching ? "Refreshing" : "Refresh"}
+            {isAnyTimeframeFetching ? "Refreshing" : "Refresh"}
           </button>
         </div>
       </div>
@@ -106,6 +133,13 @@ export function SymbolPageClient({ exchange, symbol }: SymbolPageClientProps) {
           </section>
 
           <aside className="space-y-5">
+            <MultiTimeframePanel
+              activeTimeframe={timeframe}
+              results={multiTimeframeResults}
+              summary={multiTimeframeSummary}
+              onSelect={setTimeframe}
+            />
+
             {scanResult && (
               <>
                 <div className="rounded-md border border-[var(--border)] bg-[var(--panel)] p-4">
@@ -170,6 +204,85 @@ export function SymbolPageClient({ exchange, symbol }: SymbolPageClientProps) {
   );
 }
 
+function MultiTimeframePanel({
+  activeTimeframe,
+  results,
+  summary,
+  onSelect,
+}: {
+  activeTimeframe: Timeframe;
+  results: ScanResult[];
+  summary: MultiTimeframeSummary | null;
+  onSelect: (timeframe: Timeframe) => void;
+}) {
+  const resultByTimeframe = new Map(results.map((result) => [result.timeframe, result]));
+
+  return (
+    <div className="rounded-md border border-[var(--border)] bg-[var(--panel)] p-4">
+      <div className="mb-4">
+        <h2 className="text-lg font-semibold">Timeframe Alignment</h2>
+        {summary ? (
+          <p className="mt-2 text-sm leading-6 text-[var(--muted)]">
+            <span className="font-semibold text-[var(--foreground)]">
+              {summary.label}
+            </span>{" "}
+            · {summary.summary}
+          </p>
+        ) : (
+          <p className="mt-2 text-sm leading-6 text-[var(--muted)]">
+            Loading multi-timeframe structure.
+          </p>
+        )}
+      </div>
+
+      <div className="space-y-2">
+        {TIMEFRAMES.map((option) => {
+          const result = resultByTimeframe.get(option);
+          const isActive = option === activeTimeframe;
+
+          return (
+            <button
+              key={option}
+              type="button"
+              onClick={() => onSelect(option)}
+              className={`w-full rounded-md border p-3 text-left transition ${
+                isActive
+                  ? "border-[var(--foreground)] bg-[#101923]"
+                  : "border-[var(--border)] bg-[#0b0f14] hover:border-[var(--foreground)]"
+              }`}
+            >
+              <div className="flex items-center justify-between gap-3">
+                <span className="text-sm font-semibold">
+                  {timeframeLabels[option]}
+                </span>
+                <span className="text-xs text-[var(--muted)]">
+                  {result ? `Rank ${result.rankScore.toFixed(1)}` : "Loading"}
+                </span>
+              </div>
+              {result ? (
+                <div className="mt-2 flex flex-wrap gap-2">
+                  <SignalBadge signal={result.signal} />
+                  <PhaseBadge phase={result.phase} />
+                </div>
+              ) : null}
+            </button>
+          );
+        })}
+      </div>
+
+      {summary ? (
+        <div className="mt-4 grid grid-cols-2 gap-2 text-sm">
+          <Metric
+            label="Constructive"
+            value={String(summary.constructiveCount)}
+          />
+          <Metric label="Risk" value={String(summary.riskCount)} />
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 function IndicatorSummary({
   snapshot,
   scanResult,
@@ -210,6 +323,15 @@ function StatePanel({ title, message }: { title: string; message: string }) {
       <p className="mt-2 max-w-md text-sm leading-6 text-[var(--muted)]">
         {message}
       </p>
+    </div>
+  );
+}
+
+function Metric({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-md border border-[var(--border)] bg-[#0b0f14] p-3">
+      <div className="text-xs text-[var(--muted)]">{label}</div>
+      <div className="mt-1 font-semibold">{value}</div>
     </div>
   );
 }
