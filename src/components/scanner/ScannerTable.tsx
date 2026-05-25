@@ -1,0 +1,263 @@
+"use client";
+
+import {
+  flexRender,
+  getCoreRowModel,
+  useReactTable,
+  type ColumnDef,
+} from "@tanstack/react-table";
+import { useMemo } from "react";
+import { PhaseBadge } from "./PhaseBadge";
+import { RiskBadge } from "./RiskBadge";
+import { ScoreBadge } from "./ScoreBadge";
+import type { ScanResult } from "@/lib/scanner/types";
+
+type ScannerTableProps = {
+  rows: ScanResult[];
+  selectedSymbol: string | null;
+  isLoading: boolean;
+  isFetching: boolean;
+  isError: boolean;
+  errorMessage: string;
+  cached: boolean;
+  updatedAt: string | null;
+  sourceItemCount: number;
+  partialErrors: { symbol: string; message: string }[];
+  onRefresh: () => void;
+  onSelect: (symbol: string) => void;
+};
+
+export function ScannerTable({
+  rows,
+  selectedSymbol,
+  isLoading,
+  isFetching,
+  isError,
+  errorMessage,
+  cached,
+  updatedAt,
+  sourceItemCount,
+  partialErrors,
+  onRefresh,
+  onSelect,
+}: ScannerTableProps) {
+  const columns = useMemo<ColumnDef<ScanResult>[]>(
+    () => [
+      {
+        id: "rank",
+        header: "Rank",
+        cell: ({ row }) => row.index + 1,
+      },
+      {
+        accessorKey: "symbol",
+        header: "Symbol",
+        cell: ({ row }) => (
+          <span className="font-semibold text-[var(--foreground)]">
+            {row.original.symbol}
+          </span>
+        ),
+      },
+      {
+        accessorKey: "phase",
+        header: "Phase",
+        cell: ({ row }) => <PhaseBadge phase={row.original.phase} />,
+      },
+      {
+        accessorKey: "opportunityScore",
+        header: "Opportunity",
+        cell: ({ row }) => (
+          <ScoreBadge label="Opportunity" value={row.original.opportunityScore} />
+        ),
+      },
+      {
+        accessorKey: "confirmationScore",
+        header: "Confirmation",
+        cell: ({ row }) => (
+          <ScoreBadge
+            label="Confirmation"
+            value={row.original.confirmationScore}
+          />
+        ),
+      },
+      {
+        accessorKey: "riskScore",
+        header: "Risk",
+        cell: ({ row }) => (
+          <ScoreBadge label="Risk" value={row.original.riskScore} tone="risk" />
+        ),
+      },
+      {
+        accessorKey: "rankScore",
+        header: "Rank Score",
+        cell: ({ row }) => formatNumber(row.original.rankScore, 1),
+      },
+      {
+        accessorKey: "rsi14",
+        header: "RSI",
+        cell: ({ row }) => formatNullable(row.original.rsi14, 1),
+      },
+      {
+        accessorKey: "bbWidthPercentile",
+        header: "BB Width %",
+        cell: ({ row }) => formatNullable(row.original.bbWidthPercentile, 0),
+      },
+      {
+        accessorKey: "volumeRatio",
+        header: "Volume Ratio",
+        cell: ({ row }) => formatNullable(row.original.volumeRatio, 2),
+      },
+      {
+        id: "maStatus",
+        header: "MA Status",
+        cell: ({ row }) => <MaStatus result={row.original} />,
+      },
+      {
+        id: "warnings",
+        header: "Warnings",
+        cell: ({ row }) =>
+          row.original.warnings.length > 0 ? (
+            <RiskBadge label={`${row.original.warnings.length} warning`} />
+          ) : (
+            <span className="text-[var(--muted)]">None</span>
+          ),
+      },
+    ],
+    [],
+  );
+  // TanStack Table intentionally returns callable table helpers from this hook.
+  // eslint-disable-next-line react-hooks/incompatible-library
+  const table = useReactTable({
+    data: rows,
+    columns,
+    getCoreRowModel: getCoreRowModel(),
+  });
+
+  return (
+    <section className="min-w-0 overflow-hidden rounded-md border border-[var(--border)] bg-[var(--panel)]">
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[var(--border)] px-4 py-3">
+        <div>
+          <h2 className="text-lg font-semibold">Scanner Results</h2>
+          <p className="mt-1 text-xs text-[var(--muted)]">
+            {updatedAt
+              ? `${sourceItemCount} scanned · ${cached ? "cached" : "fresh"} · ${new Date(
+                  updatedAt,
+                ).toLocaleTimeString()}`
+              : "Waiting for scan data"}
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={onRefresh}
+          disabled={isFetching}
+          className="rounded-md border border-[var(--border)] px-3 py-2 text-sm font-semibold text-[var(--foreground)] disabled:cursor-not-allowed disabled:opacity-60"
+        >
+          {isFetching ? "Refreshing" : "Refresh Scan"}
+        </button>
+      </div>
+
+      {partialErrors.length > 0 && (
+        <div className="border-b border-[var(--border)] bg-[#2b2111] px-4 py-3 text-sm text-[var(--warning)]">
+          {partialErrors.length} symbol scan failed; partial results are shown.
+        </div>
+      )}
+
+      {isError ? (
+        <StateMessage title="Scan Error" message={errorMessage} />
+      ) : isLoading ? (
+        <StateMessage
+          title="Loading Scan"
+          message="Fetching public Binance market data and calculating scanner results."
+        />
+      ) : rows.length === 0 ? (
+        <StateMessage
+          title="No Matches"
+          message="Adjust filters to widen the current scanner result set."
+        />
+      ) : (
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-[1180px] border-collapse text-left text-sm">
+            <thead className="bg-[#0d131a] text-xs uppercase text-[var(--muted)]">
+              {table.getHeaderGroups().map((headerGroup) => (
+                <tr key={headerGroup.id}>
+                  {headerGroup.headers.map((header) => (
+                    <th key={header.id} className="px-3 py-3 font-semibold">
+                      {flexRender(
+                        header.column.columnDef.header,
+                        header.getContext(),
+                      )}
+                    </th>
+                  ))}
+                </tr>
+              ))}
+            </thead>
+            <tbody>
+              {table.getRowModel().rows.map((row) => {
+                const isSelected = row.original.symbol === selectedSymbol;
+
+                return (
+                  <tr
+                    key={row.original.symbol}
+                    onClick={() => onSelect(row.original.symbol)}
+                    className={`cursor-pointer border-t border-[var(--border)] transition ${
+                      isSelected ? "bg-[#132119]" : "hover:bg-[#101923]"
+                    }`}
+                  >
+                    {row.getVisibleCells().map((cell) => (
+                      <td key={cell.id} className="px-3 py-3 align-middle">
+                        {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                      </td>
+                    ))}
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </section>
+  );
+}
+
+function MaStatus({ result }: { result: ScanResult }) {
+  const items = [
+    ["20", result.maStatus.aboveMA20],
+    ["50", result.maStatus.aboveMA50],
+    ["200", result.maStatus.aboveMA200],
+  ] as const;
+
+  return (
+    <div className="flex gap-1">
+      {items.map(([label, active]) => (
+        <span
+          key={label}
+          className={`inline-flex h-7 min-w-9 items-center justify-center rounded-md border px-2 text-xs font-semibold ${
+            active
+              ? "border-[#2f7d46] bg-[#132119] text-[var(--accent)]"
+              : "border-[var(--border)] bg-[#0b0f14] text-[var(--muted)]"
+          }`}
+        >
+          {label}
+        </span>
+      ))}
+    </div>
+  );
+}
+
+function StateMessage({ title, message }: { title: string; message: string }) {
+  return (
+    <div className="flex min-h-80 flex-col items-center justify-center px-6 py-10 text-center">
+      <h3 className="text-lg font-semibold">{title}</h3>
+      <p className="mt-2 max-w-md text-sm leading-6 text-[var(--muted)]">
+        {message}
+      </p>
+    </div>
+  );
+}
+
+function formatNullable(value: number | null, decimals: number) {
+  return value === null ? "n/a" : formatNumber(value, decimals);
+}
+
+function formatNumber(value: number, decimals: number) {
+  return value.toFixed(decimals);
+}

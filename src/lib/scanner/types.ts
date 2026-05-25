@@ -1,0 +1,43 @@
+import type { Timeframe } from "@/lib/exchanges/types";
+
+export type MarketPhase =
+  | "BASE_BUILDING"
+  | "SQUEEZE"
+  | "BREAKOUT_ATTEMPT"
+  | "BREAKOUT_CONFIRMED"
+  | "TRENDING"
+  | "PULLBACK_HEALTHY"
+  | "OVEREXTENDED"
+  | "DISTRIBUTION"
+  | "BREAKDOWN";
+
+export type ScanResult = {
+  exchange: "binance";
+  symbol: string;
+  timeframe: Timeframe;
+  price: number;
+  phase: MarketPhase;
+  opportunityScore: number;
+  confirmationScore: number;
+  riskScore: number;
+  rankScore: number;
+  rsi14: number | null;
+  bbWidthPercentile: number | null;
+  volumeRatio: number | null;
+  maStatus: {
+    aboveMA20: boolean;
+    aboveMA50: boolean;
+    aboveMA200: boolean;
+    ma20AboveMA50: boolean;
+    ma50AboveMA200: boolean;
+  };
+  reasons: string[];
+  warnings: string[];
+  nextConfirmation: string[];
+  invalidation: string[];
+  dataQuality: {
+    candleCount: number;
+    sufficientHistory: boolean;
+    missingIndicators: string[];
+  };
+};

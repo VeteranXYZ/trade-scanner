@@ -1,0 +1,26 @@
+import type { Timeframe } from "@/lib/exchanges/types";
+
+const minute = 60 * 1000;
+
+export const cacheKeys = {
+  markets: "markets:binance:spot:usdt",
+  tickers: "tickers:binance:24h",
+  candles: (symbol: string, timeframe: Timeframe, limit: number) =>
+    `candles:binance:${symbol}:${timeframe}:${limit}`,
+  scan: (timeframe: Timeframe, limit: number) =>
+    `scan:binance:${timeframe}:${limit}`,
+};
+
+export const cacheTtls = {
+  markets: 60 * minute,
+  tickers: minute,
+  candles: {
+    "1h": 2 * minute,
+    "4h": 5 * minute,
+    "1d": 15 * minute,
+  } satisfies Record<Timeframe, number>,
+  scan: {
+    "4h": 5 * minute,
+    "1d": 15 * minute,
+  } satisfies Partial<Record<Timeframe, number>>,
+};
