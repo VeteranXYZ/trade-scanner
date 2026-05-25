@@ -1,5 +1,26 @@
 import type { MarketPhase, ScannerSignal } from "./types";
 
+export const scannerSignalOrder = [
+  "WATCHLIST",
+  "CONFIRMED",
+  "TREND_CONTINUATION",
+  "HIGH_RISK",
+  "WEAK",
+  "NEUTRAL",
+] as const;
+
+export const scannerSignalLabels: Record<
+  (typeof scannerSignalOrder)[number],
+  string
+> = {
+  WATCHLIST: "Watchlist",
+  CONFIRMED: "Confirmed",
+  TREND_CONTINUATION: "Trend",
+  HIGH_RISK: "High Risk",
+  WEAK: "Weak",
+  NEUTRAL: "Neutral",
+};
+
 type SignalInput = {
   phase: MarketPhase;
   opportunityScore: number;
@@ -16,7 +37,7 @@ export function deriveScannerSignal({
   if (phase === "BREAKDOWN") {
     return {
       state: "WEAK",
-      label: "Weak",
+      label: scannerSignalLabels.WEAK,
       summary: "Price and momentum are below key trend levels.",
     };
   }
@@ -24,7 +45,7 @@ export function deriveScannerSignal({
   if (riskScore >= 55 || phase === "OVEREXTENDED" || phase === "DISTRIBUTION") {
     return {
       state: "HIGH_RISK",
-      label: "High Risk",
+      label: scannerSignalLabels.HIGH_RISK,
       summary: "Risk conditions dominate this setup.",
     };
   }
@@ -36,7 +57,7 @@ export function deriveScannerSignal({
   ) {
     return {
       state: "CONFIRMED",
-      label: "Confirmed",
+      label: scannerSignalLabels.CONFIRMED,
       summary: "Breakout has trend, momentum, and volume confirmation.",
     };
   }
@@ -48,7 +69,7 @@ export function deriveScannerSignal({
   ) {
     return {
       state: "WATCHLIST",
-      label: "Watchlist",
+      label: scannerSignalLabels.WATCHLIST,
       summary: "Compression or base structure is forming, but confirmation is still needed.",
     };
   }
@@ -60,14 +81,14 @@ export function deriveScannerSignal({
   ) {
     return {
       state: "TREND_CONTINUATION",
-      label: "Trend",
+      label: scannerSignalLabels.TREND_CONTINUATION,
       summary: "Trend structure remains constructive with manageable risk.",
     };
   }
 
   return {
     state: "NEUTRAL",
-    label: "Neutral",
+    label: scannerSignalLabels.NEUTRAL,
     summary: "No clear edge from the current scanner rules.",
   };
 }

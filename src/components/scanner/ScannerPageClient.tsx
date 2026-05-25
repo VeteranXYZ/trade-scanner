@@ -6,6 +6,7 @@ import { ScannerFilters, type ScannerSortKey } from "./ScannerFilters";
 import { ScannerTable } from "./ScannerTable";
 import { SelectedSymbolPanel } from "./SelectedSymbolPanel";
 import type { Timeframe } from "@/lib/exchanges/types";
+import { scannerSignalOrder } from "@/lib/scanner/signal";
 import type {
   MarketPhase,
   ScannerSignalState,
@@ -53,6 +54,10 @@ export function ScannerPageClient() {
     () => filterAndSortResults(scanQuery.data?.results ?? [], filters),
     [scanQuery.data?.results, filters],
   );
+  const signalSummary = useMemo(
+    () => getSignalSummary(scanQuery.data?.results ?? []),
+    [scanQuery.data?.results],
+  );
   const selectedResult =
     rows.find((row) => row.symbol === selectedSymbol) ?? rows[0] ?? null;
 
@@ -61,11 +66,17 @@ export function ScannerPageClient() {
     setSelectedSymbol(null);
   }
 
+  function selectSignal(signal: ScannerSignalState | "ALL") {
+    updateFilters({ ...filters, signal });
+  }
+
   return (
     <section className="mx-auto grid max-w-[1500px] gap-5 px-4 py-6 lg:grid-cols-[250px_minmax(0,1fr)_330px]">
       <ScannerFilters filters={filters} onChange={updateFilters} />
       <ScannerTable
         rows={rows}
+        signalSummary={signalSummary}
+        activeSignal={filters.signal}
         selectedSymbol={selectedResult?.symbol ?? null}
         isLoading={scanQuery.isLoading}
         isFetching={scanQuery.isFetching}
@@ -80,6 +91,7 @@ export function ScannerPageClient() {
         sourceItemCount={scanQuery.data?.itemCount ?? 0}
         partialErrors={scanQuery.data?.errors ?? []}
         onRefresh={() => void scanQuery.refetch()}
+        onSignalSelect={selectSignal}
         onSelect={setSelectedSymbol}
       />
       <SelectedSymbolPanel result={selectedResult} />
@@ -104,6 +116,24 @@ async function fetchScan(timeframe: Timeframe, limit: number) {
   }
 
   return (await response.json()) as ScanApiResponse;
+}
+
+export function getSignalSummary(results: ScanResult[]) {
+  const counts = new Map<ScannerSignalState, number>(
+    scannerSignalOrder.map((signal) => [signal, 0]),
+  );
+
+  for (const result of results) {
+    counts.set(result.signal.state, (counts.get(result.signal.state) ?? 0) + 1);
+  }
+
+  return [
+    { signal: "ALL" as const, count: results.length },
+    ...scannerSignalOrder.map((signal) => ({
+      signal,
+      count: counts.get(signal) ?? 0,
+    })),
+  ];
 }
 
 export function filterAndSortResults(

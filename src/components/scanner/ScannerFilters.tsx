@@ -1,4 +1,5 @@
 import type { MarketPhase, ScannerSignalState } from "@/lib/scanner/types";
+import { scannerSignalLabels, scannerSignalOrder } from "@/lib/scanner/signal";
 import type { ScannerFiltersState } from "./ScannerPageClient";
 
 export type ScannerSortKey =
@@ -27,22 +28,8 @@ const phaseOptions: Array<MarketPhase | "ALL"> = [
 
 const signalOptions: Array<ScannerSignalState | "ALL"> = [
   "ALL",
-  "WATCHLIST",
-  "CONFIRMED",
-  "TREND_CONTINUATION",
-  "HIGH_RISK",
-  "WEAK",
-  "NEUTRAL",
+  ...scannerSignalOrder,
 ];
-
-const signalLabels: Record<ScannerSignalState, string> = {
-  WATCHLIST: "Watchlist",
-  CONFIRMED: "Confirmed",
-  TREND_CONTINUATION: "Trend",
-  HIGH_RISK: "High Risk",
-  WEAK: "Weak",
-  NEUTRAL: "Neutral",
-};
 
 export function ScannerFilters({ filters, onChange }: ScannerFiltersProps) {
   function update<K extends keyof ScannerFiltersState>(
@@ -81,7 +68,7 @@ export function ScannerFilters({ filters, onChange }: ScannerFiltersProps) {
           >
             {signalOptions.map((signal) => (
               <option key={signal} value={signal}>
-                {signal === "ALL" ? "All signals" : signalLabels[signal]}
+                {signal === "ALL" ? "All signals" : scannerSignalLabels[signal]}
               </option>
             ))}
           </select>

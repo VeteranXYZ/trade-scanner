@@ -11,10 +11,16 @@ import { PhaseBadge } from "./PhaseBadge";
 import { RiskBadge } from "./RiskBadge";
 import { ScoreBadge } from "./ScoreBadge";
 import { SignalBadge } from "./SignalBadge";
-import type { ScanResult } from "@/lib/scanner/types";
+import {
+  SignalSummaryBar,
+  type SignalSummaryItem,
+} from "./SignalSummaryBar";
+import type { ScannerSignalState, ScanResult } from "@/lib/scanner/types";
 
 type ScannerTableProps = {
   rows: ScanResult[];
+  signalSummary: SignalSummaryItem[];
+  activeSignal: ScannerSignalState | "ALL";
   selectedSymbol: string | null;
   isLoading: boolean;
   isFetching: boolean;
@@ -25,11 +31,14 @@ type ScannerTableProps = {
   sourceItemCount: number;
   partialErrors: { symbol: string; message: string }[];
   onRefresh: () => void;
+  onSignalSelect: (signal: ScannerSignalState | "ALL") => void;
   onSelect: (symbol: string) => void;
 };
 
 export function ScannerTable({
   rows,
+  signalSummary,
+  activeSignal,
   selectedSymbol,
   isLoading,
   isFetching,
@@ -40,6 +49,7 @@ export function ScannerTable({
   sourceItemCount,
   partialErrors,
   onRefresh,
+  onSignalSelect,
   onSelect,
 }: ScannerTableProps) {
   const columns = useMemo<ColumnDef<ScanResult>[]>(
@@ -160,6 +170,12 @@ export function ScannerTable({
           {isFetching ? "Refreshing" : "Refresh Scan"}
         </button>
       </div>
+
+      <SignalSummaryBar
+        items={signalSummary}
+        activeSignal={activeSignal}
+        onSelect={onSignalSelect}
+      />
 
       {partialErrors.length > 0 && (
         <div className="border-b border-[var(--border)] bg-[#2b2111] px-4 py-3 text-sm text-[var(--warning)]">

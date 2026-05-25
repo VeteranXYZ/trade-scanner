@@ -4,7 +4,7 @@ type SignalBadgeProps = {
   signal: ScannerSignal;
 };
 
-const toneClass: Record<ScannerSignal["state"], string> = {
+export const signalToneClass: Record<ScannerSignal["state"], string> = {
   WATCHLIST: "border-[#8f7a31] bg-[#221d0d] text-[var(--warning)]",
   CONFIRMED: "border-[#2f7d46] bg-[#132119] text-[var(--accent)]",
   TREND_CONTINUATION: "border-[#2d5b89] bg-[#101b29] text-[#86b7ef]",
@@ -16,7 +16,7 @@ const toneClass: Record<ScannerSignal["state"], string> = {
 export function SignalBadge({ signal }: SignalBadgeProps) {
   return (
     <span
-      className={`inline-flex rounded-md border px-2 py-1 text-xs font-semibold ${toneClass[signal.state]}`}
+      className={`inline-flex rounded-md border px-2 py-1 text-xs font-semibold ${signalToneClass[signal.state]}`}
       title={signal.summary}
     >
       {signal.label}

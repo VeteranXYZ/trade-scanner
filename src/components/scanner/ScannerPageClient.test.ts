@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { filterAndSortResults, type ScannerFiltersState } from "./ScannerPageClient";
+import {
+  filterAndSortResults,
+  getSignalSummary,
+  type ScannerFiltersState,
+} from "./ScannerPageClient";
 import type {
   MarketPhase,
   ScannerSignal,
@@ -77,6 +81,38 @@ describe("scanner result filtering", () => {
     );
 
     expect(rows.map((row) => row.symbol)).toEqual(["AAAUSDT"]);
+  });
+});
+
+describe("scanner signal summary", () => {
+  it("counts all signal states in display order", () => {
+    const summary = getSignalSummary([
+      makeResult({
+        symbol: "AAAUSDT",
+        signalState: "WATCHLIST",
+        phase: "SQUEEZE",
+      }),
+      makeResult({
+        symbol: "BBBUSDT",
+        signalState: "WATCHLIST",
+        phase: "BASE_BUILDING",
+      }),
+      makeResult({
+        symbol: "CCCUSDT",
+        signalState: "HIGH_RISK",
+        phase: "OVEREXTENDED",
+      }),
+    ]);
+
+    expect(summary).toEqual([
+      { signal: "ALL", count: 3 },
+      { signal: "WATCHLIST", count: 2 },
+      { signal: "CONFIRMED", count: 0 },
+      { signal: "TREND_CONTINUATION", count: 0 },
+      { signal: "HIGH_RISK", count: 1 },
+      { signal: "WEAK", count: 0 },
+      { signal: "NEUTRAL", count: 0 },
+    ]);
   });
 });
 
