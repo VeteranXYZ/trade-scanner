@@ -187,54 +187,110 @@ function EvaluationSection({
               {t.history.noSignalBuckets}
             </p>
           ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full min-w-[720px] border-collapse text-left text-sm">
-                <thead className="bg-[#0d131a] text-xs uppercase text-[var(--muted)]">
-                  <tr>
-                    <th className="px-3 py-3 font-semibold">{t.common.signal}</th>
-                    <th className="px-3 py-3 font-semibold">{t.history.completed}</th>
-                    <th className="px-3 py-3 font-semibold">{t.history.pending}</th>
-                    <th className="px-3 py-3 font-semibold">{t.history.hitRate}</th>
-                    <th className="px-3 py-3 font-semibold">{t.history.avgReturn}</th>
-                    <th className="px-3 py-3 font-semibold">{t.history.avgMaxUp}</th>
-                    <th className="px-3 py-3 font-semibold">{t.history.avgMaxDown}</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {signalRows.map(([signal, bucket]) => (
-                    <tr key={signal} className="border-t border-[var(--border)]">
-                      <td className="px-3 py-3">
-                        {signal in t.signal
-                          ? t.signal[signal as keyof typeof t.signal]
-                          : formatEnum(signal)}
-                      </td>
-                      <td className="px-3 py-3 tabular-nums">
-                        {bucket.completedCount}
-                      </td>
-                      <td className="px-3 py-3 tabular-nums">
-                        {bucket.pendingCount}
-                      </td>
-                      <td className="px-3 py-3 tabular-nums">
-                        {formatPercentRatio(bucket.hitRate)}
-                      </td>
-                      <td className="px-3 py-3 tabular-nums">
-                        {formatSignedPercent(bucket.avgReturnPct)}
-                      </td>
-                      <td className="px-3 py-3 tabular-nums">
-                        {formatSignedPercent(bucket.avgMaxUpPct)}
-                      </td>
-                      <td className="px-3 py-3 tabular-nums">
-                        {formatSignedPercent(bucket.avgMaxDownPct)}
-                      </td>
+            <>
+              <EvaluationSignalCards rows={signalRows} />
+              <div className="overflow-x-auto">
+                <table className="w-full min-w-[720px] border-collapse text-left text-sm">
+                  <thead className="bg-[#0d131a] text-xs uppercase text-[var(--muted)]">
+                    <tr>
+                      <th className="px-3 py-3 font-semibold">{t.common.signal}</th>
+                      <th className="px-3 py-3 font-semibold">{t.history.completed}</th>
+                      <th className="px-3 py-3 font-semibold">{t.history.pending}</th>
+                      <th className="px-3 py-3 font-semibold">{t.history.hitRate}</th>
+                      <th className="px-3 py-3 font-semibold">{t.history.avgReturn}</th>
+                      <th className="px-3 py-3 font-semibold">{t.history.avgMaxUp}</th>
+                      <th className="px-3 py-3 font-semibold">{t.history.avgMaxDown}</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                  </thead>
+                  <tbody>
+                    {signalRows.map(([signal, bucket]) => (
+                      <tr key={signal} className="border-t border-[var(--border)]">
+                        <td className="px-3 py-3">
+                          {signal in t.signal
+                            ? t.signal[signal as keyof typeof t.signal]
+                            : formatEnum(signal)}
+                        </td>
+                        <td className="px-3 py-3 tabular-nums">
+                          {bucket.completedCount}
+                        </td>
+                        <td className="px-3 py-3 tabular-nums">
+                          {bucket.pendingCount}
+                        </td>
+                        <td className="px-3 py-3 tabular-nums">
+                          {formatPercentRatio(bucket.hitRate)}
+                        </td>
+                        <td className="px-3 py-3 tabular-nums">
+                          {formatSignedPercent(bucket.avgReturnPct)}
+                        </td>
+                        <td className="px-3 py-3 tabular-nums">
+                          {formatSignedPercent(bucket.avgMaxUpPct)}
+                        </td>
+                        <td className="px-3 py-3 tabular-nums">
+                          {formatSignedPercent(bucket.avgMaxDownPct)}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </>
           )}
         </div>
       )}
     </section>
+  );
+}
+
+function EvaluationSignalCards({
+  rows,
+}: {
+  rows: Array<[string, EvaluationSummaryBucket]>;
+}) {
+  const { dictionary: t } = useLanguage();
+
+  return (
+    <div>
+      <h3 className="mb-3 text-sm font-semibold">{t.history.validationSummary}</h3>
+      <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+        {rows.slice(0, 6).map(([signal, bucket]) => {
+          const hitRate = bucket.hitRate ?? 0;
+
+          return (
+            <div
+              key={signal}
+              className="rounded-md border border-[var(--border)] bg-[#0b0f14] p-3"
+            >
+              <div className="flex items-center justify-between gap-3">
+                <span className="text-sm font-semibold">
+                  {signal in t.signal
+                    ? t.signal[signal as keyof typeof t.signal]
+                    : formatEnum(signal)}
+                </span>
+                <span className="text-xs tabular-nums text-[var(--muted)]">
+                  {bucket.completedCount} {t.history.completed}
+                </span>
+              </div>
+              <div className="mt-3 grid grid-cols-2 gap-2 text-sm">
+                <Metric
+                  label={t.history.hitRate}
+                  value={formatPercentRatio(bucket.hitRate)}
+                />
+                <Metric
+                  label={t.history.avgReturn}
+                  value={formatSignedPercent(bucket.avgReturnPct)}
+                />
+              </div>
+              <div className="mt-3 h-2 overflow-hidden rounded-full bg-[#111820]">
+                <div
+                  className="h-full rounded-full bg-[var(--accent)]"
+                  style={{ width: `${hitRate * 100}%` }}
+                />
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
   );
 }
 

@@ -99,6 +99,7 @@ export function ScannerTable({
           <ScoreBadge
             label={t.scanner.columns.opportunity}
             value={row.original.opportunityScore}
+            compact
           />
         ),
       },
@@ -109,6 +110,7 @@ export function ScannerTable({
           <ScoreBadge
             label={t.scanner.columns.confirmation}
             value={row.original.confirmationScore}
+            compact
           />
         ),
       },
@@ -120,6 +122,7 @@ export function ScannerTable({
             label={t.common.risk}
             value={row.original.riskScore}
             tone="risk"
+            compact
           />
         ),
       },
@@ -222,12 +225,12 @@ export function ScannerTable({
         />
       ) : (
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[1160px] border-collapse text-left text-sm">
+          <table className="w-full min-w-[980px] border-collapse text-left text-sm">
             <thead className="bg-[#0d131a] text-xs uppercase text-[var(--muted)]">
               {table.getHeaderGroups().map((headerGroup) => (
                 <tr key={headerGroup.id}>
                   {headerGroup.headers.map((header) => (
-                    <th key={header.id} className="px-3 py-3 font-semibold">
+                    <th key={header.id} className="px-2 py-2 font-semibold">
                       {flexRender(
                         header.column.columnDef.header,
                         header.getContext(),
@@ -250,7 +253,7 @@ export function ScannerTable({
                     }`}
                   >
                     {row.getVisibleCells().map((cell) => (
-                      <td key={cell.id} className="px-3 py-3 align-middle">
+                      <td key={cell.id} className="px-2 py-2 align-middle">
                         {flexRender(cell.column.columnDef.cell, cell.getContext())}
                       </td>
                     ))}

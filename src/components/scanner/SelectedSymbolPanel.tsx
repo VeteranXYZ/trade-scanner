@@ -5,6 +5,7 @@ import { ReasonList } from "./ReasonList";
 import { RiskBadge } from "./RiskBadge";
 import { ScoreBadge } from "./ScoreBadge";
 import { SignalBadge } from "./SignalBadge";
+import { StrategyReadPanel } from "./StrategyReadPanel";
 import type { ScanResult } from "@/lib/scanner/types";
 import { formatScannerExplanation } from "@/lib/i18n/formatScannerExplanation";
 
@@ -27,124 +28,137 @@ export function SelectedSymbolPanel({ result }: SelectedSymbolPanelProps) {
   }
 
   return (
-    <aside className="rounded-md border border-[var(--border)] bg-[var(--panel)] p-4 xl:sticky xl:top-24 xl:self-start">
-      <div className="mb-4 flex items-start justify-between gap-3">
-        <div>
-          <h2 className="text-xl font-semibold">{result.symbol}</h2>
-          <div className="mt-2 flex flex-wrap gap-2">
-            <PhaseBadge phase={result.phase} />
-            <SignalBadge signal={result.signal} />
-            {result.multiTimeframe && (
-              <span className="inline-flex rounded-md border border-[var(--border)] bg-[#0b0f14] px-2 py-1 text-xs font-semibold text-[var(--foreground)]">
-                {t.alignment[result.multiTimeframe.alignment]}
-              </span>
-            )}
-          </div>
-        </div>
-        <Link
-          href={`/symbol/${result.exchange}/${result.symbol}`}
-          className="rounded-md border border-[var(--border)] px-3 py-2 text-xs font-semibold text-[var(--foreground)]"
-        >
-          {t.common.detail}
-        </Link>
-      </div>
-
-      <div className="mb-4 grid grid-cols-3 gap-2">
-        <ScoreBadge
-          label={t.scanner.columns.opportunity}
-          value={result.opportunityScore}
-          compact
-        />
-        <ScoreBadge
-          label={t.scanner.columns.confirmation}
-          value={result.confirmationScore}
-          compact
-        />
-        <ScoreBadge
-          label={t.common.risk}
-          value={result.riskScore}
-          tone="risk"
-          compact
-        />
-      </div>
-
-      <p className="mb-4 rounded-md border border-[var(--border)] bg-[#0b0f14] p-3 text-sm leading-6 text-[var(--muted)]">
-        {t.signalSummary[result.signal.state]}
-      </p>
-
-      {result.multiTimeframe && (
-        <div className="mb-4 rounded-md border border-[var(--border)] bg-[#0b0f14] p-3 text-sm leading-6 text-[var(--muted)]">
-          <div className="font-semibold text-[var(--foreground)]">
-            {t.alignment[result.multiTimeframe.alignment]}
-          </div>
-          <p className="mt-1">
-            {t.alignmentSummary[result.multiTimeframe.alignment]}
-          </p>
-          <div className="mt-3 grid grid-cols-3 gap-2 text-xs">
-            <Metric
-              label={t.scanner.mtfRank}
-              value={result.multiTimeframe.rankScore.toFixed(1)}
-            />
-            <Metric
-              label={t.scanner.constructive}
-              value={String(result.multiTimeframe.constructiveCount)}
-            />
-            <Metric label={t.common.risk} value={String(result.multiTimeframe.riskCount)} />
-          </div>
-          <div className="mt-3 space-y-2">
-            {result.multiTimeframe.timeframeResults.map((timeframeResult) => (
-              <div
-                key={timeframeResult.timeframe}
-                className="rounded-md border border-[var(--border)] bg-[var(--panel)] p-2"
-              >
-                <div className="mb-2 flex items-center justify-between gap-2">
-                  <span className="text-xs font-semibold text-[var(--foreground)]">
-                    {t.timeframe[timeframeResult.timeframe]}
-                  </span>
-                  <span className="text-xs tabular-nums">
-                    {timeframeResult.rankScore.toFixed(1)}
-                  </span>
-                </div>
-                <div className="flex flex-wrap gap-2">
-                  <SignalBadge signal={timeframeResult.signal} />
-                  <PhaseBadge phase={timeframeResult.phase} />
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      <div className="mb-4 grid grid-cols-2 gap-2 text-sm">
-        <Metric label={t.common.price} value={formatPrice(result.price)} />
-        <Metric label={t.common.rank} value={result.rankScore.toFixed(1)} />
-        <Metric label={t.scanner.columns.rsi} value={formatNullable(result.rsi14, 1)} />
-        <Metric
-          label={t.common.volume}
-          value={formatNullable(result.volumeRatio, 2)}
-        />
-      </div>
-
-      <div className="space-y-4">
-        <ReasonList title={t.scanner.reasons} items={result.reasons} />
-        {result.warnings.length > 0 && (
+    <aside className="space-y-4 xl:sticky xl:top-24 xl:self-start">
+      <section className="rounded-md border border-[var(--border)] bg-[var(--panel)] p-4">
+        <div className="mb-4 flex items-start justify-between gap-3">
           <div>
-            <h3 className="mb-2 text-sm font-semibold uppercase tracking-wide text-[var(--muted)]">
-              {t.scanner.warnings}
-            </h3>
-            <div className="space-y-2">
-              {result.warnings.map((warning) => (
-                <RiskBadge
-                  key={`${warning.key}-${JSON.stringify(warning.params ?? {})}`}
-                  label={formatScannerExplanation(warning, t)}
-                />
+            <h2 className="text-xl font-semibold">{result.symbol}</h2>
+            <div className="mt-2 flex flex-wrap gap-2">
+              <PhaseBadge phase={result.phase} />
+              <SignalBadge signal={result.signal} />
+              {result.multiTimeframe && (
+                <span className="inline-flex rounded-md border border-[var(--border)] bg-[#0b0f14] px-2 py-1 text-xs font-semibold text-[var(--foreground)]">
+                  {t.alignment[result.multiTimeframe.alignment]}
+                </span>
+              )}
+            </div>
+          </div>
+          <Link
+            href={`/symbol/${result.exchange}/${result.symbol}`}
+            className="rounded-md border border-[var(--border)] px-3 py-2 text-xs font-semibold text-[var(--foreground)]"
+          >
+            {t.common.detail}
+          </Link>
+        </div>
+
+        <div className="mb-4 grid grid-cols-3 gap-2">
+          <ScoreBadge
+            label={t.scanner.columns.opportunity}
+            value={result.opportunityScore}
+            compact
+          />
+          <ScoreBadge
+            label={t.scanner.columns.confirmation}
+            value={result.confirmationScore}
+            compact
+          />
+          <ScoreBadge
+            label={t.common.risk}
+            value={result.riskScore}
+            tone="risk"
+            compact
+          />
+        </div>
+
+        <p className="mb-4 rounded-md border border-[var(--border)] bg-[#0b0f14] p-3 text-sm leading-6 text-[var(--muted)]">
+          {t.signalSummary[result.signal.state]}
+        </p>
+
+        {result.multiTimeframe && (
+          <div className="mb-4 rounded-md border border-[var(--border)] bg-[#0b0f14] p-3 text-sm leading-6 text-[var(--muted)]">
+            <div className="font-semibold text-[var(--foreground)]">
+              {t.alignment[result.multiTimeframe.alignment]}
+            </div>
+            <p className="mt-1">
+              {t.alignmentSummary[result.multiTimeframe.alignment]}
+            </p>
+            <div className="mt-3 grid grid-cols-3 gap-2 text-xs">
+              <Metric
+                label={t.scanner.mtfRank}
+                value={result.multiTimeframe.rankScore.toFixed(1)}
+              />
+              <Metric
+                label={t.scanner.constructive}
+                value={String(result.multiTimeframe.constructiveCount)}
+              />
+              <Metric
+                label={t.common.risk}
+                value={String(result.multiTimeframe.riskCount)}
+              />
+            </div>
+            <div className="mt-3 space-y-2">
+              {result.multiTimeframe.timeframeResults.map((timeframeResult) => (
+                <div
+                  key={timeframeResult.timeframe}
+                  className="rounded-md border border-[var(--border)] bg-[var(--panel)] p-2"
+                >
+                  <div className="mb-2 flex items-center justify-between gap-2">
+                    <span className="text-xs font-semibold text-[var(--foreground)]">
+                      {t.timeframe[timeframeResult.timeframe]}
+                    </span>
+                    <span className="text-xs tabular-nums">
+                      {timeframeResult.rankScore.toFixed(1)}
+                    </span>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    <SignalBadge signal={timeframeResult.signal} />
+                    <PhaseBadge phase={timeframeResult.phase} />
+                  </div>
+                </div>
               ))}
             </div>
           </div>
         )}
-        <ReasonList title={t.scanner.nextConfirmation} items={result.nextConfirmation} />
-        <ReasonList title={t.scanner.invalidation} items={result.invalidation} />
-      </div>
+
+        <div className="mb-4 grid grid-cols-2 gap-2 text-sm">
+          <Metric label={t.common.price} value={formatPrice(result.price)} />
+          <Metric label={t.common.rank} value={result.rankScore.toFixed(1)} />
+          <Metric
+            label={t.scanner.columns.rsi}
+            value={formatNullable(result.rsi14, 1)}
+          />
+          <Metric
+            label={t.common.volume}
+            value={formatNullable(result.volumeRatio, 2)}
+          />
+        </div>
+
+        <div className="space-y-4">
+          <ReasonList title={t.scanner.reasons} items={result.reasons} />
+          {result.warnings.length > 0 && (
+            <div>
+              <h3 className="mb-2 text-sm font-semibold uppercase tracking-wide text-[var(--muted)]">
+                {t.scanner.warnings}
+              </h3>
+              <div className="space-y-2">
+                {result.warnings.map((warning) => (
+                  <RiskBadge
+                    key={`${warning.key}-${JSON.stringify(warning.params ?? {})}`}
+                    label={formatScannerExplanation(warning, t)}
+                  />
+                ))}
+              </div>
+            </div>
+          )}
+          <ReasonList
+            title={t.scanner.nextConfirmation}
+            items={result.nextConfirmation}
+          />
+          <ReasonList title={t.scanner.invalidation} items={result.invalidation} />
+        </div>
+      </section>
+
+      <StrategyReadPanel result={result} />
     </aside>
   );
 }

@@ -11,6 +11,7 @@ import type { MtfPreset } from "@/lib/scanner/multiTimeframe";
 import { scannerSignalOrder } from "@/lib/scanner/signal";
 import type {
   MarketPhase,
+  MultiTimeframeAlignment,
   ScannerSignalState,
   ScanResult,
 } from "@/lib/scanner/types";
@@ -75,6 +76,10 @@ export function ScannerPageClient() {
     () => getSignalSummary(scanQuery.data?.results ?? []),
     [scanQuery.data?.results],
   );
+  const alignmentSummary = useMemo(
+    () => getAlignmentSummary(scanQuery.data?.results ?? []),
+    [scanQuery.data?.results],
+  );
   const selectedResult =
     rows.find((row) => row.symbol === selectedSymbol) ?? rows[0] ?? null;
 
@@ -85,6 +90,10 @@ export function ScannerPageClient() {
 
   function selectSignal(signal: ScannerSignalState | "ALL") {
     updateFilters({ ...filters, signal });
+  }
+
+  function applyQuickFilter(nextFilters: ScannerFiltersState) {
+    updateFilters(nextFilters);
   }
 
   return (
@@ -121,31 +130,155 @@ export function ScannerPageClient() {
         </div>
       </div>
 
-      <div className="grid gap-5 xl:grid-cols-[280px_minmax(0,1fr)_360px]">
+      <div className="grid gap-5 xl:grid-cols-[280px_minmax(0,1fr)_380px]">
         <ScannerFilters filters={filters} onChange={updateFilters} />
-        <ScannerTable
-          rows={rows}
-          signalSummary={signalSummary}
-          activeSignal={filters.signal}
-          selectedSymbol={selectedResult?.symbol ?? null}
-          isLoading={scanQuery.isLoading}
-          isFetching={scanQuery.isFetching}
-          isError={scanQuery.isError}
-          errorMessage={
-            scanQuery.error instanceof Error
-              ? scanQuery.error.message
-              : "Unable to load scanner results."
-          }
-          cached={scanQuery.data?.cached ?? false}
-          updatedAt={scanQuery.data?.updatedAt ?? null}
-          sourceItemCount={scanQuery.data?.itemCount ?? 0}
-          partialErrors={scanQuery.data?.errors ?? []}
-          onRefresh={() => void scanQuery.refetch()}
-          onSignalSelect={selectSignal}
-          onSelect={setSelectedSymbol}
-        />
+        <div className="min-w-0 space-y-4">
+          <QuickFilterBar
+            filters={filters}
+            onSelect={applyQuickFilter}
+          />
+          <MtfAlignmentSummary items={alignmentSummary} />
+          <ScannerTable
+            rows={rows}
+            signalSummary={signalSummary}
+            activeSignal={filters.signal}
+            selectedSymbol={selectedResult?.symbol ?? null}
+            isLoading={scanQuery.isLoading}
+            isFetching={scanQuery.isFetching}
+            isError={scanQuery.isError}
+            errorMessage={
+              scanQuery.error instanceof Error
+                ? scanQuery.error.message
+                : "Unable to load scanner results."
+            }
+            cached={scanQuery.data?.cached ?? false}
+            updatedAt={scanQuery.data?.updatedAt ?? null}
+            sourceItemCount={scanQuery.data?.itemCount ?? 0}
+            partialErrors={scanQuery.data?.errors ?? []}
+            onRefresh={() => void scanQuery.refetch()}
+            onSignalSelect={selectSignal}
+            onSelect={setSelectedSymbol}
+          />
+        </div>
         <SelectedSymbolPanel result={selectedResult} />
       </div>
+    </section>
+  );
+}
+
+function QuickFilterBar({
+  filters,
+  onSelect,
+}: {
+  filters: ScannerFiltersState;
+  onSelect: (filters: ScannerFiltersState) => void;
+}) {
+  const { dictionary: t } = useLanguage();
+  const presets: Array<{ label: string; filters: ScannerFiltersState }> = [
+    { label: t.scanner.resetView, filters: initialFilters },
+    {
+      label: t.scanner.quickWatchlist,
+      filters: {
+        ...initialFilters,
+        mode: "single",
+        timeframe: "4h",
+        signal: "WATCHLIST",
+        minOpportunityScore: 60,
+        maxRiskScore: 40,
+        sortBy: "opportunityScore",
+      },
+    },
+    {
+      label: t.scanner.quickMtfSwing,
+      filters: {
+        ...initialFilters,
+        mode: "mtf",
+        mtfPreset: "swing",
+        maxRiskScore: 60,
+      },
+    },
+    {
+      label: t.scanner.quickDailyTrend,
+      filters: {
+        ...initialFilters,
+        mode: "single",
+        timeframe: "1d",
+        signal: "TREND_CONTINUATION",
+        maxRiskScore: 45,
+      },
+    },
+    {
+      label: t.scanner.quickCleanRisk,
+      filters: {
+        ...filters,
+        signal: "ALL",
+        phase: "ALL",
+        maxRiskScore: 35,
+        sortBy: "lowestRiskScore",
+      },
+    },
+  ];
+
+  return (
+    <section className="rounded-md border border-[var(--border)] bg-[var(--panel)] px-4 py-3">
+      <div className="mb-3 text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">
+        {t.scanner.quickFilters}
+      </div>
+      <div className="flex flex-wrap gap-2">
+        {presets.map((preset) => (
+          <button
+            key={preset.label}
+            type="button"
+            onClick={() => onSelect(preset.filters)}
+            className="rounded-md border border-[var(--border)] bg-[#0b0f14] px-3 py-2 text-xs font-semibold text-[var(--foreground)] transition hover:border-[var(--foreground)]"
+          >
+            {preset.label}
+          </button>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function MtfAlignmentSummary({
+  items,
+}: {
+  items: Array<{ alignment: MultiTimeframeAlignment; count: number }>;
+}) {
+  const { dictionary: t } = useLanguage();
+  const total = items.reduce((sum, item) => sum + item.count, 0);
+
+  return (
+    <section className="rounded-md border border-[var(--border)] bg-[var(--panel)] px-4 py-3">
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+        <h2 className="text-sm font-semibold">{t.scanner.mtfAlignmentSummary}</h2>
+        <span className="text-xs text-[var(--muted)]">
+          {total > 0 ? `${total} ${t.scanner.scanned}` : t.scanner.noMtfAlignment}
+        </span>
+      </div>
+      {total > 0 ? (
+        <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-5">
+          {items.map((item) => (
+            <div
+              key={item.alignment}
+              className="rounded-md border border-[var(--border)] bg-[#0b0f14] p-3"
+            >
+              <div className="truncate text-xs text-[var(--muted)]">
+                {t.alignment[item.alignment]}
+              </div>
+              <div className="mt-1 text-lg font-semibold tabular-nums">
+                {item.count}
+              </div>
+              <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-[#111820]">
+                <div
+                  className="h-full rounded-full bg-[var(--accent)]"
+                  style={{ width: `${(item.count / total) * 100}%` }}
+                />
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : null}
     </section>
   );
 }
@@ -233,6 +366,21 @@ export function getSignalSummary(results: ScanResult[]) {
       count: counts.get(signal) ?? 0,
     })),
   ];
+}
+
+export function getAlignmentSummary(results: ScanResult[]) {
+  const counts = new Map<MultiTimeframeAlignment, number>();
+
+  for (const result of results) {
+    const alignment = result.multiTimeframe?.alignment;
+    if (alignment) {
+      counts.set(alignment, (counts.get(alignment) ?? 0) + 1);
+    }
+  }
+
+  return Array.from(counts.entries())
+    .map(([alignment, count]) => ({ alignment, count }))
+    .sort((left, right) => right.count - left.count);
 }
 
 export function filterAndSortResults(

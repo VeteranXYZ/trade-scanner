@@ -10,6 +10,7 @@ import { ReasonList } from "@/components/scanner/ReasonList";
 import { RiskBadge } from "@/components/scanner/RiskBadge";
 import { ScoreBadge } from "@/components/scanner/ScoreBadge";
 import { SignalBadge } from "@/components/scanner/SignalBadge";
+import { StrategyReadPanel } from "@/components/scanner/StrategyReadPanel";
 import {
   TIMEFRAMES,
   type Candle,
@@ -144,6 +145,8 @@ export function SymbolPageClient({ exchange, symbol }: SymbolPageClientProps) {
 
             {scanResult && (
               <>
+                <StrategyReadPanel result={scanResult} />
+
                 <div className="rounded-md border border-[var(--border)] bg-[var(--panel)] p-4">
                   <h2 className="mb-4 text-lg font-semibold">
                     {t.symbol.currentStructure}
@@ -246,7 +249,7 @@ function MultiTimeframePanel({
         )}
       </div>
 
-      <div className="space-y-2">
+      <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-1 2xl:grid-cols-2">
         {TIMEFRAMES.map((option) => {
           const result = resultByTimeframe.get(option);
           const isActive = option === activeTimeframe;
@@ -256,7 +259,7 @@ function MultiTimeframePanel({
               key={option}
               type="button"
               onClick={() => onSelect(option)}
-              className={`w-full rounded-md border p-3 text-left transition ${
+              className={`min-h-28 w-full rounded-md border p-3 text-left transition ${
                 isActive
                   ? "border-[var(--foreground)] bg-[#101923]"
                   : "border-[var(--border)] bg-[#0b0f14] hover:border-[var(--foreground)]"
@@ -273,9 +276,16 @@ function MultiTimeframePanel({
                 </span>
               </div>
               {result ? (
-                <div className="mt-2 flex flex-wrap gap-2">
-                  <SignalBadge signal={result.signal} />
-                  <PhaseBadge phase={result.phase} />
+                <div className="mt-3 space-y-2">
+                  <div className="flex flex-wrap gap-2">
+                    <SignalBadge signal={result.signal} />
+                    <PhaseBadge phase={result.phase} />
+                  </div>
+                  <div className="grid grid-cols-3 gap-1 text-xs text-[var(--muted)]">
+                    <span>O {result.opportunityScore.toFixed(0)}</span>
+                    <span>C {result.confirmationScore.toFixed(0)}</span>
+                    <span>R {result.riskScore.toFixed(0)}</span>
+                  </div>
                 </div>
               ) : null}
             </button>

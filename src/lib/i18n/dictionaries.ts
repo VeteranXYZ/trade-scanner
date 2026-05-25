@@ -81,6 +81,14 @@ export const dictionaries = {
       warnings: "Warnings",
       nextConfirmation: "Next Confirmation",
       invalidation: "Invalidation",
+      quickFilters: "Quick Filters",
+      resetView: "Reset View",
+      quickWatchlist: "4H Watchlist",
+      quickMtfSwing: "MTF Swing",
+      quickDailyTrend: "Daily Trend",
+      quickCleanRisk: "Clean Risk",
+      mtfAlignmentSummary: "MTF Alignment Summary",
+      noMtfAlignment: "Run an MTF scan to compare alignment groups.",
       columns: {
         symbol: "Symbol",
         score: "Rank Score",
@@ -108,6 +116,7 @@ export const dictionaries = {
       latestLeaders: "Latest Leaders",
       forwardEvaluation: "Forward Evaluation",
       forwardEvaluationHelp: "Future 3-candle performance for recent stored snapshots.",
+      validationSummary: "Validation Summary",
       evaluated: "Evaluated",
       completed: "Completed",
       pending: "Pending",
@@ -142,6 +151,57 @@ export const dictionaries = {
       rankScore: "Rank Score",
       bbWidth: "BB Width %",
       volumeRatio: "Volume Ratio",
+    },
+    strategy: {
+      title: "Strategy Read",
+      phaseRead: "Phase Read",
+      signalRead: "Signal Read",
+      scoringModel: "Scoring Model",
+      scoreWeights: "Rank = Opportunity 45% + Confirmation 35% - Risk 25% - phase penalty.",
+      opportunityHelp:
+        "Opportunity rewards compression, pullback location, normal momentum, and quiet volume before confirmation.",
+      confirmationHelp:
+        "Confirmation rewards breakout location, volume expansion, moving-average structure, and controlled RSI.",
+      riskHelp:
+        "Risk rises when RSI is overheated, price is extended, trend averages are lost, or history is incomplete.",
+      dataQuality: "Data Quality",
+      candles: "candles",
+      sufficientHistory: "Full indicator history",
+      limitedHistory: "Limited indicator history",
+      missingIndicators: "Missing indicators",
+      phaseRule: {
+        BASE_BUILDING:
+          "No high-risk breakdown or confirmed breakout is present; the market is still building structure.",
+        SQUEEZE:
+          "Bollinger width is compressed, MA20 and MA50 are close, and price is near the middle band.",
+        BREAKOUT_ATTEMPT:
+          "Price is pressing near or above the upper Bollinger Band with momentum improving.",
+        BREAKOUT_CONFIRMED:
+          "Price is above the upper band with strong volume, positive MA structure, and RSI in the confirmation zone.",
+        TRENDING:
+          "Price is above MA20, MA20 is above MA50, and momentum is constructive without overheating.",
+        PULLBACK_HEALTHY:
+          "Price remains above MA50 while pulling back near MA20 or the Bollinger middle band.",
+        OVEREXTENDED:
+          "RSI or distance from MA20 is stretched enough that continuation risk is elevated.",
+        DISTRIBUTION:
+          "A high-volume candle with a long upper wick suggests supply is appearing overhead.",
+        BREAKDOWN:
+          "Price is below key averages and RSI is weak, so trend structure has broken down.",
+      } satisfies Record<MarketPhase, string>,
+      signalRule: {
+        WATCHLIST:
+          "Opportunity is high and risk is contained, but confirmation is not strong enough yet.",
+        CONFIRMED:
+          "Breakout structure is confirmed, confirmation score is high, and risk remains controlled.",
+        TREND_CONTINUATION:
+          "Trend or healthy pullback structure is intact with enough confirmation and manageable risk.",
+        HIGH_RISK:
+          "Risk score or phase conditions dominate the setup, so the candidate is not clean.",
+        WEAK: "Breakdown structure takes priority over other scores.",
+        NEUTRAL:
+          "Scores and phase do not meet a stronger signal rule under the current model.",
+      } satisfies Record<ScannerSignalState, string>,
     },
     sort: {
       rankScore: "Rank Score",
@@ -340,6 +400,14 @@ export const dictionaries = {
       warnings: "警告",
       nextConfirmation: "下一步确认",
       invalidation: "失效条件",
+      quickFilters: "快捷筛选",
+      resetView: "重置视图",
+      quickWatchlist: "4小时观察",
+      quickMtfSwing: "多周期波段",
+      quickDailyTrend: "日线趋势",
+      quickCleanRisk: "低风险",
+      mtfAlignmentSummary: "多周期共振概览",
+      noMtfAlignment: "运行多周期扫描后可比较共振分组。",
       columns: {
         symbol: "标的",
         score: "综合分",
@@ -367,6 +435,7 @@ export const dictionaries = {
       latestLeaders: "最新领先标的",
       forwardEvaluation: "未来表现评估",
       forwardEvaluationHelp: "最近快照未来 3 根 K 线表现。",
+      validationSummary: "验证概览",
       evaluated: "已评估",
       completed: "已完成",
       pending: "等待中",
@@ -401,6 +470,44 @@ export const dictionaries = {
       rankScore: "综合分",
       bbWidth: "布林宽度%",
       volumeRatio: "量能比",
+    },
+    strategy: {
+      title: "策略判读",
+      phaseRead: "结构判读",
+      signalRead: "信号判读",
+      scoringModel: "评分模型",
+      scoreWeights: "综合分 = 机会分 45% + 确认分 35% - 风险分 25% - 阶段惩罚。",
+      opportunityHelp:
+        "机会分奖励压缩、回踩位置、正常动能，以及确认前的低量整理。",
+      confirmationHelp:
+        "确认分奖励突破位置、量能放大、均线结构，以及可控的 RSI。",
+      riskHelp:
+        "风险分会在 RSI 过热、价格延伸、跌破趋势均线或历史数据不足时上升。",
+      dataQuality: "数据质量",
+      candles: "根 K 线",
+      sufficientHistory: "指标历史完整",
+      limitedHistory: "指标历史有限",
+      missingIndicators: "缺失指标",
+      phaseRule: {
+        BASE_BUILDING: "没有出现高风险破位或确认突破，市场仍处在结构搭建阶段。",
+        SQUEEZE: "布林宽度压缩，MA20 与 MA50 接近，价格位于布林中轨附近。",
+        BREAKOUT_ATTEMPT: "价格正在接近或突破布林上轨，动能开始改善。",
+        BREAKOUT_CONFIRMED:
+          "价格突破布林上轨，同时量能强、均线结构正向，RSI 位于确认区间。",
+        TRENDING: "价格位于 MA20 上方，MA20 高于 MA50，动能健康且未明显过热。",
+        PULLBACK_HEALTHY: "价格仍在 MA50 上方，并回踩到 MA20 或布林中轨附近。",
+        OVEREXTENDED: "RSI 或相对 MA20 的延伸幅度过高，继续追随的风险上升。",
+        DISTRIBUTION: "高量 K 线伴随较长上影线，说明上方开始出现抛压。",
+        BREAKDOWN: "价格跌破关键均线且 RSI 偏弱，趋势结构已经破位。",
+      } satisfies Record<MarketPhase, string>,
+      signalRule: {
+        WATCHLIST: "机会分高且风险可控，但确认条件还不够强。",
+        CONFIRMED: "突破结构已确认，确认分较高，同时风险仍受控。",
+        TREND_CONTINUATION: "趋势或健康回踩结构保持，确认度足够且风险可控。",
+        HIGH_RISK: "风险分或结构阶段占主导，这个候选不够干净。",
+        WEAK: "破位结构优先级最高，会覆盖其他评分。",
+        NEUTRAL: "当前评分和结构没有满足更强信号规则。",
+      } satisfies Record<ScannerSignalState, string>,
     },
     sort: {
       rankScore: "综合分",
