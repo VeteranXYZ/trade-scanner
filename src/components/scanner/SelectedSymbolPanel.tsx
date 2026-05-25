@@ -6,6 +6,7 @@ import { RiskBadge } from "./RiskBadge";
 import { ScoreBadge } from "./ScoreBadge";
 import { SignalBadge } from "./SignalBadge";
 import type { ScanResult } from "@/lib/scanner/types";
+import { formatScannerExplanation } from "@/lib/i18n/formatScannerExplanation";
 
 type SelectedSymbolPanelProps = {
   result: ScanResult | null;
@@ -133,7 +134,10 @@ export function SelectedSymbolPanel({ result }: SelectedSymbolPanelProps) {
             </h3>
             <div className="space-y-2">
               {result.warnings.map((warning) => (
-                <RiskBadge key={warning} label={warning} />
+                <RiskBadge
+                  key={`${warning.key}-${JSON.stringify(warning.params ?? {})}`}
+                  label={formatScannerExplanation(warning, t)}
+                />
               ))}
             </div>
           </div>

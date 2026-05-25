@@ -3,6 +3,7 @@ import type { MtfPreset } from "@/lib/scanner/multiTimeframe";
 import type {
   MarketPhase,
   MultiTimeframeAlignment,
+  ScannerExplanationKey,
   ScannerSignalState,
 } from "@/lib/scanner/types";
 
@@ -192,6 +193,74 @@ export const dictionaries = {
       CONFLICTING: "Timeframes are not aligned enough for a clear structure read.",
       HIGH_RISK: "Multiple timeframes are weak or risk-heavy.",
     } satisfies Record<MultiTimeframeAlignment, string>,
+    explanation: {
+      "reason.bbWidthLow":
+        "Bollinger Band width is in the lower 20% of recent candles.",
+      "reason.ma20Ma50Converging": "MA20 and MA50 are converging.",
+      "reason.priceNearBollingerMiddle":
+        "Price is holding near the Bollinger middle band.",
+      "reason.quietVolumeCompression":
+        "Volume is quiet, consistent with compression.",
+      "reason.priceAboveUpperBollinger":
+        "Price is above the upper Bollinger Band.",
+      "reason.volumeExpanding":
+        "Volume is expanding above its 20-candle average.",
+      "reason.ma20AboveMa50":
+        "MA20 is above MA50, supporting short-term trend structure.",
+      "reason.priceAboveMa200":
+        "Price is above MA200, keeping long-term structure constructive.",
+      "reason.phaseClassification":
+        "Current indicators classify the market as {phase}.",
+      "reason.limitedHistory":
+        "The market has limited candle history, so ranking confidence is lower.",
+      "confirmation.closeAboveUpperBollinger":
+        "Watch for a {timeframe} close above the upper Bollinger Band.",
+      "confirmation.volumeAbove1_5": "Volume ratio should rise above 1.5.",
+      "confirmation.breakoutVolume":
+        "Breakout attempt needs sustained volume above 1.5x average.",
+      "confirmation.rsiBelow72":
+        "RSI should remain below 72 during confirmation.",
+      "confirmation.priceAboveMa50": "Price should remain above MA50.",
+      "confirmation.pullbackHoldMa20OrMiddle":
+        "Pullbacks should hold near MA20 or the Bollinger middle band.",
+      "confirmation.consolidateNearMa20":
+        "Risk improves if price consolidates closer to MA20.",
+      "confirmation.rsiCoolBelow72":
+        "RSI should cool below 72 before structure improves.",
+      "confirmation.recoverMa50":
+        "Structure improves only if price recovers MA50.",
+      "confirmation.declineVolumeStabilize":
+        "Volume should stabilize instead of expanding on declines.",
+      "confirmation.ma20TurnAboveMa50":
+        "MA20 should turn above MA50 for stronger trend confirmation.",
+      "invalidation.loseBollingerMiddleWithVolume":
+        "Invalidated if price loses the Bollinger middle band with rising volume.",
+      "invalidation.closeBelowMa50":
+        "Invalidated if price closes back below MA50.",
+      "invalidation.pullbackBelowMa50":
+        "Invalidated if the pullback closes below MA50.",
+      "invalidation.extensionBelowMa20":
+        "Invalidated if extension resolves into a close below MA20.",
+      "invalidation.weakUntilRecoverMa50":
+        "Weak structure remains until price recovers MA50.",
+      "invalidation.closeBelowMa200":
+        "Long-term structure weakens if price closes below MA200.",
+      "warning.rsiAbove75":
+        "RSI is above 75, which may indicate overextension.",
+      "warning.possibleFakeBreakout":
+        "Possible fake breakout: price moved above the upper Bollinger Band without strong volume confirmation.",
+      "warning.extendedFromMa20":
+        "Price is extended from MA20; chasing risk is elevated.",
+      "warning.belowMa50":
+        "Trend structure is weak because price is below MA50.",
+      "warning.belowMa200":
+        "Long-term trend remains weak because price is below MA200.",
+      "warning.rsiBelow45": "RSI is below 45, indicating weak momentum.",
+      "warning.longUpperWick":
+        "The latest candle has a long upper wick, showing supply overhead.",
+      "warning.insufficientHistory":
+        "Candle history is insufficient for the full indicator set.",
+    } satisfies Record<ScannerExplanationKey, string>,
     timeframe: {
       "1h": "1H",
       "4h": "4H",
@@ -380,6 +449,47 @@ export const dictionaries = {
       CONFLICTING: "多周期尚未形成足够一致的结构判断。",
       HIGH_RISK: "多个周期偏弱或风险权重较高。",
     } satisfies Record<MultiTimeframeAlignment, string>,
+    explanation: {
+      "reason.bbWidthLow": "布林带宽度处于近期 K 线的低 20% 区间。",
+      "reason.ma20Ma50Converging": "MA20 与 MA50 正在收敛。",
+      "reason.priceNearBollingerMiddle": "价格守在布林中轨附近。",
+      "reason.quietVolumeCompression": "量能较安静，符合压缩结构。",
+      "reason.priceAboveUpperBollinger": "价格已站上布林上轨。",
+      "reason.volumeExpanding": "成交量高于 20 根 K 线均量并正在放大。",
+      "reason.ma20AboveMa50": "MA20 位于 MA50 上方，短期趋势结构较好。",
+      "reason.priceAboveMa200": "价格位于 MA200 上方，长期结构仍偏建设性。",
+      "reason.phaseClassification": "当前指标将市场归类为{phase}。",
+      "reason.limitedHistory": "K 线历史不足，排名置信度会降低。",
+      "confirmation.closeAboveUpperBollinger":
+        "关注 {timeframe} 收盘能否站上布林上轨。",
+      "confirmation.volumeAbove1_5": "量能比需要升至 1.5 以上。",
+      "confirmation.breakoutVolume": "突破尝试需要持续高于 1.5 倍均量。",
+      "confirmation.rsiBelow72": "确认过程中 RSI 应保持在 72 以下。",
+      "confirmation.priceAboveMa50": "价格需要继续保持在 MA50 上方。",
+      "confirmation.pullbackHoldMa20OrMiddle":
+        "回踩应守住 MA20 或布林中轨附近。",
+      "confirmation.consolidateNearMa20": "如果价格回到 MA20 附近盘整，风险会改善。",
+      "confirmation.rsiCoolBelow72": "RSI 需要降温到 72 以下，结构才会改善。",
+      "confirmation.recoverMa50": "只有价格重新收复 MA50，结构才会改善。",
+      "confirmation.declineVolumeStabilize": "下跌时量能应稳定，而不是继续放大。",
+      "confirmation.ma20TurnAboveMa50": "MA20 需要上穿 MA50，才能强化趋势确认。",
+      "invalidation.loseBollingerMiddleWithVolume":
+        "如果价格放量跌破布林中轨，结构失效。",
+      "invalidation.closeBelowMa50": "如果价格重新收在 MA50 下方，结构失效。",
+      "invalidation.pullbackBelowMa50": "如果回踩收在 MA50 下方，结构失效。",
+      "invalidation.extensionBelowMa20": "如果延伸行情回落并收在 MA20 下方，结构失效。",
+      "invalidation.weakUntilRecoverMa50": "价格收复 MA50 之前，弱势结构仍未解除。",
+      "invalidation.closeBelowMa200": "如果价格收在 MA200 下方，长期结构会转弱。",
+      "warning.rsiAbove75": "RSI 高于 75，可能已经过度延伸。",
+      "warning.possibleFakeBreakout":
+        "可能是假突破：价格突破布林上轨，但量能确认不足。",
+      "warning.extendedFromMa20": "价格相对 MA20 延伸过多，追高风险上升。",
+      "warning.belowMa50": "价格低于 MA50，趋势结构偏弱。",
+      "warning.belowMa200": "价格低于 MA200，长期趋势仍偏弱。",
+      "warning.rsiBelow45": "RSI 低于 45，动能偏弱。",
+      "warning.longUpperWick": "最新 K 线有较长上影线，上方抛压明显。",
+      "warning.insufficientHistory": "K 线历史不足，无法完整计算所有指标。",
+    } satisfies Record<ScannerExplanationKey, string>,
     timeframe: {
       "1h": "1小时",
       "4h": "4小时",

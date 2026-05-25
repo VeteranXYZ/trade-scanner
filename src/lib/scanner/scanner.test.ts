@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { Candle, Timeframe } from "@/lib/exchanges/types";
 import type { IndicatorSnapshot } from "@/lib/indicators";
 import { determineMarketPhase } from "./marketPhase";
+import { getNextConfirmation } from "./explanations";
 import {
   calculateMultiTimeframeRankScore,
   summarizeMultiTimeframe,
@@ -189,6 +190,32 @@ describe("scanner signal labels", () => {
         riskScore: 80,
       }).state,
     ).toBe("WEAK");
+  });
+});
+
+describe("scanner explanations", () => {
+  it("returns structured keys with dynamic params instead of UI copy", () => {
+    expect(
+      getNextConfirmation({
+        phase: "SQUEEZE",
+        snapshot: makeSnapshot({
+          close: 100,
+          ma20: 100,
+          ma50: 101,
+          ma200: 95,
+          bbMiddle: 100,
+          bbUpper: 105,
+          widthPercentile: 10,
+          rsi14: 50,
+          volumeRatio: 0.9,
+        }),
+        sufficientHistory: true,
+        timeframe: "4h",
+      }),
+    ).toContainEqual({
+      key: "confirmation.closeAboveUpperBollinger",
+      params: { timeframe: "4h" },
+    });
   });
 });
 

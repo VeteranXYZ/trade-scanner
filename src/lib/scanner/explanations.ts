@@ -1,6 +1,6 @@
 import type { Timeframe } from "@/lib/exchanges/types";
 import type { IndicatorSnapshot } from "@/lib/indicators";
-import type { MarketPhase } from "./types";
+import type { MarketPhase, ScannerExplanation } from "./types";
 
 type ExplanationInput = {
   phase: MarketPhase;
@@ -13,37 +13,37 @@ export function getReasons({
   phase,
   snapshot,
   sufficientHistory,
-}: ExplanationInput): string[] {
-  const reasons: string[] = [];
+}: ExplanationInput): ScannerExplanation[] {
+  const reasons: ScannerExplanation[] = [];
 
   if (
     snapshot.bollinger.widthPercentile !== null &&
     snapshot.bollinger.widthPercentile < 20
   ) {
-    reasons.push("Bollinger Band width is in the lower 20% of recent candles.");
+    reasons.push({ key: "reason.bbWidthLow" });
   }
 
   if (areNear(snapshot.ma20, snapshot.ma50, 0.02)) {
-    reasons.push("MA20 and MA50 are converging.");
+    reasons.push({ key: "reason.ma20Ma50Converging" });
   }
 
   if (isNear(snapshot.close, snapshot.bollinger.middle, 0.025)) {
-    reasons.push("Price is holding near the Bollinger middle band.");
+    reasons.push({ key: "reason.priceNearBollingerMiddle" });
   }
 
   if (isBetween(snapshot.volume.ratio, 0.6, 1.2)) {
-    reasons.push("Volume is quiet, consistent with compression.");
+    reasons.push({ key: "reason.quietVolumeCompression" });
   }
 
   if (
     snapshot.bollinger.upper !== null &&
     snapshot.close > snapshot.bollinger.upper
   ) {
-    reasons.push("Price is above the upper Bollinger Band.");
+    reasons.push({ key: "reason.priceAboveUpperBollinger" });
   }
 
   if (snapshot.volume.ratio !== null && snapshot.volume.ratio > 1.5) {
-    reasons.push("Volume is expanding above its 20-candle average.");
+    reasons.push({ key: "reason.volumeExpanding" });
   }
 
   if (
@@ -51,19 +51,19 @@ export function getReasons({
     snapshot.ma50 !== null &&
     snapshot.ma20 > snapshot.ma50
   ) {
-    reasons.push("MA20 is above MA50, supporting short-term trend structure.");
+    reasons.push({ key: "reason.ma20AboveMa50" });
   }
 
   if (snapshot.ma200 !== null && snapshot.close > snapshot.ma200) {
-    reasons.push("Price is above MA200, keeping long-term structure constructive.");
+    reasons.push({ key: "reason.priceAboveMa200" });
   }
 
   if (reasons.length === 0 && sufficientHistory) {
-    reasons.push(`Current indicators classify the market as ${formatPhase(phase)}.`);
+    reasons.push({ key: "reason.phaseClassification", params: { phase } });
   }
 
   if (!sufficientHistory) {
-    reasons.push("The market has limited candle history, so ranking confidence is lower.");
+    reasons.push({ key: "reason.limitedHistory" });
   }
 
   return reasons;
@@ -73,35 +73,35 @@ export function getNextConfirmation({
   phase,
   snapshot,
   timeframe,
-}: ExplanationInput): string[] {
-  const confirmations: string[] = [];
-  const timeframeLabel = timeframe.toUpperCase();
+}: ExplanationInput): ScannerExplanation[] {
+  const confirmations: ScannerExplanation[] = [];
 
   if (phase === "SQUEEZE" || phase === "BASE_BUILDING") {
-    confirmations.push(
-      `Watch for a ${timeframeLabel} close above the upper Bollinger Band.`,
-    );
-    confirmations.push("Volume ratio should rise above 1.5.");
+    confirmations.push({
+      key: "confirmation.closeAboveUpperBollinger",
+      params: { timeframe },
+    });
+    confirmations.push({ key: "confirmation.volumeAbove1_5" });
   }
 
   if (phase === "BREAKOUT_ATTEMPT") {
-    confirmations.push("Breakout attempt needs sustained volume above 1.5x average.");
-    confirmations.push("RSI should remain below 72 during confirmation.");
+    confirmations.push({ key: "confirmation.breakoutVolume" });
+    confirmations.push({ key: "confirmation.rsiBelow72" });
   }
 
   if (phase === "TRENDING" || phase === "PULLBACK_HEALTHY") {
-    confirmations.push("Price should remain above MA50.");
-    confirmations.push("Pullbacks should hold near MA20 or the Bollinger middle band.");
+    confirmations.push({ key: "confirmation.priceAboveMa50" });
+    confirmations.push({ key: "confirmation.pullbackHoldMa20OrMiddle" });
   }
 
   if (phase === "OVEREXTENDED") {
-    confirmations.push("Risk improves if price consolidates closer to MA20.");
-    confirmations.push("RSI should cool below 72 before structure improves.");
+    confirmations.push({ key: "confirmation.consolidateNearMa20" });
+    confirmations.push({ key: "confirmation.rsiCoolBelow72" });
   }
 
   if (phase === "BREAKDOWN" || phase === "DISTRIBUTION") {
-    confirmations.push("Structure improves only if price recovers MA50.");
-    confirmations.push("Volume should stabilize instead of expanding on declines.");
+    confirmations.push({ key: "confirmation.recoverMa50" });
+    confirmations.push({ key: "confirmation.declineVolumeStabilize" });
   }
 
   if (
@@ -109,19 +109,20 @@ export function getNextConfirmation({
     snapshot.ma50 !== null &&
     snapshot.ma20 <= snapshot.ma50
   ) {
-    confirmations.push("MA20 should turn above MA50 for stronger trend confirmation.");
+    confirmations.push({ key: "confirmation.ma20TurnAboveMa50" });
   }
 
   return dedupe(confirmations);
 }
 
-export function getInvalidation({ phase, snapshot }: ExplanationInput): string[] {
-  const invalidation: string[] = [];
+export function getInvalidation({
+  phase,
+  snapshot,
+}: ExplanationInput): ScannerExplanation[] {
+  const invalidation: ScannerExplanation[] = [];
 
   if (phase === "SQUEEZE" || phase === "BASE_BUILDING") {
-    invalidation.push(
-      "Invalidated if price loses the Bollinger middle band with rising volume.",
-    );
+    invalidation.push({ key: "invalidation.loseBollingerMiddleWithVolume" });
   }
 
   if (
@@ -129,23 +130,23 @@ export function getInvalidation({ phase, snapshot }: ExplanationInput): string[]
     phase === "BREAKOUT_CONFIRMED" ||
     phase === "TRENDING"
   ) {
-    invalidation.push("Invalidated if price closes back below MA50.");
+    invalidation.push({ key: "invalidation.closeBelowMa50" });
   }
 
   if (phase === "PULLBACK_HEALTHY") {
-    invalidation.push("Invalidated if the pullback closes below MA50.");
+    invalidation.push({ key: "invalidation.pullbackBelowMa50" });
   }
 
   if (phase === "OVEREXTENDED") {
-    invalidation.push("Invalidated if extension resolves into a close below MA20.");
+    invalidation.push({ key: "invalidation.extensionBelowMa20" });
   }
 
   if (phase === "BREAKDOWN" || phase === "DISTRIBUTION") {
-    invalidation.push("Weak structure remains until price recovers MA50.");
+    invalidation.push({ key: "invalidation.weakUntilRecoverMa50" });
   }
 
   if (snapshot.ma200 !== null) {
-    invalidation.push("Long-term structure weakens if price closes below MA200.");
+    invalidation.push({ key: "invalidation.closeBelowMa200" });
   }
 
   return dedupe(invalidation);
@@ -171,14 +172,16 @@ function areNear(left: number | null, right: number | null, tolerance: number) {
   return Math.abs(left - right) / Math.abs(right) <= tolerance;
 }
 
-function formatPhase(phase: MarketPhase) {
-  return phase
-    .toLowerCase()
-    .split("_")
-    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
-    .join(" ");
-}
+function dedupe(items: ScannerExplanation[]) {
+  const seen = new Set<string>();
 
-function dedupe(items: string[]) {
-  return Array.from(new Set(items));
+  return items.filter((item) => {
+    const id = JSON.stringify(item);
+    if (seen.has(id)) {
+      return false;
+    }
+
+    seen.add(id);
+    return true;
+  });
 }

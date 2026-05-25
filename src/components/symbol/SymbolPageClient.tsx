@@ -17,6 +17,7 @@ import {
   type Timeframe,
 } from "@/lib/exchanges/types";
 import { calculateIndicatorSnapshot } from "@/lib/indicators";
+import { formatScannerExplanation } from "@/lib/i18n/formatScannerExplanation";
 import {
   summarizeMultiTimeframe,
   type MultiTimeframeSummary,
@@ -182,7 +183,10 @@ export function SymbolPageClient({ exchange, symbol }: SymbolPageClientProps) {
                     </h3>
                     <div className="space-y-2">
                       {scanResult.warnings.map((warning) => (
-                        <RiskBadge key={warning} label={warning} />
+                        <RiskBadge
+                          key={`${warning.key}-${JSON.stringify(warning.params ?? {})}`}
+                          label={formatScannerExplanation(warning, t)}
+                        />
                       ))}
                     </div>
                   </div>

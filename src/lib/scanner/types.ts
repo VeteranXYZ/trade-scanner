@@ -25,6 +25,51 @@ export type ScannerSignal = {
   summary: string;
 };
 
+export type ScannerExplanationKey =
+  | "reason.bbWidthLow"
+  | "reason.ma20Ma50Converging"
+  | "reason.priceNearBollingerMiddle"
+  | "reason.quietVolumeCompression"
+  | "reason.priceAboveUpperBollinger"
+  | "reason.volumeExpanding"
+  | "reason.ma20AboveMa50"
+  | "reason.priceAboveMa200"
+  | "reason.phaseClassification"
+  | "reason.limitedHistory"
+  | "confirmation.closeAboveUpperBollinger"
+  | "confirmation.volumeAbove1_5"
+  | "confirmation.breakoutVolume"
+  | "confirmation.rsiBelow72"
+  | "confirmation.priceAboveMa50"
+  | "confirmation.pullbackHoldMa20OrMiddle"
+  | "confirmation.consolidateNearMa20"
+  | "confirmation.rsiCoolBelow72"
+  | "confirmation.recoverMa50"
+  | "confirmation.declineVolumeStabilize"
+  | "confirmation.ma20TurnAboveMa50"
+  | "invalidation.loseBollingerMiddleWithVolume"
+  | "invalidation.closeBelowMa50"
+  | "invalidation.pullbackBelowMa50"
+  | "invalidation.extensionBelowMa20"
+  | "invalidation.weakUntilRecoverMa50"
+  | "invalidation.closeBelowMa200"
+  | "warning.rsiAbove75"
+  | "warning.possibleFakeBreakout"
+  | "warning.extendedFromMa20"
+  | "warning.belowMa50"
+  | "warning.belowMa200"
+  | "warning.rsiBelow45"
+  | "warning.longUpperWick"
+  | "warning.insufficientHistory";
+
+export type ScannerExplanation = {
+  key: ScannerExplanationKey;
+  params?: {
+    timeframe?: Timeframe;
+    phase?: MarketPhase;
+  };
+};
+
 export type MultiTimeframeAlignment =
   | "STRONG_ALIGNMENT"
   | "EARLY_4H_SIGNAL"
@@ -75,10 +120,10 @@ export type ScanResult = {
     ma20AboveMA50: boolean;
     ma50AboveMA200: boolean;
   };
-  reasons: string[];
-  warnings: string[];
-  nextConfirmation: string[];
-  invalidation: string[];
+  reasons: ScannerExplanation[];
+  warnings: ScannerExplanation[];
+  nextConfirmation: ScannerExplanation[];
+  invalidation: ScannerExplanation[];
   dataQuality: {
     candleCount: number;
     sufficientHistory: boolean;
