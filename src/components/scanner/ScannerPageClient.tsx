@@ -6,7 +6,11 @@ import { ScannerFilters, type ScannerSortKey } from "./ScannerFilters";
 import { ScannerTable } from "./ScannerTable";
 import { SelectedSymbolPanel } from "./SelectedSymbolPanel";
 import type { Timeframe } from "@/lib/exchanges/types";
-import type { MarketPhase, ScanResult } from "@/lib/scanner/types";
+import type {
+  MarketPhase,
+  ScannerSignalState,
+  ScanResult,
+} from "@/lib/scanner/types";
 
 type ScanApiResponse = {
   exchange: "binance";
@@ -20,6 +24,7 @@ type ScanApiResponse = {
 
 export type ScannerFiltersState = {
   timeframe: Timeframe;
+  signal: ScannerSignalState | "ALL";
   phase: MarketPhase | "ALL";
   minOpportunityScore: number;
   maxRiskScore: number;
@@ -29,6 +34,7 @@ export type ScannerFiltersState = {
 
 const initialFilters: ScannerFiltersState = {
   timeframe: "4h",
+  signal: "ALL",
   phase: "ALL",
   minOpportunityScore: 0,
   maxRiskScore: 100,
@@ -100,12 +106,13 @@ async function fetchScan(timeframe: Timeframe, limit: number) {
   return (await response.json()) as ScanApiResponse;
 }
 
-function filterAndSortResults(
+export function filterAndSortResults(
   results: ScanResult[],
   filters: ScannerFiltersState,
 ) {
   const filtered = results.filter((result) => {
     return (
+      (filters.signal === "ALL" || result.signal.state === filters.signal) &&
       (filters.phase === "ALL" || result.phase === filters.phase) &&
       result.opportunityScore >= filters.minOpportunityScore &&
       result.riskScore <= filters.maxRiskScore
