@@ -370,6 +370,7 @@ function makeResult({
     rsi14: 55,
     bbWidthPercentile: 20,
     volumeRatio: 1,
+    volume: makeVolume(),
     maStatus: {
       aboveMA20: true,
       aboveMA50: true,
@@ -388,5 +389,24 @@ function makeResult({
       usesClosedCandles: true,
       lastClosedCandleTime: Date.parse("2026-05-25T00:00:00.000Z"),
     },
+  };
+}
+
+function makeVolume() {
+  return {
+    latest: 1000,
+    ma20: 1000,
+    ma50: 1000,
+    ratio20: 1,
+    ratio50: 1,
+    quoteVolumeLatest: 100_000,
+    quoteVolumeMA20: 100_000,
+    dryUp: false,
+    expanding: false,
+    abnormalSpike: false,
+    breakoutConfirmed: false,
+    pullbackHealthy: false,
+    distributionWarning: false,
+    quietCompression: false,
   };
 }

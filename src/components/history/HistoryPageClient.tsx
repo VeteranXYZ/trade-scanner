@@ -2,10 +2,56 @@
 
 import { useQuery } from "@tanstack/react-query";
 import { useLanguage } from "@/components/providers/LanguageProvider";
-import type { EvaluationSummaryBucket } from "@/lib/storage/scanEvaluation";
-import type { StoredScanSnapshot } from "@/lib/storage/scanSnapshotModel";
+import type {
+  MarketPhase,
+  MultiTimeframeAlignment,
+  ScannerSignalState,
+} from "@/lib/shared/scannerTypes";
+import type { Timeframe } from "@/lib/shared/timeframes";
 
 type Dictionary = ReturnType<typeof useLanguage>["dictionary"];
+
+type EvaluationSummaryBucket = {
+  completedCount: number;
+  pendingCount: number;
+  hitRate: number | null;
+  avgReturnPct: number | null;
+  avgMaxUpPct: number | null;
+  avgMaxDownPct: number | null;
+};
+
+type StoredScanSnapshot = {
+  id: string;
+  createdAt: string;
+  exchange: "binance";
+  mode: "single" | "mtf";
+  timeframe?: Timeframe;
+  preset?: string;
+  timeframes?: Timeframe[];
+  limit: number;
+  itemCount: number;
+  errorsCount: number;
+  results: Array<{
+    symbol: string;
+    timeframe: Timeframe;
+    price: number;
+    phase: MarketPhase;
+    signalState: ScannerSignalState;
+    signalLabel: string;
+    rankScore: number;
+    opportunityScore: number;
+    confirmationScore: number;
+    riskScore: number;
+    multiTimeframe?: {
+      alignment: MultiTimeframeAlignment;
+      label: string;
+      rankScore: number;
+      constructiveCount: number;
+      riskCount: number;
+      timeframes: Timeframe[];
+    };
+  }>;
+};
 
 type HistoryApiResponse = {
   snapshots: StoredScanSnapshot[];

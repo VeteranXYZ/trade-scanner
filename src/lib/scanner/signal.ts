@@ -1,25 +1,10 @@
+import {
+  scannerSignalLabels,
+  scannerSignalOrder,
+} from "@/lib/shared/scannerConfig";
 import type { MarketPhase, ScannerSignal } from "./types";
 
-export const scannerSignalOrder = [
-  "WATCHLIST",
-  "CONFIRMED",
-  "TREND_CONTINUATION",
-  "HIGH_RISK",
-  "WEAK",
-  "NEUTRAL",
-] as const;
-
-export const scannerSignalLabels: Record<
-  (typeof scannerSignalOrder)[number],
-  string
-> = {
-  WATCHLIST: "Watchlist",
-  CONFIRMED: "Confirmed",
-  TREND_CONTINUATION: "Trend",
-  HIGH_RISK: "High Risk",
-  WEAK: "Weak",
-  NEUTRAL: "Neutral",
-};
+export { scannerSignalLabels, scannerSignalOrder };
 
 type SignalInput = {
   phase: MarketPhase;

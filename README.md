@@ -77,7 +77,7 @@ Remote Binance is the default and sufficient scanner source for Phase 1. The app
 
 ```txt
 DISABLE_LOCAL_SQLITE=true
-NEXT_PUBLIC_DEPLOY_TARGET=cloudflare
+DEPLOY_TARGET=cloudflare
 ```
 
 These values are set in `wrangler.jsonc`. Cloudflare production uses Remote Binance only; local SQLite code is isolated behind local Node.js branches. `source=local` returns a friendly `501` in Cloudflare production.
@@ -180,11 +180,16 @@ Implemented:
 - Bollinger Band Width Percentile over recent valid widths
 - RSI14
 - Volume MA20
-- Volume Ratio
+- Volume MA50
+- Quote Volume MA20 when Binance kline quote volume is available
+- Volume Ratio 20 / 50
+- Volume dry-up, expansion, abnormal spike, breakout confirmation, healthy pullback, and distribution-warning context
 - MACD 12/26/9
 - Price extension from MA20
 
 MACD is used as a confirmation input for momentum improvement, crosses, and weakening warnings. It is not treated as a standalone trading signal. KDJ is intentionally not included in Phase 1 to avoid adding noisy or overfit confirmation layers.
+
+Volume analysis uses the volume and quote-volume fields already included in Binance kline responses, so it does not add extra Binance requests. Volume acts as confirmation and risk context: breakout without volume is not treated as strong confirmation, quiet volume during compression is a setup/watchlist clue rather than confirmation, and abnormal volume spikes can increase risk when the structure is extended or distribution-like.
 
 Short candle arrays return `null` for unavailable indicators instead of throwing.
 
@@ -201,13 +206,13 @@ The rank score is only used for sorting:
 
 ```txt
 rankScore =
-  opportunityScore * 0.45 +
-  confirmationScore * 0.35 -
-  riskScore * 0.25 -
+  opportunityScore * 0.40 +
+  confirmationScore * 0.40 -
+  riskScore * 0.30 -
   phase/risk penalties
 ```
 
-All component scores remain visible in the UI. Compression remains visible as a reason, but weak structures are capped so breakdowns or prices below both MA50 and MA200 are not ranked as high-opportunity solely because volatility is compressed.
+All component scores remain visible in the UI. Structure remains the base layer, while volume mainly adjusts confirmation and risk. Compression remains visible as a reason, but weak structures are capped so breakdowns or prices below both MA50 and MA200 are not ranked as high-opportunity solely because volatility or volume is compressed. The scanner remains a research/filtering tool, not a trading signal or execution system.
 
 Market phases:
 

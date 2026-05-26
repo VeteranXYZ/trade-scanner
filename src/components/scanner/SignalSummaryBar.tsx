@@ -1,5 +1,5 @@
 import { useLanguage } from "@/components/providers/LanguageProvider";
-import type { ScannerSignalState } from "@/lib/scanner/types";
+import type { ScannerSignalState } from "@/lib/shared/scannerTypes";
 import { signalToneClass } from "./SignalBadge";
 
 export type SignalSummaryItem = {

@@ -12,6 +12,7 @@ import { scanCandles } from "./scanCandles";
 import { calculateScannerScores, clampScore } from "./scoring";
 import { deriveScannerSignal } from "./signal";
 import type { MarketPhase, ScannerSignalState, ScanResult } from "./types";
+import { getVolumeAnalysis } from "./volumeAnalysis";
 
 describe("scanner phase classification", () => {
   it("classifies squeeze when width is low and averages converge", () => {
@@ -118,7 +119,7 @@ describe("scanner scoring", () => {
     expect(scores.opportunityScore).toBe(100);
     expect(scores.confirmationScore).toBe(50);
     expect(scores.riskScore).toBe(0);
-    expect(scores.rankScore).toBeCloseTo(62.5, 6);
+    expect(scores.rankScore).toBeCloseTo(60, 6);
   });
 
   it("demotes high-risk phases in risk and rank scores", () => {
@@ -238,6 +239,138 @@ describe("scanner scoring", () => {
 
     expect(scores.opportunityScore).toBeLessThanOrEqual(50);
   });
+
+  it("treats squeeze volume dry-up as setup opportunity, not confirmation", () => {
+    const scores = calculateScannerScores({
+      snapshot: makeSnapshot({
+        close: 100,
+        ma20: 100,
+        ma50: 99,
+        ma200: 95,
+        bbMiddle: 100,
+        bbUpper: 105,
+        widthPercentile: 10,
+        rsi14: 50,
+        volumeRatio: 0.5,
+      }),
+      sufficientHistory: true,
+      phase: "SQUEEZE",
+      volume: makeVolume({
+        ratio20: 0.5,
+        dryUp: true,
+        quietCompression: true,
+      }),
+    });
+
+    expect(scores.opportunityScore).toBeGreaterThanOrEqual(80);
+    expect(scores.confirmationScore).toBe(35);
+  });
+
+  it("rewards breakout volume expansion as confirmation", () => {
+    const baseSnapshot = makeSnapshot({
+      close: 112,
+      ma20: 105,
+      ma50: 100,
+      ma200: 90,
+      bbMiddle: 100,
+      bbUpper: 110,
+      widthPercentile: 40,
+      rsi14: 64,
+      volumeRatio: 1,
+    });
+    const weakScores = calculateScannerScores({
+      snapshot: baseSnapshot,
+      sufficientHistory: true,
+      phase: "BREAKOUT_ATTEMPT",
+      volume: makeVolume({ ratio20: 1 }),
+    });
+    const confirmedScores = calculateScannerScores({
+      snapshot: makeSnapshot({
+        close: 112,
+        ma20: 105,
+        ma50: 100,
+        ma200: 90,
+        bbMiddle: 100,
+        bbUpper: 110,
+        widthPercentile: 40,
+        rsi14: 64,
+        volumeRatio: 1.8,
+      }),
+      sufficientHistory: true,
+      phase: "BREAKOUT_ATTEMPT",
+      volume: makeVolume({
+        ratio20: 1.8,
+        expanding: true,
+        breakoutConfirmed: true,
+      }),
+    });
+
+    expect(confirmedScores.confirmationScore).toBeGreaterThan(
+      weakScores.confirmationScore,
+    );
+  });
+
+  it("raises risk and lowers rank for overextended abnormal volume spikes", () => {
+    const snapshot = makeSnapshot({
+      close: 113,
+      ma20: 104,
+      ma50: 100,
+      ma200: 90,
+      bbMiddle: 104,
+      bbUpper: 112,
+      widthPercentile: 80,
+      rsi14: 70,
+      volumeRatio: 3.2,
+      priceExtensionFromMA20: 0.086,
+    });
+    const baseScores = calculateScannerScores({
+      snapshot,
+      sufficientHistory: true,
+      phase: "OVEREXTENDED",
+      volume: makeVolume({ ratio20: 1 }),
+    });
+    const spikeScores = calculateScannerScores({
+      snapshot,
+      sufficientHistory: true,
+      phase: "OVEREXTENDED",
+      volume: makeVolume({
+        ratio20: 3.2,
+        expanding: true,
+        abnormalSpike: true,
+      }),
+    });
+
+    expect(spikeScores.riskScore).toBeGreaterThan(baseScores.riskScore);
+    expect(spikeScores.rankScore).toBeLessThan(baseScores.rankScore);
+  });
+
+  it("raises risk for high-volume breakdowns", () => {
+    const snapshot = makeSnapshot({
+      close: 80,
+      ma20: 82,
+      ma50: 90,
+      ma200: 100,
+      bbMiddle: 80,
+      bbUpper: 84,
+      widthPercentile: 25,
+      rsi14: 38,
+      volumeRatio: 1.8,
+    });
+    const normalScores = calculateScannerScores({
+      snapshot,
+      sufficientHistory: true,
+      phase: "BREAKDOWN",
+      volume: makeVolume({ ratio20: 1 }),
+    });
+    const highVolumeScores = calculateScannerScores({
+      snapshot,
+      sufficientHistory: true,
+      phase: "BREAKDOWN",
+      volume: makeVolume({ ratio20: 1.8, expanding: true }),
+    });
+
+    expect(highVolumeScores.riskScore).toBeGreaterThan(normalScores.riskScore);
+  });
 });
 
 describe("scanner candle quality", () => {
@@ -270,6 +403,71 @@ describe("scanner candle quality", () => {
     } finally {
       vi.useRealTimers();
     }
+  });
+});
+
+describe("scanner volume analysis", () => {
+  it("detects breakout volume confirmation", () => {
+    const volume = getVolumeAnalysis({
+      phase: "BREAKOUT_ATTEMPT",
+      snapshot: makeSnapshot({
+        close: 112,
+        ma20: 105,
+        ma50: 100,
+        ma200: 90,
+        bbMiddle: 100,
+        bbUpper: 110,
+        widthPercentile: 40,
+        rsi14: 64,
+        volumeRatio: 1.8,
+      }),
+      candles: [makeCandle({ close: 112, volume: 1800 })],
+    });
+
+    expect(volume.expanding).toBe(true);
+    expect(volume.breakoutConfirmed).toBe(true);
+  });
+
+  it("detects healthy pullback volume contraction", () => {
+    const volume = getVolumeAnalysis({
+      phase: "PULLBACK_HEALTHY",
+      snapshot: makeSnapshot({
+        close: 101,
+        ma20: 100,
+        ma50: 98,
+        ma200: 90,
+        bbMiddle: 100,
+        bbUpper: 110,
+        widthPercentile: 45,
+        rsi14: 52,
+        volumeRatio: 0.8,
+      }),
+      candles: [makeCandle({ open: 100, close: 101, high: 102, low: 99 })],
+    });
+
+    expect(volume.pullbackHealthy).toBe(true);
+    expect(volume.distributionWarning).toBe(false);
+  });
+
+  it("detects distribution-like volume near extension", () => {
+    const volume = getVolumeAnalysis({
+      phase: "OVEREXTENDED",
+      snapshot: makeSnapshot({
+        close: 113,
+        ma20: 104,
+        ma50: 100,
+        ma200: 90,
+        bbMiddle: 104,
+        bbUpper: 114,
+        widthPercentile: 70,
+        rsi14: 78,
+        volumeRatio: 2,
+        priceExtensionFromMA20: 0.09,
+      }),
+      candles: [makeCandle({ open: 116, close: 113, high: 120, low: 112 })],
+    });
+
+    expect(volume.distributionWarning).toBe(true);
   });
 });
 
@@ -336,6 +534,57 @@ describe("scanner MACD warnings", () => {
     expect(warnings).toContainEqual({
       key: "warning.macdBearishCross",
     });
+  });
+});
+
+describe("scanner volume warnings", () => {
+  it("warns when a breakout lacks volume confirmation", () => {
+    const warnings = getRiskWarnings({
+      phase: "BREAKOUT_ATTEMPT",
+      snapshot: makeSnapshot({
+        close: 112,
+        ma20: 105,
+        ma50: 100,
+        ma200: 90,
+        bbMiddle: 100,
+        bbUpper: 110,
+        widthPercentile: 40,
+        rsi14: 64,
+        volumeRatio: 0.8,
+      }),
+      volume: makeVolume({ ratio20: 0.8 }),
+      candles: [makeCandle({ close: 112 })],
+      sufficientHistory: true,
+    });
+
+    expect(warnings).toContainEqual({ key: "warning.breakoutWithoutVolume" });
+  });
+
+  it("warns on distribution-like volume", () => {
+    const warnings = getRiskWarnings({
+      phase: "OVEREXTENDED",
+      snapshot: makeSnapshot({
+        close: 113,
+        ma20: 104,
+        ma50: 100,
+        ma200: 90,
+        bbMiddle: 104,
+        bbUpper: 114,
+        widthPercentile: 70,
+        rsi14: 78,
+        volumeRatio: 2,
+        priceExtensionFromMA20: 0.09,
+      }),
+      volume: makeVolume({
+        ratio20: 2,
+        expanding: true,
+        distributionWarning: true,
+      }),
+      candles: [makeCandle({ open: 116, close: 113, high: 120, low: 112 })],
+      sufficientHistory: true,
+    });
+
+    expect(warnings).toContainEqual({ key: "warning.distributionVolume" });
   });
 });
 
@@ -517,8 +766,17 @@ function makeSnapshot({
     rsi14,
     volume: {
       current: 1000,
+      latest: 1000,
       ma20: volumeRatio === null ? null : 1000 / volumeRatio,
+      ma50: volumeRatio === null ? null : 1000 / volumeRatio,
       ratio: volumeRatio,
+      ratio20: volumeRatio,
+      ratio50: volumeRatio,
+      quoteVolumeLatest: 100_000,
+      quoteVolumeMA20: 100_000,
+      dryUp: volumeRatio !== null && volumeRatio < 0.6,
+      expanding: volumeRatio !== null && volumeRatio >= 1.5,
+      abnormalSpike: volumeRatio !== null && volumeRatio >= 3,
     },
     macd,
     priceExtensionFromMA20,
@@ -561,6 +819,7 @@ function makeScanResult(
     rsi14: 55,
     bbWidthPercentile: 20,
     volumeRatio: 1,
+    volume: makeVolume(),
     maStatus: {
       aboveMA20: true,
       aboveMA50: true,
@@ -577,5 +836,25 @@ function makeScanResult(
       sufficientHistory: true,
       missingIndicators: [],
     },
+  };
+}
+
+function makeVolume(overrides: Partial<ScanResult["volume"]> = {}) {
+  return {
+    latest: 1000,
+    ma20: 1000,
+    ma50: 1000,
+    ratio20: 1,
+    ratio50: 1,
+    quoteVolumeLatest: 100_000,
+    quoteVolumeMA20: 100_000,
+    dryUp: false,
+    expanding: false,
+    abnormalSpike: false,
+    breakoutConfirmed: false,
+    pullbackHealthy: false,
+    distributionWarning: false,
+    quietCompression: false,
+    ...overrides,
   };
 }

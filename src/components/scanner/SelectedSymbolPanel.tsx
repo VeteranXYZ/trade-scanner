@@ -6,7 +6,7 @@ import { RiskBadge } from "./RiskBadge";
 import { ScoreBadge } from "./ScoreBadge";
 import { SignalBadge } from "./SignalBadge";
 import { StrategyReadPanel } from "./StrategyReadPanel";
-import type { ScanResult } from "@/lib/scanner/types";
+import type { ScanResult } from "@/lib/shared/scannerTypes";
 import { formatScannerExplanation } from "@/lib/i18n/formatScannerExplanation";
 
 type SelectedSymbolPanelProps = {
@@ -134,6 +134,28 @@ export function SelectedSymbolPanel({ result }: SelectedSymbolPanelProps) {
           <Metric label={t.scanner.macd} value={formatMacdStatus(result, t)} />
         </div>
 
+        <div className="mb-4 rounded-md border border-[var(--border)] bg-[#0b0f14] p-3">
+          <h3 className="mb-3 text-sm font-semibold">{t.scanner.volumeDetails}</h3>
+          <div className="grid grid-cols-2 gap-2 text-sm">
+            <Metric
+              label={t.scanner.volumeLatest}
+              value={formatCompactNumber(result.volume.latest)}
+            />
+            <Metric
+              label={t.scanner.volumeMa20}
+              value={formatNullable(result.volume.ma20, 0)}
+            />
+            <Metric
+              label={t.scanner.volumeRatio20}
+              value={formatNullable(result.volume.ratio20, 2)}
+            />
+            <Metric
+              label={t.scanner.volumeState}
+              value={formatVolumeState(result, t)}
+            />
+          </div>
+        </div>
+
         <div className="space-y-4">
           <ReasonList title={t.scanner.reasons} items={result.reasons} />
           {result.warnings.length > 0 && (
@@ -189,6 +211,17 @@ function formatPrice(value: number) {
   return value.toFixed(6);
 }
 
+function formatCompactNumber(value: number | null | undefined) {
+  if (value === null || value === undefined) {
+    return "n/a";
+  }
+
+  return new Intl.NumberFormat(undefined, {
+    notation: "compact",
+    maximumFractionDigits: 2,
+  }).format(value);
+}
+
 function formatMacdStatus(
   result: ScanResult,
   dictionary: ReturnType<typeof useLanguage>["dictionary"],
@@ -210,4 +243,35 @@ function formatMacdStatus(
   }
 
   return dictionary.scanner.macdImproving;
+}
+
+function formatVolumeState(
+  result: ScanResult,
+  dictionary: ReturnType<typeof useLanguage>["dictionary"],
+) {
+  if (result.volume.distributionWarning) {
+    return dictionary.scanner.volumeDistributionWarning;
+  }
+
+  if (result.volume.abnormalSpike) {
+    return dictionary.scanner.volumeAbnormalSpike;
+  }
+
+  if (result.volume.breakoutConfirmed) {
+    return dictionary.scanner.volumeBreakoutConfirmed;
+  }
+
+  if (result.volume.pullbackHealthy) {
+    return dictionary.scanner.volumePullbackHealthy;
+  }
+
+  if (result.volume.expanding) {
+    return dictionary.scanner.volumeExpanding;
+  }
+
+  if (result.volume.dryUp) {
+    return dictionary.scanner.volumeDryUp;
+  }
+
+  return dictionary.scanner.volumeNeutral;
 }

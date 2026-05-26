@@ -1,5 +1,5 @@
 import { useLanguage } from "@/components/providers/LanguageProvider";
-import type { ScanResult } from "@/lib/scanner/types";
+import type { ScanResult } from "@/lib/shared/scannerTypes";
 
 type StrategyReadPanelProps = {
   result: ScanResult;

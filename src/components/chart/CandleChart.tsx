@@ -11,7 +11,7 @@ import {
   type UTCTimestamp,
 } from "lightweight-charts";
 import { useEffect, useMemo, useRef } from "react";
-import type { Candle } from "@/lib/exchanges/types";
+import type { Candle } from "@/lib/shared/timeframes";
 import { calculateBollingerSeries, calculateSmaSeries } from "@/lib/indicators";
 
 type CandleChartProps = {

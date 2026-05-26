@@ -1,5 +1,5 @@
 import type { useLanguage } from "@/components/providers/LanguageProvider";
-import type { ScannerExplanation } from "@/lib/scanner/types";
+import type { ScannerExplanation } from "@/lib/shared/scannerTypes";
 
 type Dictionary = ReturnType<typeof useLanguage>["dictionary"];
 

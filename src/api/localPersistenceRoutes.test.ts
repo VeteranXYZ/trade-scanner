@@ -42,7 +42,7 @@ describe("local persistence route guards", () => {
   });
 
   it("blocks Cloudflare data sync instead of using a remote database", async () => {
-    vi.stubEnv("NEXT_PUBLIC_DEPLOY_TARGET", "cloudflare");
+    vi.stubEnv("DEPLOY_TARGET", "cloudflare");
 
     const response = await postDataSync(
       new Request("http://localhost/api/data/sync", {

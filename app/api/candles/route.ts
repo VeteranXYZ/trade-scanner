@@ -3,10 +3,13 @@ import { cacheKeys } from "@/lib/cache/keys";
 import { getCached } from "@/lib/cache/memory";
 import { getCandles } from "@/lib/exchanges/binance";
 import { TIMEFRAMES, type Candle, type Timeframe } from "@/lib/exchanges/types";
+import { calculateIndicatorSnapshot } from "@/lib/indicators";
+import { publicErrorMessage } from "@/lib/runtime/publicErrors";
 import {
   isLocalPersistenceDisabled,
   localPersistenceUnavailableMessage,
 } from "@/lib/runtime/localPersistence";
+import { scanCandles } from "@/lib/scanner/scanCandles";
 
 const DEFAULT_CANDLE_LIMIT = 300;
 const MAX_CANDLE_LIMIT = 1000;
@@ -71,8 +74,7 @@ export async function GET(request: Request) {
           symbol,
           timeframe,
           source: "local",
-          candles,
-          itemCount: candles.length,
+          ...buildCandleAnalysis(symbol, timeframe, candles),
           cached: false,
           updatedAt: new Date().toISOString(),
         });
@@ -90,8 +92,7 @@ export async function GET(request: Request) {
         symbol,
         timeframe,
         source: "remote",
-        candles: cachedEntry.value,
-        itemCount: cachedEntry.value.length,
+        ...buildCandleAnalysis(symbol, timeframe, cachedEntry.value),
         cached: true,
         updatedAt: cachedEntry.updatedAt,
       });
@@ -105,20 +106,38 @@ export async function GET(request: Request) {
       symbol,
       timeframe,
       source: "remote",
-      candles,
-      itemCount: candles.length,
+      ...buildCandleAnalysis(symbol, timeframe, candles),
       cached: false,
       updatedAt: storedEntry?.updatedAt ?? new Date().toISOString(),
     });
   } catch (error) {
+    console.error("candles route failed", error);
     return NextResponse.json(
       {
         error: "Failed to fetch Binance candles.",
-        message: error instanceof Error ? error.message : "Unknown error",
+        message: publicErrorMessage("Remote market data request failed."),
       },
       { status: 502 },
     );
   }
+}
+
+function buildCandleAnalysis(symbol: string, timeframe: Timeframe, candles: Candle[]) {
+  if (candles.length === 0) {
+    return {
+      candles,
+      snapshot: null,
+      scanResult: null,
+      itemCount: 0,
+    };
+  }
+
+  return {
+    candles,
+    snapshot: calculateIndicatorSnapshot(candles),
+    scanResult: scanCandles(symbol, timeframe, candles),
+    itemCount: candles.length,
+  };
 }
 
 function localPersistenceUnavailableResponse() {

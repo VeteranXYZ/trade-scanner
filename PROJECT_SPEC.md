@@ -105,7 +105,10 @@ MVP scope:
   - Bollinger Band Width Percentile
   - RSI14
   - Volume MA20
-  - Volume Ratio
+  - Volume MA50
+  - Quote Volume MA20 when available
+  - Volume Ratio 20 / 50
+  - Volume dry-up, expansion, abnormal spike, breakout confirmation, healthy pullback, and distribution-warning context
   - MACD 12/26/9
   - Price extension from MA20
 - Output:
@@ -219,7 +222,7 @@ Remote Binance is the default and sufficient scan source for Phase 1. The app is
 
 ```txt
 DISABLE_LOCAL_SQLITE=true
-NEXT_PUBLIC_DEPLOY_TARGET=cloudflare
+DEPLOY_TARGET=cloudflare
 ```
 
 When those flags are active, Cloudflare production uses `source=remote` only. `source=local` and local sync routes return a friendly `501`. SQLite modules remain isolated behind local Node.js branches. D1 is future optional only and is not configured for Phase 1.
@@ -603,11 +606,16 @@ Calculate:
 - Bollinger Band Width Percentile over the last 90 valid width values
 - RSI14
 - Volume MA20
-- Volume Ratio
+- Volume MA50
+- Quote Volume MA20 when available
+- Volume Ratio 20 / 50
+- Volume dry-up, expansion, abnormal spike, breakout confirmation, healthy pullback, and distribution-warning context
 - MACD 12/26/9
 - Price extension from MA20
 
 MACD is a conservative confirmation input only. It can support confirmation when histogram momentum improves, a bullish cross appears, or MACD remains above zero in constructive phases. It must not become a standalone trading signal. KDJ is intentionally excluded from Phase 1 to reduce noise and overfitting.
+
+Volume analysis is a confirmation and risk layer, not a standalone trading signal. It uses the volume and quote-volume fields already returned by Binance klines, so it must not increase Binance requests. Breakout without volume is not strong confirmation, quiet volume compression is a setup/watchlist clue, and abnormal volume spikes can be risk when price is extended, closes weak, or shows distribution-like candles.
 
 ### 6.4 Null behavior
 
@@ -837,7 +845,8 @@ Add points for:
 - MA20 and MA50 convergence
 - Price near Bollinger middle band
 - RSI not overextended
-- Volume quiet during compression
+- Quiet volume compression or volume dry-up during compression
+- Healthy pullback with contracted volume
 - Sufficient candle history
 
 Example logic:
@@ -848,6 +857,8 @@ Example logic:
 +15 if price is near Bollinger middle band
 +10 if RSI between 40 and 65
 +10 if volume ratio between 0.6 and 1.2 during compression
++10 if BB compression aligns with quiet volume or volume dry-up
++10 if a healthy pullback has contracted volume
 +15 if trend context is not broken
 ```
 
@@ -864,16 +875,20 @@ Confirmation score measures whether the setup is already being confirmed.
 Add points for:
 
 - Close above upper Bollinger Band
-- Volume ratio > 1.5
+- Breakout volume confirmed
+- Volume expansion in constructive phases
 - MA20 > MA50
 - Price > MA200
 - RSI between 55 and 72
+- MACD confirmation when available
 
 Example logic:
 
 ```txt
 +25 if close > upper Bollinger Band
-+25 if volume ratio > 1.5
++20 if breakout volume is confirmed
++10 if volume expands in a constructive phase
++10 if volume expands while price is above MA50 and MA200
 +20 if MA20 > MA50
 +15 if price > MA200
 +15 if RSI is between 55 and 72
@@ -889,6 +904,9 @@ Add points for:
 - Price far above MA20
 - Price below MA50 or MA200
 - Breakout without volume
+- Abnormal volume spike with extension or overextended RSI
+- Distribution-like volume warning
+- High-volume breakdown below MA50/MA200
 - Long upper wick
 - Insufficient history
 - Market regime weak
@@ -900,6 +918,8 @@ Example logic:
 +20 if price extension from MA20 > 8%
 +20 if price < MA50
 +25 if close > upper Bollinger Band but volumeRatio < 1.2
++20 if distribution-like volume appears
++20 if high volume confirms a breakdown below key averages
 +10 if candle history is insufficient
 ```
 
@@ -911,9 +931,9 @@ Initial formula:
 
 ```txt
 rankScore =
-  opportunityScore * 0.45 +
-  confirmationScore * 0.35 -
-  riskScore * 0.25 -
+  opportunityScore * 0.40 +
+  confirmationScore * 0.40 -
+  riskScore * 0.30 -
   phase/risk penalties
 ```
 

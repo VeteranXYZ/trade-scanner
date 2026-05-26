@@ -1,6 +1,6 @@
 import { useLanguage } from "@/components/providers/LanguageProvider";
 import { formatScannerExplanation } from "@/lib/i18n/formatScannerExplanation";
-import type { ScannerExplanation } from "@/lib/scanner/types";
+import type { ScannerExplanation } from "@/lib/shared/scannerTypes";
 
 type ReasonListProps = {
   title: string;

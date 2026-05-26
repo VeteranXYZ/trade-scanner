@@ -1,9 +1,12 @@
-import type { MarketPhase, ScannerSignalState } from "@/lib/scanner/types";
-import { scannerSignalOrder } from "@/lib/scanner/signal";
+import {
+  mtfPresetTimeframes,
+  scannerSignalOrder,
+  type MtfPreset,
+} from "@/lib/shared/scannerConfig";
+import type { MarketPhase, ScannerSignalState } from "@/lib/shared/scannerTypes";
 import type { ScannerFiltersState } from "./ScannerPageClient";
-import { TIMEFRAMES } from "@/lib/exchanges/types";
-import { mtfPresetTimeframes, type MtfPreset } from "@/lib/scanner/multiTimeframe";
 import { useLanguage } from "@/components/providers/LanguageProvider";
+import { TIMEFRAMES } from "@/lib/shared/timeframes";
 
 export type ScannerSortKey =
   | "rankScore"

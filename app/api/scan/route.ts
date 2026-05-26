@@ -10,6 +10,7 @@ import {
 } from "@/lib/runtime/localPersistence";
 import {
   summarizeScanFailures,
+  toPublicScanErrorSample,
   type ScanErrorSample,
   type ScanFailureSummary,
 } from "@/lib/scanner/diagnostics";
@@ -175,7 +176,10 @@ export async function GET(request: Request) {
       failureSummary,
       results,
       itemCount: results.length,
-      errors: errors.length > 0 ? errors.slice(0, 10) : undefined,
+      errors:
+        errors.length > 0
+          ? errors.slice(0, 10).map(toPublicScanErrorSample)
+          : undefined,
       ...(batch
         ? {
             batchMode: true,
@@ -211,10 +215,11 @@ export async function GET(request: Request) {
       cacheExpiresAt: new Date(entry.expiresAt).toISOString(),
     });
   } catch (error) {
+    console.error("scan route failed", error);
     return NextResponse.json(
       {
         error: "Failed to scan Binance markets.",
-        message: error instanceof Error ? error.message : "Unknown error",
+        message: "Remote scanner request failed.",
       },
       { status: 502 },
     );

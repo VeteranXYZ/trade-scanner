@@ -1,10 +1,11 @@
 import type { Timeframe } from "@/lib/exchanges/types";
 import type { IndicatorSnapshot } from "@/lib/indicators";
-import type { MarketPhase, ScannerExplanation } from "./types";
+import type { MarketPhase, ScannerExplanation, ScanResult } from "./types";
 
 type ExplanationInput = {
   phase: MarketPhase;
   snapshot: IndicatorSnapshot;
+  volume?: ScanResult["volume"];
   sufficientHistory: boolean;
   timeframe: Timeframe;
 };
@@ -12,6 +13,7 @@ type ExplanationInput = {
 export function getReasons({
   phase,
   snapshot,
+  volume,
   sufficientHistory,
 }: ExplanationInput): ScannerExplanation[] {
   const reasons: ScannerExplanation[] = [];
@@ -31,8 +33,28 @@ export function getReasons({
     reasons.push({ key: "reason.priceNearBollingerMiddle" });
   }
 
-  if (isBetween(snapshot.volume.ratio, 0.6, 1.2)) {
+  if (isBetween(snapshot.volume.ratio20, 0.6, 1.2)) {
     reasons.push({ key: "reason.quietVolumeCompression" });
+  }
+
+  if (volume?.quietCompression) {
+    reasons.push({ key: "reason.quietVolumeCompression" });
+  }
+
+  if (volume?.dryUp && phase === "SQUEEZE") {
+    reasons.push({ key: "reason.volumeDryUpCompression" });
+  }
+
+  if (volume?.expanding) {
+    reasons.push({ key: "reason.volumeExpansion" });
+  }
+
+  if (volume?.breakoutConfirmed) {
+    reasons.push({ key: "reason.breakoutVolumeConfirmed" });
+  }
+
+  if (volume?.pullbackHealthy) {
+    reasons.push({ key: "reason.pullbackVolumeHealthy" });
   }
 
   if (
@@ -42,7 +64,7 @@ export function getReasons({
     reasons.push({ key: "reason.priceAboveUpperBollinger" });
   }
 
-  if (snapshot.volume.ratio !== null && snapshot.volume.ratio > 1.5) {
+  if (snapshot.volume.ratio20 !== null && snapshot.volume.ratio20 > 1.5) {
     reasons.push({ key: "reason.volumeExpanding" });
   }
 
@@ -78,7 +100,7 @@ export function getReasons({
     reasons.push({ key: "reason.limitedHistory" });
   }
 
-  return reasons;
+  return dedupe(reasons);
 }
 
 export function getNextConfirmation({

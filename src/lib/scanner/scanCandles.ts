@@ -6,6 +6,7 @@ import { getRiskWarnings } from "./riskFilters";
 import { calculateScannerScores } from "./scoring";
 import { deriveScannerSignal } from "./signal";
 import type { ScanResult } from "./types";
+import { getVolumeAnalysis } from "./volumeAnalysis";
 
 export function scanCandles(
   symbol: string,
@@ -17,7 +18,13 @@ export function scanCandles(
   const missingIndicators = getMissingIndicators(snapshot);
   const sufficientHistory = closedCandles.length >= 200;
   const phase = determineMarketPhase(snapshot, closedCandles);
-  const scores = calculateScannerScores({ snapshot, sufficientHistory, phase });
+  const volume = getVolumeAnalysis({ snapshot, phase, candles: closedCandles });
+  const scores = calculateScannerScores({
+    snapshot,
+    sufficientHistory,
+    phase,
+    volume,
+  });
   const signal = deriveScannerSignal({ phase, ...scores });
   const lastClosedCandle = closedCandles.at(-1);
 
@@ -31,13 +38,15 @@ export function scanCandles(
     ...scores,
     rsi14: snapshot.rsi14,
     bbWidthPercentile: snapshot.bollinger.widthPercentile,
-    volumeRatio: snapshot.volume.ratio,
+    volumeRatio: snapshot.volume.ratio20,
+    volume,
     macd: getMacdStatus(snapshot),
     maStatus: getMaStatus(snapshot),
-    reasons: getReasons({ phase, snapshot, sufficientHistory, timeframe }),
+    reasons: getReasons({ phase, snapshot, volume, sufficientHistory, timeframe }),
     warnings: getRiskWarnings({
       phase,
       snapshot,
+      volume,
       candles: closedCandles,
       sufficientHistory,
     }),
@@ -114,7 +123,7 @@ function getMissingIndicators(snapshot: ReturnType<typeof calculateIndicatorSnap
   }
   if (snapshot.rsi14 === null) missing.push("rsi14");
   if (snapshot.volume.ma20 === null) missing.push("volumeMa20");
-  if (snapshot.volume.ratio === null) missing.push("volumeRatio");
+  if (snapshot.volume.ratio20 === null) missing.push("volumeRatio");
   if (snapshot.macd.line === null) missing.push("macd");
   if (snapshot.priceExtensionFromMA20 === null) {
     missing.push("priceExtensionFromMA20");

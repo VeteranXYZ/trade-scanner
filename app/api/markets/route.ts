@@ -3,6 +3,7 @@ import { cacheKeys } from "@/lib/cache/keys";
 import { getCached } from "@/lib/cache/memory";
 import { getTopUsdtMarkets } from "@/lib/exchanges/binance";
 import type { Market } from "@/lib/exchanges/types";
+import { publicErrorMessage } from "@/lib/runtime/publicErrors";
 
 const DEFAULT_MARKET_LIMIT = 100;
 const MAX_MARKET_LIMIT = 500;
@@ -41,10 +42,11 @@ export async function GET(request: Request) {
         new Date().toISOString(),
     });
   } catch (error) {
+    console.error("markets route failed", error);
     return NextResponse.json(
       {
         error: "Failed to fetch Binance markets.",
-        message: error instanceof Error ? error.message : "Unknown error",
+        message: publicErrorMessage("Remote market data request failed."),
       },
       { status: 502 },
     );

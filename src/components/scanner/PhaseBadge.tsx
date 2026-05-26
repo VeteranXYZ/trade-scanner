@@ -1,5 +1,5 @@
 import { useLanguage } from "@/components/providers/LanguageProvider";
-import type { MarketPhase } from "@/lib/scanner/types";
+import type { MarketPhase } from "@/lib/shared/scannerTypes";
 
 type PhaseBadgeProps = {
   phase: MarketPhase;

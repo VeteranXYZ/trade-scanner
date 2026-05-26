@@ -1,11 +1,11 @@
-import type { Timeframe } from "@/lib/exchanges/types";
-import type { MtfPreset } from "@/lib/scanner/multiTimeframe";
+import type { MtfPreset } from "@/lib/shared/scannerConfig";
 import type {
   MarketPhase,
   MultiTimeframeAlignment,
   ScannerExplanationKey,
   ScannerSignalState,
-} from "@/lib/scanner/types";
+} from "@/lib/shared/scannerTypes";
+import type { Timeframe } from "@/lib/shared/timeframes";
 
 export type Language = "en" | "zh";
 
@@ -116,6 +116,18 @@ export const dictionaries = {
       macdAboveZero: "Above zero",
       macdWeakening: "Weakening",
       macdUnavailable: "n/a",
+      volumeDetails: "Volume",
+      volumeLatest: "Latest volume",
+      volumeMa20: "Volume MA20",
+      volumeRatio20: "Volume ratio",
+      volumeState: "Volume state",
+      volumeDryUp: "Dry-up",
+      volumeExpanding: "Expanding",
+      volumeBreakoutConfirmed: "Breakout confirmed",
+      volumeAbnormalSpike: "Abnormal spike",
+      volumePullbackHealthy: "Healthy pullback",
+      volumeDistributionWarning: "Distribution warning",
+      volumeNeutral: "Neutral",
       currentSignal: "Current Signal",
       mtfContext: "MTF Context",
       mtfRank: "MTF Rank",
@@ -321,6 +333,13 @@ export const dictionaries = {
         "Price is holding near the Bollinger middle band.",
       "reason.quietVolumeCompression":
         "Volume is quiet, consistent with compression.",
+      "reason.volumeDryUpCompression":
+        "Volume has dried up while the structure remains compressed.",
+      "reason.volumeExpansion": "Volume is expanding above its recent baseline.",
+      "reason.breakoutVolumeConfirmed":
+        "Breakout structure has volume expansion confirmation.",
+      "reason.pullbackVolumeHealthy":
+        "Pullback volume is contained, which keeps the structure healthier.",
       "reason.priceAboveUpperBollinger":
         "Price is above the upper Bollinger Band.",
       "reason.volumeExpanding":
@@ -374,6 +393,16 @@ export const dictionaries = {
         "RSI is above 75, which may indicate overextension.",
       "warning.possibleFakeBreakout":
         "Possible fake breakout: price moved above the upper Bollinger Band without strong volume confirmation.",
+      "warning.breakoutWithoutVolume":
+        "Breakout attempt lacks clear volume confirmation.",
+      "warning.abnormalVolumeSpike":
+        "Volume is unusually high; inspect whether this is accumulation or risk transfer.",
+      "warning.distributionVolume":
+        "High volume appeared with a weak close or upper wick near elevated prices.",
+      "warning.highVolumeBreakdown":
+        "High volume is accompanying a weak structure below key averages.",
+      "warning.volumeSpikeWithExtension":
+        "Volume spike is occurring while price is extended.",
       "warning.extendedFromMa20":
         "Price is extended from MA20; chasing risk is elevated.",
       "warning.belowMa50":
@@ -503,6 +532,18 @@ export const dictionaries = {
       macdAboveZero: "零轴上方",
       macdWeakening: "动能转弱",
       macdUnavailable: "n/a",
+      volumeDetails: "成交量",
+      volumeLatest: "最新成交量",
+      volumeMa20: "成交量 MA20",
+      volumeRatio20: "量能比",
+      volumeState: "量能状态",
+      volumeDryUp: "缩量",
+      volumeExpanding: "放量",
+      volumeBreakoutConfirmed: "突破量能确认",
+      volumeAbnormalSpike: "异常放量",
+      volumePullbackHealthy: "健康回踩",
+      volumeDistributionWarning: "派发风险",
+      volumeNeutral: "中性",
       currentSignal: "当前信号",
       mtfContext: "多周期背景",
       mtfRank: "共振分",
@@ -689,6 +730,10 @@ export const dictionaries = {
       "reason.ma20Ma50Converging": "MA20 与 MA50 正在收敛。",
       "reason.priceNearBollingerMiddle": "价格守在布林中轨附近。",
       "reason.quietVolumeCompression": "量能较安静，符合压缩结构。",
+      "reason.volumeDryUpCompression": "结构压缩过程中量能明显收缩。",
+      "reason.volumeExpansion": "成交量高于近期基准并正在放大。",
+      "reason.breakoutVolumeConfirmed": "突破结构获得量能放大确认。",
+      "reason.pullbackVolumeHealthy": "回踩量能受控，结构仍较健康。",
       "reason.priceAboveUpperBollinger": "价格已站上布林上轨。",
       "reason.volumeExpanding": "成交量高于 20 根 K 线均量并正在放大。",
       "reason.ma20AboveMa50": "MA20 位于 MA50 上方，短期趋势结构较好。",
@@ -721,6 +766,11 @@ export const dictionaries = {
       "warning.rsiAbove75": "RSI 高于 75，可能已经过度延伸。",
       "warning.possibleFakeBreakout":
         "可能是假突破：价格突破布林上轨，但量能确认不足。",
+      "warning.breakoutWithoutVolume": "突破尝试缺少明确的量能确认。",
+      "warning.abnormalVolumeSpike": "成交量异常放大，需要辨别是承接还是风险转移。",
+      "warning.distributionVolume": "高位附近出现放量弱收或长上影，存在派发风险。",
+      "warning.highVolumeBreakdown": "弱势结构跌破关键均线时伴随放量。",
+      "warning.volumeSpikeWithExtension": "价格延伸时出现放量，风险权重上升。",
       "warning.extendedFromMa20": "价格相对 MA20 延伸过多，追高风险上升。",
       "warning.belowMa50": "价格低于 MA50，趋势结构偏弱。",
       "warning.belowMa200": "价格低于 MA200，长期趋势仍偏弱。",

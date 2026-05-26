@@ -1,5 +1,5 @@
 import { useLanguage } from "@/components/providers/LanguageProvider";
-import type { ScannerSignal } from "@/lib/scanner/types";
+import type { ScannerSignal } from "@/lib/shared/scannerTypes";
 
 type SignalBadgeProps = {
   signal: ScannerSignal;

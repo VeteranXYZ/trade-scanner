@@ -13,6 +13,7 @@ export function calculateIndicatorSnapshot(candles: Candle[]): IndicatorSnapshot
   const latest = candles.at(-1);
   const closes = candles.map((candle) => candle.close);
   const volumes = candles.map((candle) => candle.volume);
+  const quoteVolumes = candles.map((candle) => candle.quoteVolume);
 
   const close = latest?.close ?? 0;
   const ma20 = calculateSma(closes, 20);
@@ -24,7 +25,7 @@ export function calculateIndicatorSnapshot(candles: Candle[]): IndicatorSnapshot
     bollingerSeries.map((band) => band.width),
     90,
   );
-  const volume = calculateVolumeSnapshot(volumes);
+  const volume = calculateVolumeSnapshot(volumes, quoteVolumes);
   const macd = calculateMacdSnapshot(closes);
 
   return {

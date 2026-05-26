@@ -42,6 +42,25 @@ export function summarizeScanFailures({
   };
 }
 
+export function toPublicScanErrorSample(error: ScanErrorSample): ScanErrorSample {
+  return {
+    symbol: error.symbol,
+    message: publicScanErrorMessage(error.message),
+  };
+}
+
+function publicScanErrorMessage(message: string) {
+  if (isSubrequestLimitFailure(message)) {
+    return "Cloudflare Free subrequest limit reached. Try a smaller batch size.";
+  }
+
+  if (isFetchFailure(message)) {
+    return "Remote market data request failed.";
+  }
+
+  return "Scanner calculation failed for this symbol.";
+}
+
 function isFetchFailure(message: string) {
   if (isSubrequestLimitFailure(message)) {
     return false;

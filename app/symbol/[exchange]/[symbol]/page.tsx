@@ -1,5 +1,5 @@
 import { SymbolPageClient } from "@/components/symbol/SymbolPageClient";
-import type { Exchange } from "@/lib/exchanges/types";
+import type { Exchange } from "@/lib/shared/timeframes";
 
 type SymbolPageProps = {
   params: Promise<{

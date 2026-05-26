@@ -13,8 +13,17 @@ export type IndicatorSnapshot = {
   rsi14: number | null;
   volume: {
     current: number;
+    latest: number;
     ma20: number | null;
+    ma50: number | null;
     ratio: number | null;
+    ratio20: number | null;
+    ratio50: number | null;
+    quoteVolumeLatest?: number;
+    quoteVolumeMA20?: number | null;
+    dryUp: boolean;
+    expanding: boolean;
+    abnormalSpike: boolean;
   };
   macd: {
     line: number | null;

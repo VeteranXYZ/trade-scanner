@@ -16,7 +16,7 @@ import {
   SignalSummaryBar,
   type SignalSummaryItem,
 } from "./SignalSummaryBar";
-import type { ScannerSignalState, ScanResult } from "@/lib/scanner/types";
+import type { ScannerSignalState, ScanResult } from "@/lib/shared/scannerTypes";
 
 type ScannerTableProps = {
   rows: ScanResult[];

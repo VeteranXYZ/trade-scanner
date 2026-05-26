@@ -12,7 +12,7 @@ import type {
   ScannerSignal,
   ScannerSignalState,
   ScanResult,
-} from "@/lib/scanner/types";
+} from "@/lib/shared/scannerTypes";
 
 describe("scanner result filtering", () => {
   it("filters by signal before sorting the result set", () => {
@@ -402,6 +402,7 @@ function makeResult({
     rsi14: 55,
     bbWidthPercentile: 20,
     volumeRatio: 1,
+    volume: makeVolume(),
     maStatus: {
       aboveMA20: true,
       aboveMA50: true,
@@ -418,6 +419,25 @@ function makeResult({
       sufficientHistory: true,
       missingIndicators: [],
     },
+  };
+}
+
+function makeVolume() {
+  return {
+    latest: 1000,
+    ma20: 1000,
+    ma50: 1000,
+    ratio20: 1,
+    ratio50: 1,
+    quoteVolumeLatest: 100_000,
+    quoteVolumeMA20: 100_000,
+    dryUp: false,
+    expanding: false,
+    abnormalSpike: false,
+    breakoutConfirmed: false,
+    pullbackHealthy: false,
+    distributionWarning: false,
+    quietCompression: false,
   };
 }
 

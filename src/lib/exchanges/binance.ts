@@ -304,6 +304,7 @@ function toCandle(kline: BinanceKline): Candle {
     low: Number(kline[3]),
     close: Number(kline[4]),
     volume: Number(kline[5]),
+    quoteVolume: Number(kline[7]),
     closeTime: Number(kline[6]),
   };
 }

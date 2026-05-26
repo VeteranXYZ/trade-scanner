@@ -1,10 +1,11 @@
 import type { IndicatorSnapshot } from "@/lib/indicators";
-import type { MarketPhase } from "./types";
+import type { MarketPhase, ScanResult } from "./types";
 
 type ScoreInput = {
   snapshot: IndicatorSnapshot;
   sufficientHistory: boolean;
   phase?: MarketPhase;
+  volume?: ScanResult["volume"];
 };
 
 export type ScannerScores = {
@@ -18,11 +19,17 @@ export function calculateScannerScores({
   snapshot,
   sufficientHistory,
   phase,
+  volume,
 }: ScoreInput): ScannerScores {
-  const confirmationScore = calculateConfirmationScore(snapshot, phase);
-  const riskScore = calculateRiskScore(snapshot, sufficientHistory, phase);
+  const confirmationScore = calculateConfirmationScore(snapshot, phase, volume);
+  const riskScore = calculateRiskScore(snapshot, sufficientHistory, phase, volume);
   const opportunityScore = capOpportunityScore({
-    opportunityScore: calculateOpportunityScore(snapshot, sufficientHistory),
+    opportunityScore: calculateOpportunityScore(
+      snapshot,
+      sufficientHistory,
+      phase,
+      volume,
+    ),
     confirmationScore,
     snapshot,
     phase,
@@ -32,9 +39,9 @@ export function calculateScannerScores({
 
   // Rank score is only a sorting aid; the UI still exposes the component scores.
   const rankScore = clampScore(
-    opportunityScore * 0.45 +
-      confirmationScore * 0.35 -
-      riskScore * 0.25 -
+    opportunityScore * 0.4 +
+      confirmationScore * 0.4 -
+      riskScore * 0.3 -
       getPhaseRankPenalty(phase) -
       riskConfirmationPenalty,
   );
@@ -84,6 +91,8 @@ export function clampScore(value: number) {
 function calculateOpportunityScore(
   snapshot: IndicatorSnapshot,
   sufficientHistory: boolean,
+  phase?: MarketPhase,
+  volume?: ScanResult["volume"],
 ) {
   let score = 0;
 
@@ -106,7 +115,19 @@ function calculateOpportunityScore(
     score += 10;
   }
 
-  if (isBetween(snapshot.volume.ratio, 0.6, 1.2)) {
+  if (isBetween(snapshot.volume.ratio20, 0.6, 1.2)) {
+    score += 10;
+  }
+
+  if (
+    snapshot.bollinger.widthPercentile !== null &&
+    snapshot.bollinger.widthPercentile <= 35 &&
+    (volume?.quietCompression || volume?.dryUp)
+  ) {
+    score += 10;
+  }
+
+  if (phase === "PULLBACK_HEALTHY" && volume?.pullbackHealthy) {
     score += 10;
   }
 
@@ -121,15 +142,44 @@ function calculateOpportunityScore(
   return clampScore(score);
 }
 
-function calculateConfirmationScore(snapshot: IndicatorSnapshot, phase?: MarketPhase) {
+function calculateConfirmationScore(
+  snapshot: IndicatorSnapshot,
+  phase?: MarketPhase,
+  volume?: ScanResult["volume"],
+) {
   let score = 0;
 
   if (snapshot.bollinger.upper !== null && snapshot.close > snapshot.bollinger.upper) {
     score += 25;
   }
 
-  if (snapshot.volume.ratio !== null && snapshot.volume.ratio > 1.5) {
-    score += 25;
+  const constructiveVolumePhase = isConstructiveVolumePhase(phase);
+
+  if (volume?.breakoutConfirmed && constructiveVolumePhase) {
+    score += 20;
+  } else if (volume?.expanding && constructiveVolumePhase) {
+    score += 10;
+  }
+
+  if (
+    volume?.expanding &&
+    constructiveVolumePhase &&
+    snapshot.ma50 !== null &&
+    snapshot.ma200 !== null &&
+    snapshot.close > snapshot.ma50 &&
+    snapshot.close > snapshot.ma200
+  ) {
+    score += 10;
+  }
+
+  if (
+    snapshot.volume.ratio20 !== null &&
+    snapshot.volume.ratio20 >= 1 &&
+    snapshot.volume.ratio20 < 1.5 &&
+    snapshot.ma50 !== null &&
+    snapshot.close > snapshot.ma50
+  ) {
+    score += 5;
   }
 
   if (
@@ -177,6 +227,7 @@ function calculateRiskScore(
   snapshot: IndicatorSnapshot,
   sufficientHistory: boolean,
   phase?: MarketPhase,
+  volume?: ScanResult["volume"],
 ) {
   let score = 0;
 
@@ -202,13 +253,35 @@ function calculateRiskScore(
   if (
     snapshot.bollinger.upper !== null &&
     snapshot.close > snapshot.bollinger.upper &&
-    (snapshot.volume.ratio === null || snapshot.volume.ratio < 1.2)
+    (snapshot.volume.ratio20 === null || snapshot.volume.ratio20 < 1.2)
   ) {
     score += 25;
   }
 
   if (!sufficientHistory) {
     score += 10;
+  }
+
+  if (
+    volume?.abnormalSpike &&
+    ((snapshot.rsi14 !== null && snapshot.rsi14 > 75) ||
+      (snapshot.priceExtensionFromMA20 !== null &&
+        snapshot.priceExtensionFromMA20 > 0.08))
+  ) {
+    score += 20;
+  }
+
+  if (volume?.distributionWarning) {
+    score += 20;
+  }
+
+  if (
+    volume?.expanding &&
+    phase === "BREAKDOWN" &&
+    ((snapshot.ma50 !== null && snapshot.close < snapshot.ma50) ||
+      (snapshot.ma200 !== null && snapshot.close < snapshot.ma200))
+  ) {
+    score += 20;
   }
 
   if (phase === "OVEREXTENDED") {
@@ -237,6 +310,16 @@ function getPhaseRankPenalty(phase?: MarketPhase) {
     default:
       return 0;
   }
+}
+
+function isConstructiveVolumePhase(phase?: MarketPhase) {
+  return (
+    phase === undefined ||
+    phase === "BREAKOUT_ATTEMPT" ||
+    phase === "BREAKOUT_CONFIRMED" ||
+    phase === "TRENDING" ||
+    phase === "PULLBACK_HEALTHY"
+  );
 }
 
 function isBetween(value: number | null, min: number, max: number) {

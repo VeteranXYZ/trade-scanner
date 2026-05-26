@@ -1,7 +1,7 @@
 "use client";
 
 import { useQueries } from "@tanstack/react-query";
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { CandleChart } from "@/components/chart/CandleChart";
 import { IndicatorLegend } from "@/components/chart/IndicatorLegend";
 import { useLanguage } from "@/components/providers/LanguageProvider";
@@ -12,19 +12,17 @@ import { ScoreBadge } from "@/components/scanner/ScoreBadge";
 import { SignalBadge } from "@/components/scanner/SignalBadge";
 import { StrategyReadPanel } from "@/components/scanner/StrategyReadPanel";
 import {
+  summarizeMultiTimeframe,
+  type MultiTimeframeSummary,
+} from "@/lib/shared/multiTimeframe";
+import type { ScanResult } from "@/lib/shared/scannerTypes";
+import {
   TIMEFRAMES,
   type Candle,
   type Exchange,
   type Timeframe,
-} from "@/lib/exchanges/types";
-import { calculateIndicatorSnapshot } from "@/lib/indicators";
+} from "@/lib/shared/timeframes";
 import { formatScannerExplanation } from "@/lib/i18n/formatScannerExplanation";
-import {
-  summarizeMultiTimeframe,
-  type MultiTimeframeSummary,
-} from "@/lib/scanner/multiTimeframe";
-import { scanCandles } from "@/lib/scanner/scanCandles";
-import type { ScanResult } from "@/lib/scanner/types";
 
 const EMPTY_CANDLES: Candle[] = [];
 
@@ -38,9 +36,25 @@ type CandlesApiResponse = {
   symbol: string;
   timeframe: Timeframe;
   candles: Candle[];
+  snapshot: IndicatorSummarySnapshot | null;
+  scanResult: ScanResult | null;
   itemCount: number;
   cached: boolean;
   updatedAt: string;
+};
+
+type IndicatorSummarySnapshot = {
+  close: number;
+  ma20: number | null;
+  ma50: number | null;
+  ma200: number | null;
+  rsi14: number | null;
+  bollinger: {
+    widthPercentile: number | null;
+  };
+  volume: {
+    ratio20: number | null;
+  };
 };
 
 export function SymbolPageClient({ exchange, symbol }: SymbolPageClientProps) {
@@ -56,16 +70,11 @@ export function SymbolPageClient({ exchange, symbol }: SymbolPageClientProps) {
   const candlesQuery = timeframeQueries[selectedTimeframeIndex];
   const isAnyTimeframeFetching = timeframeQueries.some((query) => query.isFetching);
   const candles = candlesQuery.data?.candles ?? EMPTY_CANDLES;
-  const snapshot = useMemo(() => calculateIndicatorSnapshot(candles), [candles]);
-  const scanResult = useMemo(
-    () => (candles.length > 0 ? scanCandles(symbol, timeframe, candles) : null),
-    [candles, symbol, timeframe],
-  );
-  const multiTimeframeResults = TIMEFRAMES.flatMap((option, index) => {
-    const optionCandles = timeframeQueries[index]?.data?.candles ?? EMPTY_CANDLES;
-    return optionCandles.length > 0
-      ? [scanCandles(symbol, option, optionCandles)]
-      : [];
+  const snapshot = candlesQuery.data?.snapshot ?? null;
+  const scanResult = candlesQuery.data?.scanResult ?? null;
+  const multiTimeframeResults = TIMEFRAMES.flatMap((_, index) => {
+    const result = timeframeQueries[index]?.data?.scanResult;
+    return result ? [result] : [];
   });
   const multiTimeframeSummary =
     multiTimeframeResults.length > 0
@@ -169,7 +178,9 @@ export function SymbolPageClient({ exchange, symbol }: SymbolPageClientProps) {
                       compact
                     />
                   </div>
-                  <IndicatorSummary snapshot={snapshot} scanResult={scanResult} />
+                  {snapshot && (
+                    <IndicatorSummary snapshot={snapshot} scanResult={scanResult} />
+                  )}
                   <p className="mt-4 rounded-md border border-[var(--border)] bg-[#0b0f14] p-3 text-sm leading-6 text-[var(--muted)]">
                     {t.signalSummary[scanResult.signal.state]}
                   </p>
@@ -310,15 +321,15 @@ function IndicatorSummary({
   snapshot,
   scanResult,
 }: {
-  snapshot: ReturnType<typeof calculateIndicatorSnapshot>;
-  scanResult: ReturnType<typeof scanCandles>;
+  snapshot: IndicatorSummarySnapshot;
+  scanResult: ScanResult;
 }) {
   const { dictionary: t } = useLanguage();
   const rows = [
     [t.common.price, formatPrice(snapshot.close)],
     ["RSI14", formatNullable(snapshot.rsi14, 1)],
     [t.symbol.bbWidth, formatNullable(snapshot.bollinger.widthPercentile, 0)],
-    [t.symbol.volumeRatio, formatNullable(snapshot.volume.ratio, 2)],
+    [t.symbol.volumeRatio, formatNullable(snapshot.volume.ratio20, 2)],
     ["MA20", formatNullable(snapshot.ma20, 4)],
     ["MA50", formatNullable(snapshot.ma50, 4)],
     ["MA200", formatNullable(snapshot.ma200, 4)],

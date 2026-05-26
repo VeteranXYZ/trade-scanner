@@ -1,10 +1,11 @@
 import type { Candle } from "@/lib/exchanges/types";
 import type { IndicatorSnapshot } from "@/lib/indicators";
-import type { MarketPhase, ScannerExplanation } from "./types";
+import type { MarketPhase, ScannerExplanation, ScanResult } from "./types";
 
 type RiskWarningInput = {
   phase: MarketPhase;
   snapshot: IndicatorSnapshot;
+  volume?: ScanResult["volume"];
   candles: Candle[];
   sufficientHistory: boolean;
 };
@@ -12,6 +13,7 @@ type RiskWarningInput = {
 export function getRiskWarnings({
   phase,
   snapshot,
+  volume,
   candles,
   sufficientHistory,
 }: RiskWarningInput): ScannerExplanation[] {
@@ -25,9 +27,41 @@ export function getRiskWarnings({
   if (
     snapshot.bollinger.upper !== null &&
     snapshot.close > snapshot.bollinger.upper &&
-    (snapshot.volume.ratio === null || snapshot.volume.ratio < 1.2)
+    (snapshot.volume.ratio20 === null || snapshot.volume.ratio20 < 1.2)
   ) {
     warnings.push({ key: "warning.possibleFakeBreakout" });
+  }
+
+  if (
+    (phase === "BREAKOUT_ATTEMPT" || phase === "BREAKOUT_CONFIRMED") &&
+    !volume?.breakoutConfirmed
+  ) {
+    warnings.push({ key: "warning.breakoutWithoutVolume" });
+  }
+
+  if (volume?.abnormalSpike) {
+    warnings.push({ key: "warning.abnormalVolumeSpike" });
+  }
+
+  if (volume?.distributionWarning) {
+    warnings.push({ key: "warning.distributionVolume" });
+  }
+
+  if (
+    volume?.expanding &&
+    phase === "BREAKDOWN" &&
+    ((snapshot.ma50 !== null && snapshot.close < snapshot.ma50) ||
+      (snapshot.ma200 !== null && snapshot.close < snapshot.ma200))
+  ) {
+    warnings.push({ key: "warning.highVolumeBreakdown" });
+  }
+
+  if (
+    volume?.abnormalSpike &&
+    snapshot.priceExtensionFromMA20 !== null &&
+    snapshot.priceExtensionFromMA20 > 0.08
+  ) {
+    warnings.push({ key: "warning.volumeSpikeWithExtension" });
   }
 
   if (

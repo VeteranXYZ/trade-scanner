@@ -29,14 +29,36 @@ describe("indicator calculations", () => {
   });
 
   it("calculates SMA and volume ratio deterministically", () => {
-    const values = Array.from({ length: 20 }, (_, index) => index + 1);
+    const values = Array.from({ length: 21 }, (_, index) => index + 1);
 
-    expect(calculateSma(values, 20)).toBe(10.5);
+    expect(calculateSma(values.slice(0, 20), 20)).toBe(10.5);
 
     const volume = calculateVolumeSnapshot(values);
-    expect(volume.current).toBe(20);
+    expect(volume.current).toBe(21);
     expect(volume.ma20).toBe(10.5);
-    expect(volume.ratio).toBeCloseTo(20 / 10.5, 6);
+    expect(volume.ratio20).toBeCloseTo(21 / 10.5, 6);
+    expect(volume.ratio).toBe(volume.ratio20);
+  });
+
+  it("derives richer volume states from previous candle averages", () => {
+    const baseline = Array.from({ length: 20 }, () => 100);
+    const quoteBaseline = Array.from({ length: 20 }, () => 10_000);
+
+    const dry = calculateVolumeSnapshot([...baseline, 50], [...quoteBaseline, 5000]);
+    expect(dry.ma20).toBe(100);
+    expect(dry.quoteVolumeMA20).toBe(10_000);
+    expect(dry.ratio20).toBe(0.5);
+    expect(dry.dryUp).toBe(true);
+    expect(dry.expanding).toBe(false);
+
+    const expanding = calculateVolumeSnapshot([...baseline, 160]);
+    expect(expanding.ratio20).toBe(1.6);
+    expect(expanding.expanding).toBe(true);
+    expect(expanding.abnormalSpike).toBe(false);
+
+    const abnormal = calculateVolumeSnapshot([...baseline, 320]);
+    expect(abnormal.ratio20).toBe(3.2);
+    expect(abnormal.abnormalSpike).toBe(true);
   });
 
   it("calculates Bollinger width and percentile rank", () => {

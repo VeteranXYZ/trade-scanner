@@ -4,6 +4,7 @@ import {
   isLocalPersistenceDisabled,
   localPersistenceUnavailableMessage,
 } from "@/lib/runtime/localPersistence";
+import { publicErrorMessage } from "@/lib/runtime/publicErrors";
 
 export const runtime = "nodejs";
 
@@ -25,14 +26,25 @@ export async function GET() {
     return localPersistenceUnavailableResponse();
   }
 
-  const store = await createMarketDataStore();
-
   try {
-    return NextResponse.json({
-      summary: await store.getSummary(),
-    });
-  } finally {
-    await store.close?.();
+    const store = await createMarketDataStore();
+
+    try {
+      return NextResponse.json({
+        summary: await store.getSummary(),
+      });
+    } finally {
+      await store.close?.();
+    }
+  } catch (error) {
+    console.error("local data summary failed", error);
+    return NextResponse.json(
+      {
+        error: "Failed to read local market data summary.",
+        message: publicErrorMessage("Local market data summary failed."),
+      },
+      { status: 502 },
+    );
   }
 }
 
@@ -70,12 +82,19 @@ export async function POST(request: Request) {
       store,
     });
 
-    return NextResponse.json(result);
+    return NextResponse.json({
+      ...result,
+      errors: result.errors.map((error) => ({
+        ...error,
+        message: "Local market data fetch failed.",
+      })),
+    });
   } catch (error) {
+    console.error("local data sync failed", error);
     return NextResponse.json(
       {
         error: "Failed to sync local market data.",
-        message: error instanceof Error ? error.message : "Unknown error",
+        message: publicErrorMessage("Local market data sync failed."),
       },
       { status: 502 },
     );

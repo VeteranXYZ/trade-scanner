@@ -10,6 +10,6 @@
   },
   "vars": {
     "DISABLE_LOCAL_SQLITE": "true",
-    "NEXT_PUBLIC_DEPLOY_TARGET": "cloudflare"
+    "DEPLOY_TARGET": "cloudflare"
   }
 }

@@ -6,15 +6,15 @@ import { useLanguage } from "@/components/providers/LanguageProvider";
 import { ScannerFilters, type ScannerSortKey } from "./ScannerFilters";
 import { ScannerTable } from "./ScannerTable";
 import { SelectedSymbolPanel } from "./SelectedSymbolPanel";
-import type { Timeframe } from "@/lib/exchanges/types";
-import type { MtfPreset } from "@/lib/scanner/multiTimeframe";
-import { scannerSignalOrder } from "@/lib/scanner/signal";
+import { scannerSignalOrder } from "@/lib/shared/scannerConfig";
+import type { MtfPreset } from "@/lib/shared/scannerConfig";
 import type {
   MarketPhase,
   MultiTimeframeAlignment,
   ScannerSignalState,
   ScanResult,
-} from "@/lib/scanner/types";
+} from "@/lib/shared/scannerTypes";
+import type { Timeframe } from "@/lib/shared/timeframes";
 
 type ScanApiResponse = {
   exchange: "binance";
