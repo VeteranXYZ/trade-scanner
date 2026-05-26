@@ -11,6 +11,9 @@ export type ScanCacheKeyOptions = {
   maxSymbols: number | null;
   minQuoteVolume: number;
   filters?: string;
+  batchMode?: boolean;
+  cursor?: number;
+  batchSize?: number;
 };
 
 export const cacheKeys = {
@@ -33,6 +36,9 @@ export const cacheKeys = {
     maxSymbols,
     minQuoteVolume,
     filters = "none",
+    batchMode = false,
+    cursor,
+    batchSize,
   }: ScanCacheKeyOptions) =>
     [
       "scan",
@@ -42,6 +48,7 @@ export const cacheKeys = {
       universe,
       `max:${maxSymbols ?? "all"}`,
       `minQuote:${minQuoteVolume}`,
+      batchMode ? `batch:${cursor ?? 0}:${batchSize ?? "default"}` : "batch:none",
       `filters:${filters}`,
     ].join(":"),
   mtfScan: ({

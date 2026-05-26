@@ -94,8 +94,12 @@ export const dictionaries = {
       indicatorFailed: "Indicator failed",
       filteredLowVolume: "Low volume filtered",
       excludedStableOrLeveraged: "Stable / leveraged excluded",
+      subrequestLimitExceeded: "Subrequest limit",
       cachePolicyNote:
         "This scanner is optimized for medium-to-large timeframe selection. Results may be cached for stability and lower request cost.",
+      cloudflareBatchNote:
+        "Full-market scans are processed in small batches on Cloudflare Free.",
+      scanningBatch: "Scanning batch",
       loadingTitle: "Loading Scan",
       loadingMessage: "Fetching public Binance market data and calculating scanner results.",
       errorTitle: "Scan Error",
@@ -463,8 +467,11 @@ export const dictionaries = {
       indicatorFailed: "指标失败",
       filteredLowVolume: "低成交额过滤",
       excludedStableOrLeveraged: "稳定币/杠杆币排除",
+      subrequestLimitExceeded: "子请求限制",
       cachePolicyNote:
         "本扫描器针对中大周期选币优化。结果可能被缓存，以提升稳定性并降低请求成本。",
+      cloudflareBatchNote: "Cloudflare Free 上的全市场扫描会分成小批次顺序处理。",
+      scanningBatch: "正在扫描批次",
       loadingTitle: "正在扫描",
       loadingMessage: "正在获取 Binance 公共行情并计算扫描结果。",
       errorTitle: "扫描错误",

@@ -49,6 +49,7 @@ describe("MTF scan API timeframe defaults", () => {
       insufficientHistory: 0,
       fetchFailed: 0,
       indicatorFailed: 0,
+      subrequestLimitExceeded: 0,
       filteredLowVolume: 0,
       excludedStableOrLeveraged: 0,
     });

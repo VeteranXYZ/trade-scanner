@@ -92,6 +92,17 @@ npm run deploy:cloudflare
 
 D1 is not configured in `wrangler.jsonc` for Phase 1. The old migration workflow is intentionally removed.
 
+### Cloudflare Free Batching
+
+Cloudflare Workers Free can hit the external subrequest limit if one invocation scans hundreds of symbols. As a temporary Phase 1 solution, the Scanner UI processes full-market single-timeframe scans through sequential frontend batches:
+
+- Default batch size: `35`
+- Maximum API batch size: `40`
+- API form: `/api/scan?source=remote&timeframe=4h&batchMode=true&batchSize=35&cursor=0`
+- The frontend requests one batch at a time, merges results, deduplicates by symbol/timeframe, then sorts by `rankScore`.
+
+Numeric `maxSymbols` requests such as `maxSymbols=20` still use the normal single-call scan path. Workers Paid may remove the need for this batching later. D1, KV, R2, Queues, and Durable Objects are not required for this phase.
+
 ## Timeframes
 
 The scanner is designed for medium-to-large timeframe coin selection, not intraday scalping.
@@ -212,6 +223,7 @@ GET /api/candles?source=remote&symbol=BTCUSDT&timeframe=4h&limit=300
 GET /api/scan?source=remote&timeframe=4h
 GET /api/scan?source=remote&timeframe=4h&maxSymbols=200&minQuoteVolume=10000000
 GET /api/scan?source=remote&timeframe=4h&maxSymbols=all
+GET /api/scan?source=remote&timeframe=4h&batchMode=true&batchSize=35&cursor=0
 GET /api/scan/mtf?source=remote&preset=short
 ```
 
@@ -231,6 +243,8 @@ Responses include:
 - `failureSummary`
 
 The scan route defaults to the full eligible Binance Spot USDT universe with a hard safety cap of 600 symbols. `maxSymbols` is optional and only narrows the scan universe when explicitly provided. It is not the number of displayed result rows. Leave it empty, set it to `ALL` in the UI, or pass `maxSymbols=all` for full-market selection. The scan route uses `p-limit` with concurrency `5`. If one symbol fails, the route returns partial results and a small sampled `errors` array.
+
+Batch responses also include `batchMode`, `cursor`, `nextCursor`, `hasMore`, `batchSize`, `batchIndex`, `totalBatches`, `totalEligibleCount`, and `scannedInBatch`.
 
 ## Cache
 

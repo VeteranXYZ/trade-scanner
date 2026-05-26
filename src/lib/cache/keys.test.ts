@@ -26,4 +26,20 @@ describe("scanner cache policy", () => {
     expect(key).toContain("minQuote:10000000");
     expect(key).toContain("filters:none");
   });
+
+  it("includes batch cursor and size in batched scan keys", () => {
+    const key = cacheKeys.scan({
+      source: "remote",
+      timeframe: "4h",
+      universe: "all-eligible-usdt",
+      maxSymbols: null,
+      minQuoteVolume: 0,
+      batchMode: true,
+      cursor: 35,
+      batchSize: 35,
+      filters: "none",
+    });
+
+    expect(key).toContain("batch:35:35");
+  });
 });

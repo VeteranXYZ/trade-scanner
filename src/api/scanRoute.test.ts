@@ -64,12 +64,13 @@ describe("scan API remote market universe", () => {
   });
 
   it("applies maxSymbols only when explicitly provided", async () => {
-    await GET(
-      new Request("http://localhost/api/scan?timeframe=4h&maxSymbols=100"),
+    const response = await GET(
+      new Request("http://localhost/api/scan?timeframe=4h&maxSymbols=20"),
     );
 
+    expect(response.status).toBe(200);
     expect(getEligibleUsdtMarketsMock).toHaveBeenCalledWith(
-      expect.objectContaining({ maxSymbols: 100 }),
+      expect.objectContaining({ maxSymbols: 20 }),
     );
   });
 
@@ -202,6 +203,7 @@ describe("scan API remote market universe", () => {
         insufficientHistory: 1,
         fetchFailed: 1,
         indicatorFailed: 1,
+        subrequestLimitExceeded: 0,
         filteredLowVolume: 2,
         excludedStableOrLeveraged: 2,
       },
@@ -213,14 +215,142 @@ describe("scan API remote market universe", () => {
     expect(body.results).toHaveLength(1);
     expect(body.errors).toHaveLength(2);
   });
+
+  it("returns batch metadata and scans only the requested batch slice", async () => {
+    const markets = Array.from({ length: 80 }, (_, index) => ({
+      exchange: "binance",
+      symbol: `COIN${index.toString().padStart(2, "0")}USDT`,
+    }));
+    getEligibleUsdtMarketsMock.mockResolvedValue({
+      markets,
+      totalUsdtPairs: 90,
+      eligibleCount: 80,
+      filteredLowVolume: 5,
+      excludedStableOrLeveraged: 5,
+      capped: false,
+    });
+    scanMarketMock.mockImplementation((symbol: string) =>
+      makeResult({ symbol, sufficientHistory: true }),
+    );
+
+    const response = await GET(
+      new Request(
+        "http://localhost/api/scan?timeframe=4h&batchMode=true&batchSize=35&cursor=35",
+      ),
+    );
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(body).toMatchObject({
+      batchMode: true,
+      cursor: 35,
+      nextCursor: 70,
+      hasMore: true,
+      batchSize: 35,
+      batchIndex: 2,
+      totalBatches: 3,
+      totalEligibleCount: 80,
+      scannedInBatch: 35,
+      scannedCount: 35,
+      eligibleCount: 80,
+    });
+    expect(scanMarketMock).toHaveBeenCalledTimes(35);
+    expect(scanMarketMock).toHaveBeenCalledWith("COIN35USDT", "4h");
+    expect(scanMarketMock).toHaveBeenLastCalledWith("COIN69USDT", "4h");
+  });
+
+  it("defaults batchSize to 35 in batch mode", async () => {
+    const markets = Array.from({ length: 36 }, (_, index) => ({
+      exchange: "binance",
+      symbol: `DEF${index}USDT`,
+    }));
+    getEligibleUsdtMarketsMock.mockResolvedValue({
+      markets,
+      totalUsdtPairs: 36,
+      eligibleCount: 36,
+      filteredLowVolume: 0,
+      excludedStableOrLeveraged: 0,
+      capped: false,
+    });
+    scanMarketMock.mockImplementation((symbol: string) =>
+      makeResult({ symbol, sufficientHistory: true }),
+    );
+
+    const response = await GET(
+      new Request("http://localhost/api/scan?timeframe=4h&batchMode=true"),
+    );
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(body.batchSize).toBe(35);
+    expect(body.nextCursor).toBe(35);
+    expect(body.hasMore).toBe(true);
+    expect(scanMarketMock).toHaveBeenCalledTimes(35);
+  });
+
+  it("clamps batchSize above 40 to the Cloudflare Free safe maximum", async () => {
+    const markets = Array.from({ length: 50 }, (_, index) => ({
+      exchange: "binance",
+      symbol: `SAFE${index}USDT`,
+    }));
+    getEligibleUsdtMarketsMock.mockResolvedValue({
+      markets,
+      totalUsdtPairs: 50,
+      eligibleCount: 50,
+      filteredLowVolume: 0,
+      excludedStableOrLeveraged: 0,
+      capped: false,
+    });
+    scanMarketMock.mockImplementation((symbol: string) =>
+      makeResult({ symbol, sufficientHistory: true }),
+    );
+
+    const response = await GET(
+      new Request(
+        "http://localhost/api/scan?timeframe=4h&batchMode=true&batchSize=99",
+      ),
+    );
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(body.batchSize).toBe(40);
+    expect(body.scannedInBatch).toBe(40);
+    expect(scanMarketMock).toHaveBeenCalledTimes(40);
+  });
+
+  it("classifies platform subrequest failures separately from indicator failures", async () => {
+    getEligibleUsdtMarketsMock.mockResolvedValue({
+      markets: [{ exchange: "binance", symbol: "AAAUSDT" }],
+      totalUsdtPairs: 1,
+      eligibleCount: 1,
+      filteredLowVolume: 0,
+      excludedStableOrLeveraged: 0,
+      capped: false,
+    });
+    scanMarketMock.mockImplementation(() => {
+      throw new Error("Too many subrequests by single Worker invocation.");
+    });
+
+    const response = await GET(
+      new Request("http://localhost/api/scan?timeframe=4h&batchMode=true"),
+    );
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(body.failureSummary.subrequestLimitExceeded).toBe(1);
+    expect(body.failureSummary.indicatorFailed).toBe(0);
+    expect(body.failureSummary.fetchFailed).toBe(0);
+  });
 });
 
 function makeResult({
   symbol,
   sufficientHistory,
+  rankScore = 80,
 }: {
   symbol: string;
   sufficientHistory: boolean;
+  rankScore?: number;
 }) {
   return {
     exchange: "binance",
@@ -236,7 +366,7 @@ function makeResult({
     opportunityScore: 70,
     confirmationScore: 50,
     riskScore: 20,
-    rankScore: 80,
+    rankScore,
     rsi14: 55,
     bbWidthPercentile: 20,
     volumeRatio: 1,

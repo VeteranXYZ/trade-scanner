@@ -223,6 +223,15 @@ NEXT_PUBLIC_DEPLOY_TARGET=cloudflare
 
 When those flags are active, Cloudflare production uses `source=remote` only. `source=local` and local sync routes return a friendly `501`. SQLite modules remain isolated behind local Node.js branches. D1 is future optional only and is not configured for Phase 1.
 
+Cloudflare Workers Free has a strict external subrequest limit per Worker invocation. Full eligible-market scans must therefore use a temporary sequential frontend batching path in Phase 1:
+
+- `/api/scan?source=remote&timeframe=4h&batchMode=true&batchSize=35&cursor=0`
+- Default batch size: `35`
+- Maximum safe API batch size: `40`
+- The frontend requests one batch at a time, appends results, deduplicates, and sorts the final combined result set by `rankScore`.
+
+Do not add D1, KV, R2, Queues, Durable Objects, or database persistence for this temporary batching solution. Workers Paid may remove the need for frontend batching later.
+
 ### 2.4 Timeframe Boundary
 
 The product is designed for medium-to-large timeframe coin selection during larger market moves, not intraday scalping.
@@ -1071,6 +1080,9 @@ source=remote
 timeframe=4h
 maxSymbols=all
 minQuoteVolume=0
+batchMode=true
+batchSize=35
+cursor=0
 ```
 
 `maxSymbols` is a scan-universe cap, not a display row limit. Leave it empty or pass `maxSymbols=all` for full-market selection. Numeric values such as `100` or `200` narrow how many eligible markets are scanned.
@@ -1100,9 +1112,19 @@ Response:
     insufficientHistory: number;
     fetchFailed: number;
     indicatorFailed: number;
+    subrequestLimitExceeded: number;
     filteredLowVolume: number;
     excludedStableOrLeveraged: number;
   };
+  batchMode?: true;
+  cursor?: number;
+  nextCursor?: number | null;
+  hasMore?: boolean;
+  batchSize?: number;
+  batchIndex?: number;
+  totalBatches?: number;
+  totalEligibleCount?: number;
+  scannedInBatch?: number;
   results: ScanResult[];
   itemCount: number;
   errors?: {

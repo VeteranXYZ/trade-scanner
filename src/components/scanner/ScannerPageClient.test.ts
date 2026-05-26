@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 import {
   filterAndSortResults,
   getSignalSummary,
+  mergeBatchScanResponses,
+  shouldUseBatchedScan,
   type ScannerFiltersState,
 } from "./ScannerPageClient";
 import type {
@@ -135,6 +137,124 @@ describe("scanner signal summary", () => {
       { signal: "WEAK", count: 0 },
       { signal: "NEUTRAL", count: 0 },
     ]);
+  });
+});
+
+describe("scanner batched fetch helpers", () => {
+  it("uses batched scan mode for full remote single-timeframe scans only", () => {
+    expect(shouldUseBatchedScan(makeFilters({ maxSymbols: "ALL" }))).toBe(true);
+    expect(shouldUseBatchedScan(makeFilters({ maxSymbols: 100 }))).toBe(false);
+    expect(shouldUseBatchedScan(makeFilters({ mode: "mtf" }))).toBe(false);
+  });
+
+  it("combines, deduplicates, and sorts batch results by rank score", () => {
+    const merged = mergeBatchScanResponses([
+      {
+        exchange: "binance",
+        timeframe: "4h",
+        source: "remote",
+        universe: "all-eligible-usdt",
+        eligibleCount: 4,
+        scannedCount: 2,
+        scannedInBatch: 2,
+        failedCount: 1,
+        skippedCount: 0,
+        cached: true,
+        cacheTtlSeconds: 3600,
+        cacheExpiresAt: "2026-05-25T11:00:00.000Z",
+        updatedAt: "2026-05-25T10:00:00.000Z",
+        durationMs: 100,
+        batchMode: true,
+        batchIndex: 1,
+        totalBatches: 2,
+        totalEligibleCount: 4,
+        hasMore: true,
+        nextCursor: 2,
+        failureSummary: {
+          insufficientHistory: 0,
+          fetchFailed: 1,
+          indicatorFailed: 0,
+          subrequestLimitExceeded: 0,
+          filteredLowVolume: 2,
+          excludedStableOrLeveraged: 1,
+        },
+        results: [
+          makeResult({
+            symbol: "AAAUSDT",
+            signalState: "WATCHLIST",
+            phase: "SQUEEZE",
+            rankScore: 20,
+          }),
+          makeResult({
+            symbol: "BBBUSDT",
+            signalState: "WATCHLIST",
+            phase: "SQUEEZE",
+            rankScore: 80,
+          }),
+        ],
+        itemCount: 2,
+      },
+      {
+        exchange: "binance",
+        timeframe: "4h",
+        source: "remote",
+        universe: "all-eligible-usdt",
+        eligibleCount: 4,
+        scannedCount: 2,
+        scannedInBatch: 2,
+        failedCount: 0,
+        skippedCount: 0,
+        cached: true,
+        cacheTtlSeconds: 3600,
+        cacheExpiresAt: "2026-05-25T11:00:00.000Z",
+        updatedAt: "2026-05-25T10:01:00.000Z",
+        durationMs: 150,
+        batchMode: true,
+        batchIndex: 2,
+        totalBatches: 2,
+        totalEligibleCount: 4,
+        hasMore: false,
+        nextCursor: null,
+        failureSummary: {
+          insufficientHistory: 1,
+          fetchFailed: 0,
+          indicatorFailed: 0,
+          subrequestLimitExceeded: 0,
+          filteredLowVolume: 2,
+          excludedStableOrLeveraged: 1,
+        },
+        results: [
+          makeResult({
+            symbol: "CCCUSDT",
+            signalState: "WATCHLIST",
+            phase: "SQUEEZE",
+            rankScore: 60,
+          }),
+          makeResult({
+            symbol: "AAAUSDT",
+            signalState: "WATCHLIST",
+            phase: "SQUEEZE",
+            rankScore: 40,
+          }),
+        ],
+        itemCount: 2,
+      },
+    ]);
+
+    expect(merged.results.map((result) => result.symbol)).toEqual([
+      "BBBUSDT",
+      "CCCUSDT",
+      "AAAUSDT",
+    ]);
+    expect(merged.scannedCount).toBe(4);
+    expect(merged.failedCount).toBe(1);
+    expect(merged.durationMs).toBe(250);
+    expect(merged.failureSummary).toMatchObject({
+      insufficientHistory: 1,
+      fetchFailed: 1,
+      filteredLowVolume: 2,
+      excludedStableOrLeveraged: 1,
+    });
   });
 });
 

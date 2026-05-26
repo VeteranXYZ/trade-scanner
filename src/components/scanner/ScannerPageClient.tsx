@@ -40,9 +40,19 @@ type ScanApiResponse = {
     insufficientHistory: number;
     fetchFailed: number;
     indicatorFailed: number;
+    subrequestLimitExceeded: number;
     filteredLowVolume: number;
     excludedStableOrLeveraged: number;
   };
+  batchMode?: true;
+  cursor?: number;
+  nextCursor?: number | null;
+  hasMore?: boolean;
+  batchSize?: number;
+  batchIndex?: number;
+  totalBatches?: number;
+  totalEligibleCount?: number;
+  scannedInBatch?: number;
   results: ScanResult[];
   itemCount: number;
   scannedMarketCount?: number;
@@ -50,6 +60,19 @@ type ScanApiResponse = {
   errors?: { symbol: string; message: string }[];
   cached: boolean;
   updatedAt: string;
+};
+
+type BatchProgress = {
+  batchIndex: number;
+  totalBatches: number;
+  scannedCount: number;
+  totalEligibleCount: number;
+  failedCount: number;
+};
+
+type FetchScanOptions = {
+  signal?: AbortSignal;
+  onBatchProgress?: (progress: BatchProgress | null) => void;
 };
 
 export type ScannerMode = "single" | "mtf";
@@ -89,6 +112,7 @@ export function ScannerPageClient() {
   const { dictionary: t } = useLanguage();
   const [filters, setFilters] = useState<ScannerFiltersState>(initialFilters);
   const [selectedSymbol, setSelectedSymbol] = useState<string | null>(null);
+  const [batchProgress, setBatchProgress] = useState<BatchProgress | null>(null);
   const scanQuery = useQuery({
     queryKey: [
       "scan",
@@ -99,7 +123,11 @@ export function ScannerPageClient() {
       filters.maxSymbols,
       filters.minQuoteVolume,
     ],
-    queryFn: () => fetchScan(filters),
+    queryFn: ({ signal }) =>
+      fetchScan(filters, {
+        signal,
+        onBatchProgress: setBatchProgress,
+      }),
   });
   const filteredRows = useMemo(
     () => filterAndSortResults(scanQuery.data?.results ?? [], filters),
@@ -123,6 +151,7 @@ export function ScannerPageClient() {
   function updateFilters(nextFilters: ScannerFiltersState) {
     setFilters(normalizeFilters(nextFilters));
     setSelectedSymbol(null);
+    setBatchProgress(null);
   }
 
   function selectSignal(signal: ScannerSignalState | "ALL") {
@@ -178,7 +207,7 @@ export function ScannerPageClient() {
         </div>
       </div>
 
-      <ScanScopePanel data={scanQuery.data ?? null} />
+      <ScanScopePanel data={scanQuery.data ?? null} progress={batchProgress} />
 
       <div className="grid gap-5 xl:grid-cols-[280px_minmax(0,1fr)_380px]">
         <ScannerFilters filters={filters} onChange={updateFilters} />
@@ -218,7 +247,13 @@ export function ScannerPageClient() {
   );
 }
 
-export function ScanScopePanel({ data }: { data: ScanApiResponse | null }) {
+export function ScanScopePanel({
+  data,
+  progress,
+}: {
+  data: ScanApiResponse | null;
+  progress?: BatchProgress | null;
+}) {
   const { dictionary: t } = useLanguage();
 
   return (
@@ -227,10 +262,29 @@ export function ScanScopePanel({ data }: { data: ScanApiResponse | null }) {
       <p className="mt-1 text-xs leading-5 text-[var(--muted)]">
         {t.scanner.cachePolicyNote}
       </p>
+      <p className="mt-1 text-xs leading-5 text-[var(--muted)]">
+        {t.scanner.cloudflareBatchNote}
+      </p>
 
       {data?.capped && (
         <div className="mt-3 rounded-md border border-[var(--warning)] bg-[#2b2111] px-3 py-2 text-xs font-semibold text-[var(--warning)]">
           {t.scanner.cappedWarning}
+        </div>
+      )}
+
+      {progress && (
+        <div className="mt-3 rounded-md border border-[var(--border)] bg-[#0b0f14] px-3 py-2 text-xs text-[var(--muted)]">
+          <span className="font-semibold text-[var(--foreground)]">
+            {t.scanner.scanningBatch} {progress.batchIndex} /{" "}
+            {progress.totalBatches}
+          </span>
+          <span className="ml-3">
+            {t.scanner.scanned}: {formatInteger(progress.scannedCount)} /{" "}
+            {formatInteger(progress.totalEligibleCount)}
+          </span>
+          <span className="ml-3">
+            {t.scanner.failedMarkets}: {formatInteger(progress.failedCount)}
+          </span>
         </div>
       )}
 
@@ -277,6 +331,10 @@ export function ScanScopePanel({ data }: { data: ScanApiResponse | null }) {
           <span>
             {t.scanner.indicatorFailed}:{" "}
             {formatInteger(data.failureSummary.indicatorFailed)}
+          </span>
+          <span>
+            {t.scanner.subrequestLimitExceeded}:{" "}
+            {formatInteger(data.failureSummary.subrequestLimitExceeded)}
           </span>
           <span>
             {t.scanner.filteredLowVolume}:{" "}
@@ -418,15 +476,27 @@ function HeaderMetric({ label, value }: { label: string; value: string }) {
   );
 }
 
-async function fetchScan(filters: ScannerFiltersState) {
+async function fetchScan(
+  filters: ScannerFiltersState,
+  options: FetchScanOptions = {},
+) {
+  options.onBatchProgress?.(null);
+
   if (filters.mode === "mtf") {
-    return fetchMtfScan(filters);
+    return fetchMtfScan(filters, options.signal);
   }
 
-  return fetchSingleTimeframeScan(filters);
+  return fetchSingleTimeframeScan(filters, options);
 }
 
-async function fetchSingleTimeframeScan(filters: ScannerFiltersState) {
+export async function fetchSingleTimeframeScan(
+  filters: ScannerFiltersState,
+  options: FetchScanOptions = {},
+) {
+  if (shouldUseBatchedScan(filters)) {
+    return fetchBatchedSingleTimeframeScan(filters, options);
+  }
+
   const params = new URLSearchParams({
     timeframe: filters.timeframe,
     source: filters.source,
@@ -438,21 +508,72 @@ async function fetchSingleTimeframeScan(filters: ScannerFiltersState) {
     params.set("maxSymbols", String(maxSymbols));
   }
 
-  const response = await fetch(`/api/scan?${params.toString()}`);
+  const response = await fetch(`/api/scan?${params.toString()}`, {
+    signal: options.signal,
+  });
 
   if (!response.ok) {
-    const errorBody = (await response.json().catch(() => null)) as
-      | { error?: string; message?: string }
-      | null;
-    throw new Error(
-      errorBody?.message ?? errorBody?.error ?? "Scanner request failed.",
-    );
+    throw new Error(await getScannerErrorMessage(response, "Scanner request failed."));
   }
 
   return (await response.json()) as ScanApiResponse;
 }
 
-async function fetchMtfScan(filters: ScannerFiltersState) {
+async function fetchBatchedSingleTimeframeScan(
+  filters: ScannerFiltersState,
+  options: FetchScanOptions,
+) {
+  const batchSize = 35;
+  let cursor = 0;
+  let response: ScanApiResponse | null = null;
+  const responses: ScanApiResponse[] = [];
+
+  try {
+    do {
+      const params = new URLSearchParams({
+        timeframe: filters.timeframe,
+        source: filters.source,
+        minQuoteVolume: String(filters.minQuoteVolume),
+        batchMode: "true",
+        batchSize: String(batchSize),
+        cursor: String(cursor),
+      });
+      const batchResponse = await fetch(`/api/scan?${params.toString()}`, {
+        signal: options.signal,
+      });
+
+      if (!batchResponse.ok) {
+        throw new Error(
+          await getScannerErrorMessage(batchResponse, "Scanner batch request failed."),
+        );
+      }
+
+      response = (await batchResponse.json()) as ScanApiResponse;
+      responses.push(response);
+      options.onBatchProgress?.({
+        batchIndex: response.batchIndex ?? responses.length,
+        totalBatches: response.totalBatches ?? responses.length,
+        scannedCount: responses.reduce(
+          (sum, item) => sum + (item.scannedInBatch ?? item.scannedCount ?? 0),
+          0,
+        ),
+        totalEligibleCount:
+          response.totalEligibleCount ?? response.eligibleCount ?? response.itemCount,
+        failedCount: responses.reduce((sum, item) => sum + (item.failedCount ?? 0), 0),
+      });
+      cursor = response.nextCursor ?? 0;
+    } while (response.hasMore && response.nextCursor !== null);
+
+    return mergeBatchScanResponses(responses);
+  } finally {
+    options.onBatchProgress?.(null);
+  }
+}
+
+async function fetchMtfScan(
+  filters: ScannerFiltersState,
+  signal?: AbortSignal,
+) {
   const params = new URLSearchParams({
     preset: filters.mtfPreset,
     source: filters.source,
@@ -464,18 +585,127 @@ async function fetchMtfScan(filters: ScannerFiltersState) {
     params.set("maxSymbols", String(maxSymbols));
   }
 
-  const response = await fetch(`/api/scan/mtf?${params.toString()}`);
+  const response = await fetch(`/api/scan/mtf?${params.toString()}`, { signal });
 
   if (!response.ok) {
-    const errorBody = (await response.json().catch(() => null)) as
-      | { error?: string; message?: string }
-      | null;
-    throw new Error(
-      errorBody?.message ?? errorBody?.error ?? "MTF scanner request failed.",
-    );
+    throw new Error(await getScannerErrorMessage(response, "MTF scanner request failed."));
   }
 
   return (await response.json()) as ScanApiResponse;
+}
+
+export function shouldUseBatchedScan(filters: ScannerFiltersState) {
+  return (
+    filters.mode === "single" &&
+    filters.source === "remote" &&
+    filters.maxSymbols === "ALL"
+  );
+}
+
+export function mergeBatchScanResponses(responses: ScanApiResponse[]) {
+  if (responses.length === 0) {
+    throw new Error("No scanner batches returned.");
+  }
+
+  const [first] = responses;
+  const resultMap = new Map<string, ScanResult>();
+
+  for (const response of responses) {
+    for (const result of response.results) {
+      resultMap.set(
+        `${result.exchange}:${result.symbol}:${result.timeframe}`,
+        result,
+      );
+    }
+  }
+
+  const results = Array.from(resultMap.values()).sort(
+    (left, right) => right.rankScore - left.rankScore,
+  );
+  const failedCount = responses.reduce(
+    (sum, response) => sum + (response.failedCount ?? 0),
+    0,
+  );
+  const scannedCount = responses.reduce(
+    (sum, response) =>
+      sum + (response.scannedInBatch ?? response.scannedCount ?? 0),
+    0,
+  );
+
+  return {
+    ...first,
+    batchMode: true as const,
+    hasMore: false,
+    nextCursor: null,
+    batchIndex: responses.at(-1)?.batchIndex,
+    totalBatches: responses.at(-1)?.totalBatches,
+    totalEligibleCount:
+      responses.at(-1)?.totalEligibleCount ??
+      first.totalEligibleCount ??
+      first.eligibleCount,
+    scannedInBatch: responses.at(-1)?.scannedInBatch,
+    cached: responses.every((response) => response.cached),
+    durationMs: responses.reduce(
+      (sum, response) => sum + (response.durationMs ?? 0),
+      0,
+    ),
+    scannedCount,
+    scannedMarketCount: scannedCount,
+    failedCount,
+    skippedCount: responses.reduce(
+      (sum, response) => sum + (response.skippedCount ?? 0),
+      0,
+    ),
+    failureSummary: mergeFailureSummaries(responses),
+    errors: responses.flatMap((response) => response.errors ?? []).slice(0, 10),
+    results,
+    itemCount: results.length,
+    updatedAt: responses.at(-1)?.updatedAt ?? first.updatedAt,
+    cacheExpiresAt: responses.at(-1)?.cacheExpiresAt ?? first.cacheExpiresAt,
+    lastClosedCandleTime: getLatestIsoTime(
+      responses.map((response) => response.lastClosedCandleTime),
+    ),
+  } satisfies ScanApiResponse;
+}
+
+function mergeFailureSummaries(responses: ScanApiResponse[]) {
+  return responses.reduce(
+    (summary, response) => ({
+      insufficientHistory:
+        summary.insufficientHistory +
+        (response.failureSummary?.insufficientHistory ?? 0),
+      fetchFailed: summary.fetchFailed + (response.failureSummary?.fetchFailed ?? 0),
+      indicatorFailed:
+        summary.indicatorFailed + (response.failureSummary?.indicatorFailed ?? 0),
+      subrequestLimitExceeded:
+        summary.subrequestLimitExceeded +
+        (response.failureSummary?.subrequestLimitExceeded ?? 0),
+      filteredLowVolume: response.failureSummary?.filteredLowVolume ?? 0,
+      excludedStableOrLeveraged:
+        response.failureSummary?.excludedStableOrLeveraged ?? 0,
+    }),
+    {
+      insufficientHistory: 0,
+      fetchFailed: 0,
+      indicatorFailed: 0,
+      subrequestLimitExceeded: 0,
+      filteredLowVolume: 0,
+      excludedStableOrLeveraged: 0,
+    },
+  );
+}
+
+async function getScannerErrorMessage(response: Response, fallback: string) {
+  const errorBody = (await response.json().catch(() => null)) as
+    | { error?: string; message?: string }
+    | null;
+  const message = errorBody?.message ?? errorBody?.error ?? fallback;
+
+  if (/too many subrequests|subrequests|single worker invocation/i.test(message)) {
+    return "Cloudflare Free subrequest limit reached. Try a smaller batch size.";
+  }
+
+  return message;
 }
 
 function normalizeFilters(filters: ScannerFiltersState): ScannerFiltersState {
@@ -519,6 +749,16 @@ function formatDateTime(value: string | undefined) {
   }
 
   return new Date(value).toLocaleString();
+}
+
+function getLatestIsoTime(values: Array<string | null | undefined>) {
+  const latest = Math.max(
+    ...values
+      .map((value) => (value ? Date.parse(value) : Number.NaN))
+      .filter(Number.isFinite),
+  );
+
+  return Number.isFinite(latest) ? new Date(latest).toISOString() : null;
 }
 
 function formatDisplayCount(displayed: number, total: number) {

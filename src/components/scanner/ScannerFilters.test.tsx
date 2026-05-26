@@ -46,6 +46,7 @@ describe("scanner diagnostics panel", () => {
                 insufficientHistory: 1,
                 fetchFailed: 1,
                 indicatorFailed: 1,
+                subrequestLimitExceeded: 0,
                 filteredLowVolume: 4,
                 excludedStableOrLeveraged: 3,
               },
@@ -64,6 +65,7 @@ describe("scanner diagnostics panel", () => {
     expect(html).toContain("Scanner reached the safety cap");
     expect(html).toContain("Insufficient history");
     expect(html).toContain("Low volume filtered");
+    expect(html).toContain("Full-market scans are processed in small batches");
   });
 });
 
