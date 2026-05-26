@@ -1,5 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { GET as getDataSync } from "../../app/api/data/sync/route";
+import {
+  GET as getDataSync,
+  POST as postDataSync,
+} from "../../app/api/data/sync/route";
 import { GET as getHistoryScans } from "../../app/api/history/scans/route";
 
 vi.mock("@/lib/storage/marketData", () => {
@@ -31,6 +34,21 @@ describe("local persistence route guards", () => {
   it("blocks local history without importing filesystem storage", async () => {
     const response = await getHistoryScans(
       new Request("http://localhost/api/history/scans"),
+    );
+    const body = await response.json();
+
+    expect(response.status).toBe(501);
+    expect(body.error).toContain("Persistent scan history is not enabled");
+  });
+
+  it("blocks Cloudflare data sync instead of using a remote database", async () => {
+    vi.stubEnv("NEXT_PUBLIC_DEPLOY_TARGET", "cloudflare");
+
+    const response = await postDataSync(
+      new Request("http://localhost/api/data/sync", {
+        method: "POST",
+        body: JSON.stringify({ mode: "incremental", timeframes: ["4h"] }),
+      }),
     );
     const body = await response.json();
 

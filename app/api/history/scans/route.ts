@@ -1,9 +1,7 @@
 import { NextResponse } from "next/server";
-import {
-  isCloudflareDeployTarget,
-  isLocalPersistenceDisabled,
-  localPersistenceUnavailableMessage,
-} from "@/lib/runtime/localPersistence";
+
+const disabledMessage =
+  "Persistent scan history is not enabled in this deployment. This private scanner currently uses real-time Remote Binance scans only.";
 
 export const runtime = "nodejs";
 
@@ -22,42 +20,21 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: limit.error }, { status: 400 });
   }
 
-  if (!isCloudflareDeployTarget() && isLocalPersistenceDisabled()) {
-    return localPersistenceUnavailableResponse();
-  }
-
-  try {
-    if (isCloudflareDeployTarget()) {
-      const { getScanHistoryFromD1 } = await import(
-        "@/lib/storage/d1ScanSnapshots"
-      );
-      return NextResponse.json(await getScanHistoryFromD1(limit.value));
-    }
-
-    const { getRecentScanSnapshots, summarizeScanSnapshots } = await import(
-      "@/lib/storage/scanSnapshots"
-    );
-    const snapshots = await getRecentScanSnapshots(limit.value);
-
-    return NextResponse.json({
-      snapshots,
-      itemCount: snapshots.length,
-      summary: summarizeScanSnapshots(snapshots),
-    });
-  } catch (error) {
-    return NextResponse.json(
-      {
-        error: "Failed to read scan history.",
-        message: error instanceof Error ? error.message : "Unknown error",
-      },
-      { status: 500 },
-    );
-  }
-}
-
-function localPersistenceUnavailableResponse() {
   return NextResponse.json(
-    { error: localPersistenceUnavailableMessage },
+    {
+      error: disabledMessage,
+      snapshots: [],
+      itemCount: 0,
+      summary: {
+        snapshotCount: 0,
+        resultCount: 0,
+        latestAt: null,
+        byMode: {},
+        bySignal: {},
+        byPhase: {},
+        byAlignment: {},
+      },
+    },
     { status: 501 },
   );
 }

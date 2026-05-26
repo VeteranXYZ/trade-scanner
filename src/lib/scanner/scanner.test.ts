@@ -222,24 +222,22 @@ describe("scanner explanations", () => {
 describe("multi-timeframe alignment", () => {
   it("classifies 4H and 1D constructive structure as strong alignment", () => {
     const summary = summarizeMultiTimeframe([
-      makeScanResult("1h", "WATCHLIST", "SQUEEZE"),
       makeScanResult("4h", "TREND_CONTINUATION", "TRENDING"),
       makeScanResult("1d", "TREND_CONTINUATION", "TRENDING"),
-      makeScanResult("7d", "NEUTRAL", "BASE_BUILDING"),
+      makeScanResult("1w", "NEUTRAL", "BASE_BUILDING"),
       makeScanResult("1M", "NEUTRAL", "BASE_BUILDING"),
     ]);
 
     expect(summary.alignment).toBe("STRONG_ALIGNMENT");
-    expect(summary.constructiveCount).toBe(3);
+    expect(summary.constructiveCount).toBe(2);
     expect(summary.riskCount).toBe(0);
   });
 
   it("classifies multiple higher-timeframe risks as high risk", () => {
     const summary = summarizeMultiTimeframe([
-      makeScanResult("1h", "WATCHLIST", "SQUEEZE"),
       makeScanResult("4h", "TREND_CONTINUATION", "TRENDING"),
       makeScanResult("1d", "WEAK", "BREAKDOWN"),
-      makeScanResult("7d", "HIGH_RISK", "OVEREXTENDED"),
+      makeScanResult("1w", "HIGH_RISK", "OVEREXTENDED"),
       makeScanResult("1M", "NEUTRAL", "BASE_BUILDING"),
     ]);
 
@@ -251,12 +249,12 @@ describe("multi-timeframe alignment", () => {
     const strongResults = [
       makeScanResult("4h", "TREND_CONTINUATION", "TRENDING"),
       makeScanResult("1d", "TREND_CONTINUATION", "TRENDING"),
-      makeScanResult("7d", "NEUTRAL", "BASE_BUILDING"),
+      makeScanResult("1w", "NEUTRAL", "BASE_BUILDING"),
     ];
     const mixedResults = [
       makeScanResult("4h", "NEUTRAL", "BASE_BUILDING"),
       makeScanResult("1d", "NEUTRAL", "BASE_BUILDING"),
-      makeScanResult("7d", "NEUTRAL", "BASE_BUILDING"),
+      makeScanResult("1w", "NEUTRAL", "BASE_BUILDING"),
     ];
 
     expect(

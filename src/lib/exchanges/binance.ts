@@ -64,11 +64,23 @@ export type GetCandlesOptions = {
   endTime?: number;
 };
 
+export type EligibleMarketsOptions = {
+  maxSymbols?: number | null;
+  minQuoteVolume?: number;
+  safetyCap?: number;
+};
+
+export type EligibleMarketsResult = {
+  markets: Market[];
+  totalUsdtPairs: number;
+  eligibleCount: number;
+  capped: boolean;
+};
+
 const timeframeToBinanceInterval = {
-  "1h": "1h",
   "4h": "4h",
   "1d": "1d",
-  "7d": "1w",
+  "1w": "1w",
   "1M": "1M",
 } satisfies Record<Timeframe, string>;
 
@@ -127,9 +139,22 @@ export async function get24hTickers(): Promise<
 }
 
 export async function getTopUsdtMarkets(limit = 100): Promise<Market[]> {
+  const { markets } = await getEligibleUsdtMarkets({
+    maxSymbols: limit,
+    safetyCap: limit,
+  });
+
+  return markets;
+}
+
+export async function getEligibleUsdtMarkets({
+  maxSymbols = null,
+  minQuoteVolume = 0,
+  safetyCap,
+}: EligibleMarketsOptions = {}): Promise<EligibleMarketsResult> {
   const [markets, tickers] = await Promise.all([getSpotMarkets(), get24hTickers()]);
 
-  return markets
+  const eligible = markets
     .map((market) => {
       const ticker = tickers[market.symbol];
 
@@ -140,8 +165,17 @@ export async function getTopUsdtMarkets(limit = 100): Promise<Market[]> {
       };
     })
     .filter((market) => market.quoteVolume > 0)
-    .sort((left, right) => (right.quoteVolume ?? 0) - (left.quoteVolume ?? 0))
-    .slice(0, limit);
+    .filter((market) => (market.quoteVolume ?? 0) >= minQuoteVolume)
+    .sort((left, right) => (right.quoteVolume ?? 0) - (left.quoteVolume ?? 0));
+  const cap = maxSymbols ?? safetyCap ?? eligible.length;
+  const capped = eligible.length > cap;
+
+  return {
+    markets: eligible.slice(0, cap),
+    totalUsdtPairs: markets.length,
+    eligibleCount: eligible.length,
+    capped,
+  };
 }
 
 export async function getCandles(

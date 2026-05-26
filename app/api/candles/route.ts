@@ -4,7 +4,6 @@ import { getCached } from "@/lib/cache/memory";
 import { getCandles } from "@/lib/exchanges/binance";
 import { TIMEFRAMES, type Candle, type Timeframe } from "@/lib/exchanges/types";
 import {
-  isCloudflareDeployTarget,
   isLocalPersistenceDisabled,
   localPersistenceUnavailableMessage,
 } from "@/lib/runtime/localPersistence";
@@ -36,7 +35,7 @@ export async function GET(request: Request) {
 
   if (!isTimeframe(timeframe)) {
     return NextResponse.json(
-      { error: "timeframe must be one of 1h, 4h, 1d, 7d, or 1M." },
+      { error: "timeframe must be one of 4h, 1d, 1w, or 1M." },
       { status: 400 },
     );
   }
@@ -51,7 +50,6 @@ export async function GET(request: Request) {
 
   if (
     source.value === "local" &&
-    !isCloudflareDeployTarget() &&
     isLocalPersistenceDisabled()
   ) {
     return localPersistenceUnavailableResponse();
@@ -131,11 +129,6 @@ function localPersistenceUnavailableResponse() {
 }
 
 async function createMarketDataStore() {
-  if (isCloudflareDeployTarget()) {
-    const { createD1MarketDataStore } = await import("@/lib/storage/d1MarketData");
-    return createD1MarketDataStore();
-  }
-
   const { MarketDataStore } = await import("@/lib/storage/marketData");
   return new MarketDataStore();
 }

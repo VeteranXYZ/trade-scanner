@@ -45,7 +45,7 @@ export async function scanMarketMultiTimeframe(
 }
 
 function pickPrimaryResult(results: ScanResult[], timeframes: Timeframe[]) {
-  const preferredTimeframes: Timeframe[] = ["4h", "1d", "1h", "7d", "1M"];
+  const preferredTimeframes: Timeframe[] = ["4h", "1d", "1w", "1M"];
 
   for (const timeframe of preferredTimeframes) {
     if (timeframes.includes(timeframe)) {

@@ -9,7 +9,7 @@ import type {
   MarketDataSummary,
 } from "./marketDataModel";
 
-export type MarketDataSyncMode = "recent" | "incremental" | "backfill";
+export type MarketDataSyncMode = "recent" | "incremental";
 
 export type MarketDataSyncOptions = {
   mode?: MarketDataSyncMode;
@@ -34,10 +34,9 @@ export type MarketDataSyncResult = {
 };
 
 const defaultCandlesPerTimeframe = {
-  "1h": 1500,
   "4h": 1000,
   "1d": 1000,
-  "7d": 500,
+  "1w": 500,
   "1M": 300,
 } satisfies Record<Timeframe, number>;
 
@@ -162,10 +161,6 @@ async function fetchCandlesForMode({
     return fetchRecentCandles(symbol, timeframe, limit);
   }
 
-  if (mode === "backfill") {
-    return fetchOlderCandles(symbol, timeframe, store, limit);
-  }
-
   const latestOpenTime = await store.getLatestCandleOpenTime({ symbol, timeframe });
 
   if (latestOpenTime === null) {
@@ -175,24 +170,6 @@ async function fetchCandlesForMode({
   return fetchCandlesFromBinance(symbol, timeframe, {
     limit: MAX_BINANCE_KLINES_LIMIT,
     startTime: latestOpenTime + 1,
-  });
-}
-
-async function fetchOlderCandles(
-  symbol: string,
-  timeframe: Timeframe,
-  store: MarketDataStoreLike,
-  limit: number,
-) {
-  const stats = await store.getCandleStats({ symbol, timeframe });
-
-  if (stats.firstOpenTime === null) {
-    return fetchRecentCandles(symbol, timeframe, limit);
-  }
-
-  return fetchCandlesFromBinance(symbol, timeframe, {
-    limit: Math.min(MAX_BINANCE_KLINES_LIMIT, limit),
-    endTime: stats.firstOpenTime - 1,
   });
 }
 

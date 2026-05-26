@@ -63,20 +63,6 @@ export function ScannerFilters({ filters, onChange }: ScannerFiltersProps) {
         </label>
 
         <label className="block">
-          <span className="mb-2 block">{t.scanner.dataSource}</span>
-          <select
-            value={filters.source}
-            onChange={(event) =>
-              update("source", event.target.value as ScannerFiltersState["source"])
-            }
-            className="w-full rounded-md border border-[var(--border)] bg-[#0b0f14] px-3 py-2 text-[var(--foreground)]"
-          >
-            <option value="remote">{t.scanner.remoteBinanceSource}</option>
-            <option value="local">{t.scanner.localSyncedSource}</option>
-          </select>
-        </label>
-
-        <label className="block">
           <span className="mb-2 block">{t.scanner.timeframe}</span>
           <select
             value={filters.timeframe}
@@ -92,6 +78,40 @@ export function ScannerFilters({ filters, onChange }: ScannerFiltersProps) {
               </option>
             ))}
           </select>
+        </label>
+
+        <label className="block">
+          <span className="mb-2 block">{t.scanner.maxSymbols}</span>
+          <select
+            value={filters.maxSymbols}
+            onChange={(event) => {
+              const nextValue =
+                event.target.value === "ALL"
+                  ? "ALL"
+                  : (Number(event.target.value) as ScannerFiltersState["maxSymbols"]);
+
+              update("maxSymbols", nextValue);
+            }}
+            className="w-full rounded-md border border-[var(--border)] bg-[#0b0f14] px-3 py-2 text-[var(--foreground)]"
+          >
+            <option value="ALL">{t.scanner.allEligible}</option>
+            <option value={100}>100</option>
+            <option value={200}>200</option>
+            <option value={400}>400</option>
+            <option value={600}>600</option>
+          </select>
+        </label>
+
+        <label className="block">
+          <span className="mb-2 block">{t.scanner.minQuoteVolume}</span>
+          <input
+            type="number"
+            min="0"
+            step="1000000"
+            value={filters.minQuoteVolume}
+            onChange={(event) => update("minQuoteVolume", Number(event.target.value))}
+            className="w-full rounded-md border border-[var(--border)] bg-[#0b0f14] px-3 py-2 text-[var(--foreground)]"
+          />
         </label>
 
         {filters.mode === "mtf" && (

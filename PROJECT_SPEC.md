@@ -48,7 +48,7 @@ For every phase, Codex must:
 
 ### 0.1 One-sentence positioning
 
-**Crypto Technical Scanner** is a web-based crypto market scanner that ranks Binance USDT spot pairs by technical structure, volatility compression, trend state, confirmation strength, and risk level.
+**Crypto Technical Scanner** is a web-based medium-to-large timeframe crypto market scanner that ranks Binance USDT spot pairs by technical structure, volatility compression, trend state, confirmation strength, and risk level.
 
 ### 0.2 What the product should do
 
@@ -92,8 +92,11 @@ MVP scope:
 
 - Exchange: Binance Spot only
 - Quote asset: USDT only
-- Market universe: Top 100 by 24h quote volume
-- Timeframes: 4h and 1d
+- Market universe: all eligible Binance Spot USDT pairs by default
+- Timeframes: 4h, 1d, 1w, and 1M
+- Minimum timeframe: 4h
+- Core workflow: scan 4h, confirm with 1d, optionally inspect 1w and 1M
+- Unsupported lower intervals: 1h, 15m, 5m, and 1m
 - Indicators:
   - SMA20 / SMA50 / SMA200
   - Bollinger Bands 20, 2
@@ -210,14 +213,34 @@ Cloudflare production supports the remote Binance scanner by default:
 - `/api/scan?source=remote`
 - `/api/scan/mtf?source=remote`
 
-Remote Binance is the default scan source. Scan snapshots, synced markets, synced candles, and sync state are persisted to Cloudflare D1 through the `DB` binding. Local SQLite market-data sync remains a local Node.js development feature. Cloudflare production should set:
+Remote Binance is the default and sufficient scan source for Phase 1. The app is a private real-time scanner, not a paid database warehouse. Paid D1 storage, full candle warehousing, historical backfill, and persistent scan history are out of scope unless a future database backend is added. Cloudflare production should set:
 
 ```txt
 DISABLE_LOCAL_SQLITE=true
 NEXT_PUBLIC_DEPLOY_TARGET=cloudflare
 ```
 
-When those flags are active, Cloudflare production uses D1 for `/api/data/sync`, `/api/candles?source=local`, `/api/scan?source=local`, and `/api/scan/mtf?source=local`. SQLite modules remain isolated behind local Node.js branches. D1 sync supports recent-window refresh, latest incremental sync, and older-history `backfill`; full historical coverage should be built up in bounded batches rather than a single unlimited Worker request.
+When those flags are active, Cloudflare production uses `source=remote` only. `source=local` and local sync routes return a friendly `501`. SQLite modules remain isolated behind local Node.js branches. D1 is future optional only and is not configured for Phase 1.
+
+### 2.4 Timeframe Boundary
+
+The product is designed for medium-to-large timeframe coin selection during larger market moves, not intraday scalping.
+
+Supported scanner, cache, and UI timeframes:
+
+- `4h`
+- `1d`
+- `1w`
+- `1M`
+
+Unsupported lower intervals must return `400` from public scanner/candle APIs:
+
+- `1h`
+- `15m`
+- `5m`
+- `1m`
+
+The default single scan timeframe is `4h`. The default multi-timeframe scan uses `4h` as the primary structure and `1d` as confirmation. `1w` and `1M` are optional higher-timeframe context. Lower intervals were intentionally removed to reduce short-term noise and reduce API/database load.
 
 ---
 
@@ -307,7 +330,7 @@ crypto-technical-scanner/
 ```ts
 export type Exchange = "binance";
 
-export type Timeframe = "1h" | "4h" | "1d";
+export type Timeframe = "4h" | "1d" | "1w" | "1M";
 ```
 
 ### 4.2 Market type
@@ -1083,13 +1106,16 @@ src/lib/cache/keys.ts
 Use:
 
 ```txt
-markets: 1 hour
-tickers: 1 minute
-candles 1h: 2 minutes
-candles 4h: 5 minutes
-candles 1d: 15 minutes
-scan 4h: 5 minutes
-scan 1d: 15 minutes
+markets / exchangeInfo: 12 hours
+tickers: 30 minutes
+candles 4h: 60 minutes
+candles 1d: 6 hours
+candles 1w: 24 hours
+candles 1M: 72 hours
+scan 4h: 60 minutes
+scan 1d: 6 hours
+scan 1w: 24 hours
+scan 1M: 72 hours
 ```
 
 ### 13.3 Cache keys
@@ -1671,7 +1697,7 @@ Implement:
 4. getCandles(symbol, timeframe, limit = 300)
 - Fetch Binance klines
 - Convert raw response to typed Candle[]
-- Support 1h, 4h, 1d
+- Support 4h, 1d, 1w, 1M
 
 Create API routes:
 - /api/markets
@@ -1946,13 +1972,16 @@ src/lib/cache/memory.ts
 src/lib/cache/keys.ts
 
 Implement simple server-side memory cache:
-- markets: 1 hour
-- tickers: 1 minute
-- candles 1h: 2 minutes
-- candles 4h: 5 minutes
-- candles 1d: 15 minutes
-- scan 4h: 5 minutes
-- scan 1d: 15 minutes
+- markets / exchangeInfo: 12 hours
+- tickers: 30 minutes
+- candles 4h: 60 minutes
+- candles 1d: 6 hours
+- candles 1w: 24 hours
+- candles 1M: 72 hours
+- scan 4h: 60 minutes
+- scan 1d: 6 hours
+- scan 1w: 24 hours
+- scan 1M: 72 hours
 
 Add cache keys:
 - markets:binance:spot:usdt

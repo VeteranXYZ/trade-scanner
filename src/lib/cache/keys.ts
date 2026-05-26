@@ -1,6 +1,17 @@
 import type { Timeframe } from "@/lib/exchanges/types";
 
 const minute = 60 * 1000;
+const hour = 60 * minute;
+
+export type ScanCacheKeyOptions = {
+  source: string;
+  timeframe?: Timeframe;
+  preset?: string;
+  universe: string;
+  maxSymbols: number | null;
+  minQuoteVolume: number;
+  filters?: string;
+};
 
 export const cacheKeys = {
   markets: "markets:binance:spot:usdt",
@@ -15,27 +26,59 @@ export const cacheKeys = {
     endTime?: number,
   ) =>
     `candles:binance:${symbol}:${timeframe}:${limit}:start:${startTime ?? "latest"}:end:${endTime ?? "latest"}`,
-  scan: (timeframe: Timeframe, limit: number) =>
-    `scan:binance:${timeframe}:${limit}`,
-  mtfScan: (preset: string, limit: number) => `scan:binance:mtf:${preset}:${limit}`,
+  scan: ({
+    source,
+    timeframe,
+    universe,
+    maxSymbols,
+    minQuoteVolume,
+    filters = "none",
+  }: ScanCacheKeyOptions) =>
+    [
+      "scan",
+      "binance",
+      source,
+      timeframe,
+      universe,
+      `max:${maxSymbols ?? "all"}`,
+      `minQuote:${minQuoteVolume}`,
+      `filters:${filters}`,
+    ].join(":"),
+  mtfScan: ({
+    source,
+    preset,
+    universe,
+    maxSymbols,
+    minQuoteVolume,
+    filters = "none",
+  }: ScanCacheKeyOptions) =>
+    [
+      "scan",
+      "binance",
+      "mtf",
+      source,
+      preset,
+      universe,
+      `max:${maxSymbols ?? "all"}`,
+      `minQuote:${minQuoteVolume}`,
+      `filters:${filters}`,
+    ].join(":"),
 };
 
 export const cacheTtls = {
-  markets: 60 * minute,
-  tickers: minute,
+  markets: 12 * hour,
+  tickers: 30 * minute,
   candles: {
-    "1h": 2 * minute,
-    "4h": 5 * minute,
-    "1d": 15 * minute,
-    "7d": 60 * minute,
-    "1M": 6 * 60 * minute,
+    "4h": 60 * minute,
+    "1d": 6 * hour,
+    "1w": 24 * hour,
+    "1M": 72 * hour,
   } satisfies Record<Timeframe, number>,
   scan: {
-    "1h": 2 * minute,
-    "4h": 5 * minute,
-    "1d": 15 * minute,
-    "7d": 60 * minute,
-    "1M": 6 * 60 * minute,
+    "4h": 60 * minute,
+    "1d": 6 * hour,
+    "1w": 24 * hour,
+    "1M": 72 * hour,
   } satisfies Record<Timeframe, number>,
-  mtfScan: 15 * minute,
+  mtfScan: 60 * minute,
 };

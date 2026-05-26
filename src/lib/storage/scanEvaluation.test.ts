@@ -80,7 +80,7 @@ function makeSnapshot(createdAt: string): StoredScanSnapshot {
     createdAt,
     exchange: "binance",
     mode: "single",
-    timeframe: "1h",
+    timeframe: "4h",
     limit: 1,
     itemCount: 1,
     errorsCount: 0,
@@ -91,7 +91,7 @@ function makeSnapshot(createdAt: string): StoredScanSnapshot {
 function makeResult({ price }: { price: number }): StoredScanResult {
   return {
     symbol: "BTCUSDT",
-    timeframe: "1h",
+    timeframe: "4h",
     price,
     phase: "SQUEEZE",
     signalState: "WATCHLIST",
@@ -135,7 +135,7 @@ function baseEvaluation(
     snapshotId: "snapshot",
     snapshotCreatedAt: "2026-05-25T00:00:00.000Z",
     symbol,
-    timeframe: "1h" as const,
+    timeframe: "4h" as const,
     phase: "SQUEEZE" as const,
     signalState,
     entryPrice: 100,

@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
 import { TIMEFRAMES, type Timeframe } from "@/lib/exchanges/types";
 import {
-  isCloudflareDeployTarget,
   isLocalPersistenceDisabled,
   localPersistenceUnavailableMessage,
 } from "@/lib/runtime/localPersistence";
@@ -10,14 +9,10 @@ export const runtime = "nodejs";
 
 const MAX_MARKET_LIMIT = 500;
 const DEFAULT_MARKET_LIMIT = 200;
-const SUPPORTED_MODES = new Set<MarketDataSyncMode>([
-  "recent",
-  "incremental",
-  "backfill",
-]);
+const SUPPORTED_MODES = new Set<MarketDataSyncMode>(["recent", "incremental"]);
 const SUPPORTED_TIMEFRAMES = new Set<Timeframe>(TIMEFRAMES);
 
-type MarketDataSyncMode = "recent" | "incremental" | "backfill";
+type MarketDataSyncMode = "recent" | "incremental";
 
 type SyncRequestBody = {
   mode?: string;
@@ -26,7 +21,7 @@ type SyncRequestBody = {
 };
 
 export async function GET() {
-  if (!isCloudflareDeployTarget() && isLocalPersistenceDisabled()) {
+  if (isLocalPersistenceDisabled()) {
     return localPersistenceUnavailableResponse();
   }
 
@@ -42,7 +37,7 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
-  if (!isCloudflareDeployTarget() && isLocalPersistenceDisabled()) {
+  if (isLocalPersistenceDisabled()) {
     return localPersistenceUnavailableResponse();
   }
 
@@ -88,11 +83,6 @@ export async function POST(request: Request) {
 }
 
 async function createMarketDataStore() {
-  if (isCloudflareDeployTarget()) {
-    const { createD1MarketDataStore } = await import("@/lib/storage/d1MarketData");
-    return createD1MarketDataStore();
-  }
-
   const { MarketDataStore } = await import("@/lib/storage/marketData");
   return new MarketDataStore();
 }
@@ -110,7 +100,7 @@ function parseMode(value: string | undefined) {
   if (!SUPPORTED_MODES.has(mode as MarketDataSyncMode)) {
     return {
       valid: false as const,
-      error: "mode must be recent, incremental, or backfill.",
+      error: "mode must be recent or incremental.",
     };
   }
 
@@ -144,7 +134,7 @@ function parseTimeframes(value: string[] | undefined) {
   ) {
     return {
       valid: false as const,
-      error: "timeframes must be a non-empty array of 1h, 4h, 1d, 7d, or 1M.",
+      error: "timeframes must be a non-empty array of 4h, 1d, 1w, or 1M.",
     };
   }
 

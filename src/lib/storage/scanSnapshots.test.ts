@@ -79,7 +79,7 @@ function makeSnapshot({
     mode,
     timeframe: mode === "single" ? "4h" : undefined,
     preset: mode === "mtf" ? "swing" : undefined,
-    timeframes: mode === "mtf" ? ["4h", "1d", "7d"] : undefined,
+    timeframes: mode === "mtf" ? ["4h", "1d", "1w"] : undefined,
     limit: 3,
     itemCount: results.length,
     errorsCount: 0,
@@ -101,7 +101,7 @@ function makeSnapshot({
             rankScore: 50,
             constructiveCount: 1,
             riskCount: 0,
-            timeframes: ["4h", "1d", "7d"],
+            timeframes: ["4h", "1d", "1w"],
           }
         : undefined,
     })),

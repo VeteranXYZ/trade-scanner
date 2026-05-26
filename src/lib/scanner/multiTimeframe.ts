@@ -12,19 +12,19 @@ export type MultiTimeframeSummary = Omit<
 >;
 
 export const mtfPresetLabels: Record<MtfPreset, string> = {
-  short: "1H / 4H / 1D",
-  swing: "4H / 1D / 7D",
-  position: "1D / 7D / 1M",
-  full: "1H / 4H / 1D / 7D / 1M",
+  short: "4H / 1D",
+  swing: "4H / 1D / 1W",
+  position: "1D / 1W / 1M",
+  full: "4H / 1D / 1W / 1M",
 };
 
 export type MtfPreset = "short" | "swing" | "position" | "full";
 
 export const mtfPresetTimeframes: Record<MtfPreset, Timeframe[]> = {
-  short: ["1h", "4h", "1d"],
-  swing: ["4h", "1d", "7d"],
-  position: ["1d", "7d", "1M"],
-  full: ["1h", "4h", "1d", "7d", "1M"],
+  short: ["4h", "1d"],
+  swing: ["4h", "1d", "1w"],
+  position: ["1d", "1w", "1M"],
+  full: ["4h", "1d", "1w", "1M"],
 };
 
 const constructiveSignals = new Set<ScannerSignalState>([
@@ -33,7 +33,7 @@ const constructiveSignals = new Set<ScannerSignalState>([
   "TREND_CONTINUATION",
 ]);
 const riskSignals = new Set<ScannerSignalState>(["HIGH_RISK", "WEAK"]);
-const higherTimeframes = new Set<Timeframe>(["1d", "7d", "1M"]);
+const higherTimeframes = new Set<Timeframe>(["1d", "1w", "1M"]);
 
 export function summarizeMultiTimeframe(
   results: ScanResult[],
@@ -43,14 +43,13 @@ export function summarizeMultiTimeframe(
   ).length;
   const riskCount = results.filter((result) => isRisk(result.signal.state)).length;
   const byTimeframe = new Map(results.map((result) => [result.timeframe, result]));
-  const oneHour = byTimeframe.get("1h");
   const fourHour = byTimeframe.get("4h");
   const daily = byTimeframe.get("1d");
   const higherRiskCount = results.filter(
     (result) =>
       higherTimeframes.has(result.timeframe) && isRisk(result.signal.state),
   ).length;
-  const shortTermConstructive = [oneHour, fourHour].some(
+  const shortTermConstructive = [fourHour].some(
     (result) => result && isConstructive(result.signal.state),
   );
   const coreConstructive =
@@ -81,7 +80,7 @@ export function summarizeMultiTimeframe(
     return {
       alignment: "EARLY_4H_SIGNAL",
       label: "Early Signal",
-      summary: "Shorter timeframes are improving before full daily confirmation.",
+      summary: "4H structure is improving before full daily confirmation.",
       constructiveCount,
       riskCount,
     };
@@ -91,7 +90,7 @@ export function summarizeMultiTimeframe(
     return {
       alignment: "DAILY_CONFIRMATION",
       label: "Daily Confirmed",
-      summary: "Daily structure is constructive, but lower timeframes are mixed.",
+      summary: "Daily structure is constructive, but 4H confirmation is mixed.",
       constructiveCount,
       riskCount,
     };

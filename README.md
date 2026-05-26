@@ -1,12 +1,14 @@
 # Crypto Technical Scanner
 
-Crypto Technical Scanner is a web-based technical screening and research tool for Binance USDT spot markets.
+Crypto Technical Scanner is a web-based medium-to-large timeframe technical screening and research tool for Binance USDT spot markets.
 
 It ranks markets by technical structure, volatility compression, confirmation strength, and risk context. It is not a trading bot and does not place trades.
 
 ## What It Does
 
 - Scans Binance USDT spot markets by 24h quote volume.
+- Focuses on larger market moves with supported timeframes `4h`, `1d`, `1w`, and `1M`.
+- Uses `4h` as the minimum timeframe and `4h` + `1d` as the core multi-timeframe workflow.
 - Calculates technical indicators from public candle data.
 - Classifies each market into a neutral market phase.
 - Produces opportunity, confirmation, risk, and rank scores.
@@ -71,31 +73,44 @@ Production mode on Cloudflare supports the remote Binance scanner:
 /api/scan/mtf?source=remote
 ```
 
-Remote Binance is the default scanner source. Cloudflare production persists scan snapshots, synced markets, synced candles, and sync state to Cloudflare D1 through the `DB` binding. Local SQLite market-data sync remains available for local Node.js development. Cloudflare Workers should run with:
+Remote Binance is the default and sufficient scanner source for Phase 1. The app is a private real-time scanner, not a paid database warehouse. D1, full candle warehousing, historical backfill, and persistent scan history are out of scope unless a future database backend is added. Cloudflare Workers should run with:
 
 ```txt
 DISABLE_LOCAL_SQLITE=true
 NEXT_PUBLIC_DEPLOY_TARGET=cloudflare
 ```
 
-These values are set in `wrangler.jsonc`. Cloudflare production uses D1 for synced market data when `source=local`; local-only SQLite code is still isolated from the Worker bundle path.
+These values are set in `wrangler.jsonc`. Cloudflare production uses Remote Binance only; local SQLite code is isolated behind local Node.js branches. `source=local` returns a friendly `501` in Cloudflare production.
 
 Cloudflare commands:
 
 ```bash
 npm run build:cloudflare
-npm run db:migrate:remote
 npm run preview:cloudflare
 npm run deploy:cloudflare
 ```
 
-For local Wrangler preview, apply the D1 migration locally first:
+D1 is not configured in `wrangler.jsonc` for Phase 1. The old migration workflow is intentionally removed.
 
-```bash
-npm run db:migrate:local
-```
+## Timeframes
 
-D1 currently stores scan snapshots, market metadata, candles, and sync state. `/api/data/sync` can run recent-window refreshes, latest incremental syncs, or older-history `backfill` syncs. Full historical coverage should be built up in batches with `backfill`; it is intentionally not a single unlimited request.
+The scanner is designed for medium-to-large timeframe coin selection, not intraday scalping.
+
+Supported public scanner timeframes:
+
+- `4h`
+- `1d`
+- `1w`
+- `1M`
+
+Unsupported lower timeframes intentionally return `400` from public scanner/candle APIs:
+
+- `1h`
+- `15m`
+- `5m`
+- `1m`
+
+The core workflow is to scan eligible Binance USDT pairs on `4h`, confirm structure with `1d`, and optionally inspect `1w` and `1M`. Lower intervals were removed to reduce short-term noise and avoid unnecessary API/database load.
 
 ## Data Source
 
@@ -191,22 +206,24 @@ Market phases:
 ```txt
 GET /api/markets?limit=100
 GET /api/candles?source=remote&symbol=BTCUSDT&timeframe=4h&limit=300
-GET /api/candles?source=local&symbol=BTCUSDT&timeframe=4h&limit=300
-GET /api/scan?source=remote&timeframe=4h&limit=100
-GET /api/scan?source=local&timeframe=4h&limit=100
-GET /api/scan/mtf?source=remote&preset=swing&limit=50
-GET /api/scan/mtf?source=local&preset=swing&limit=50
-GET /api/data/sync
-POST /api/data/sync
+GET /api/scan?source=remote&timeframe=4h
+GET /api/scan?source=remote&timeframe=4h&maxSymbols=200&minQuoteVolume=10000000
+GET /api/scan/mtf?source=remote&preset=short
 ```
 
 Responses include:
 
 - `itemCount`
 - `cached`
+- `cacheTtlSeconds`
+- `cacheExpiresAt`
 - `updatedAt`
+- `durationMs`
+- `eligibleCount`
+- `scannedCount`
+- `failedCount`
 
-The scan route uses `p-limit` with concurrency `5`. If one symbol fails, the route returns partial results and an `errors` array.
+The scan route defaults to the full eligible Binance Spot USDT universe with a hard safety cap of 600 symbols. `maxSymbols` is optional and only narrows the scan when explicitly provided. The scan route uses `p-limit` with concurrency `5`. If one symbol fails, the route returns partial results and an `errors` array.
 
 ## Cache
 
@@ -214,13 +231,16 @@ The MVP uses process-local memory cache.
 
 TTL values:
 
-- Markets: 1 hour
-- 24h tickers: 1 minute
-- 1h candles: 2 minutes
-- 4h candles: 5 minutes
-- 1d candles: 15 minutes
-- 4h scan: 5 minutes
-- 1d scan: 15 minutes
+- Markets / exchangeInfo: 12 hours
+- 24h tickers: 30 minutes
+- 4h candles: 60 minutes
+- 1d candles: 6 hours
+- 1w candles: 24 hours
+- 1M candles: 72 hours
+- 4h scan: 60 minutes
+- 1d scan: 6 hours
+- 1w scan: 24 hours
+- 1M scan: 72 hours
 
 This cache resets when the server process restarts.
 

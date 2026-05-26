@@ -1,4 +1,4 @@
-import type { Timeframe } from "@/lib/exchanges/types";
+import { TIMEFRAMES, type Timeframe } from "@/lib/exchanges/types";
 import type { MtfPreset } from "@/lib/scanner/multiTimeframe";
 import type {
   MarketPhase,
@@ -115,4 +115,59 @@ export function summarizeScanSnapshots(snapshots: StoredScanSnapshot[]) {
   }
 
   return summary;
+}
+
+export function normalizeStoredScanSnapshot(
+  snapshot: StoredScanSnapshot,
+): StoredScanSnapshot {
+  const timeframe = normalizeTimeframe(snapshot.timeframe);
+  const timeframes = snapshot.timeframes
+    ?.map(normalizeTimeframe)
+    .filter((value): value is Timeframe => value !== null);
+  const results = snapshot.results
+    .map(normalizeStoredScanResult)
+    .filter((value): value is StoredScanResult => value !== null);
+
+  return {
+    ...snapshot,
+    timeframe: timeframe ?? undefined,
+    timeframes: timeframes && timeframes.length > 0 ? timeframes : undefined,
+    itemCount: results.length,
+    results,
+  };
+}
+
+function normalizeStoredScanResult(
+  result: StoredScanResult,
+): StoredScanResult | null {
+  const timeframe = normalizeTimeframe(result.timeframe);
+
+  if (!timeframe) {
+    return null;
+  }
+
+  return {
+    ...result,
+    timeframe,
+    multiTimeframe: result.multiTimeframe
+      ? {
+          ...result.multiTimeframe,
+          timeframes: result.multiTimeframe.timeframes
+            .map(normalizeTimeframe)
+            .filter((value): value is Timeframe => value !== null),
+        }
+      : undefined,
+  };
+}
+
+function normalizeTimeframe(value: Timeframe | string | undefined) {
+  if (!value) {
+    return null;
+  }
+
+  if (value === "7d") {
+    return "1w";
+  }
+
+  return TIMEFRAMES.includes(value as Timeframe) ? (value as Timeframe) : null;
 }

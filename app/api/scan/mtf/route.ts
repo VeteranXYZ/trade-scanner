@@ -2,13 +2,12 @@ import { NextResponse } from "next/server";
 import pLimit from "p-limit";
 import { cacheKeys, cacheTtls } from "@/lib/cache/keys";
 import { getCached, setCached } from "@/lib/cache/memory";
-import { getTopUsdtMarkets } from "@/lib/exchanges/binance";
+import { getEligibleUsdtMarkets } from "@/lib/exchanges/binance";
 import {
   mtfPresetTimeframes,
   type MtfPreset,
 } from "@/lib/scanner/multiTimeframe";
 import {
-  isCloudflareDeployTarget,
   isLocalPersistenceDisabled,
   localPersistenceUnavailableMessage,
 } from "@/lib/runtime/localPersistence";
@@ -17,9 +16,9 @@ import type { ScanResult } from "@/lib/scanner/types";
 
 export const runtime = "nodejs";
 
-const DEFAULT_MTF_SCAN_LIMIT = 50;
-const MAX_MTF_SCAN_LIMIT = 100;
+const MAX_ELIGIBLE_SCAN_SYMBOLS = 600;
 const MTF_SCAN_CONCURRENCY = 3;
+const SCAN_UNIVERSE = "all-eligible-usdt";
 const SUPPORTED_PRESETS = new Set<MtfPreset>([
   "short",
   "swing",
@@ -36,22 +35,34 @@ type MtfScanPayload = {
   preset: MtfPreset;
   timeframes: typeof mtfPresetTimeframes[MtfPreset];
   source: ScanSource;
+  universe: typeof SCAN_UNIVERSE;
+  totalUsdtPairs: number;
+  eligibleCount: number;
+  scannedCount: number;
+  scannedMarketCount: number;
+  skippedCount: number;
+  failedCount: number;
+  minQuoteVolume: number;
+  maxSymbols: number | null;
+  capped: boolean;
+  concurrency: number;
+  durationMs: number;
+  cacheTtlSeconds: number;
+  cacheExpiresAt: string;
   results: ScanResult[];
   itemCount: number;
-  scannedMarketCount: number;
-  displayLimit: number;
   errors?: { symbol: string; message: string }[];
 };
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
-  const preset = searchParams.get("preset") ?? "swing";
+  const startedAt = Date.now();
+  const preset = searchParams.get("preset") ?? "short";
   const source = parseSource(searchParams.get("source"));
-  const limit = parseLimit(
-    searchParams.get("limit"),
-    DEFAULT_MTF_SCAN_LIMIT,
-    MAX_MTF_SCAN_LIMIT,
+  const maxSymbols = parseOptionalMaxSymbols(
+    searchParams.get("maxSymbols") ?? searchParams.get("limit"),
   );
+  const minQuoteVolume = parseMinQuoteVolume(searchParams.get("minQuoteVolume"));
 
   if (!isPreset(preset)) {
     return NextResponse.json(
@@ -64,20 +75,29 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: source.error }, { status: 400 });
   }
 
-  if (!limit.valid) {
-    return NextResponse.json({ error: limit.error }, { status: 400 });
+  if (!maxSymbols.valid) {
+    return NextResponse.json({ error: maxSymbols.error }, { status: 400 });
   }
 
-  if (
-    source.value === "local" &&
-    !isCloudflareDeployTarget() &&
-    isLocalPersistenceDisabled()
-  ) {
+  if (!minQuoteVolume.valid) {
+    return NextResponse.json({ error: minQuoteVolume.error }, { status: 400 });
+  }
+
+  if (source.value === "local" && isLocalPersistenceDisabled()) {
     return localPersistenceUnavailableResponse();
   }
 
   try {
-    const cacheKey = cacheKeys.mtfScan(preset, limit.value);
+    const ttlMs = getMtfCacheTtl(preset);
+    const cacheTtlSeconds = Math.floor(ttlMs / 1000);
+    const cacheKey = cacheKeys.mtfScan({
+      source: source.value,
+      preset,
+      universe: SCAN_UNIVERSE,
+      maxSymbols: maxSymbols.value,
+      minQuoteVolume: minQuoteVolume.value,
+      filters: "none",
+    });
     const cachedEntry =
       source.value === "remote" ? getCached<MtfScanPayload>(cacheKey) : null;
 
@@ -86,45 +106,51 @@ export async function GET(request: Request) {
         ...cachedEntry.value,
         cached: true,
         updatedAt: cachedEntry.updatedAt,
+        cacheExpiresAt: new Date(cachedEntry.expiresAt).toISOString(),
+        durationMs: Date.now() - startedAt,
       });
     }
 
-    const { settled, useLocal, scannedMarketCount } = await scanMtfMarkets(
+    const { settled, useLocal, marketStats } = await scanMtfMarkets(
       preset,
-      limit.value,
       source.value,
+      maxSymbols.value,
+      minQuoteVolume.value,
     );
-    const results = settled
-      .flatMap((item) => (item.result ? [item.result] : []))
+    const successful = settled.flatMap((item) => (item.result ? [item.result] : []));
+    const results = successful
+      .filter((result) => result.dataQuality.sufficientHistory)
       .sort((left, right) => right.rankScore - left.rankScore);
     const errors = settled.flatMap((item) => (item.error ? [item.error] : []));
+    const skippedCount = successful.length - results.length;
+    const durationMs = Date.now() - startedAt;
     const payload: MtfScanPayload = {
       exchange: "binance",
       mode: "mtf",
       preset,
       timeframes: mtfPresetTimeframes[preset],
       source: useLocal ? "local" : "remote",
+      universe: SCAN_UNIVERSE,
+      totalUsdtPairs: marketStats.totalUsdtPairs,
+      eligibleCount: marketStats.eligibleCount,
+      scannedCount: marketStats.scannedCount,
+      scannedMarketCount: marketStats.scannedCount,
+      skippedCount,
+      failedCount: errors.length,
+      minQuoteVolume: minQuoteVolume.value,
+      maxSymbols: maxSymbols.value,
+      capped: marketStats.capped,
+      concurrency: MTF_SCAN_CONCURRENCY,
+      durationMs,
+      cacheTtlSeconds,
+      cacheExpiresAt: new Date(Date.now() + ttlMs).toISOString(),
       results,
       itemCount: results.length,
-      scannedMarketCount,
-      displayLimit: limit.value,
       errors: errors.length > 0 ? errors : undefined,
     };
 
     if (errors.length > 0 || useLocal) {
       const updatedAt = new Date().toISOString();
-      await safePersistScanSnapshotIfAvailable({
-        createdAt: updatedAt,
-        exchange: "binance",
-        mode: "mtf",
-        preset,
-        timeframes: mtfPresetTimeframes[preset],
-        limit: limit.value,
-        itemCount: results.length,
-        errorsCount: errors.length,
-        results,
-      });
-
       return NextResponse.json({
         ...payload,
         cached: false,
@@ -132,23 +158,13 @@ export async function GET(request: Request) {
       });
     }
 
-    const entry = setCached(cacheKey, payload, cacheTtls.mtfScan);
-    await safePersistScanSnapshotIfAvailable({
-      createdAt: entry.updatedAt,
-      exchange: "binance",
-      mode: "mtf",
-      preset,
-      timeframes: mtfPresetTimeframes[preset],
-      limit: limit.value,
-      itemCount: results.length,
-      errorsCount: 0,
-      results,
-    });
+    const entry = setCached(cacheKey, payload, ttlMs);
 
     return NextResponse.json({
       ...entry.value,
       cached: false,
       updatedAt: entry.updatedAt,
+      cacheExpiresAt: new Date(entry.expiresAt).toISOString(),
     });
   } catch (error) {
     return NextResponse.json(
@@ -163,20 +179,30 @@ export async function GET(request: Request) {
 
 async function scanMtfMarkets(
   preset: MtfPreset,
-  limit: number,
   source: ScanSource,
+  maxSymbols: number | null,
+  minQuoteVolume: number,
 ) {
   if (source === "remote") {
-    const markets = await getTopUsdtMarkets(limit);
+    const marketResult = await getEligibleUsdtMarkets({
+      maxSymbols,
+      minQuoteVolume,
+      safetyCap: MAX_ELIGIBLE_SCAN_SYMBOLS,
+    });
     const settled = await scanMtfMarketBatch({
-      markets,
+      markets: marketResult.markets,
       getResult: (symbol) => scanMarketMultiTimeframe(symbol, preset),
     });
 
     return {
       settled,
       useLocal: false,
-      scannedMarketCount: markets.length,
+      marketStats: {
+        totalUsdtPairs: marketResult.totalUsdtPairs,
+        eligibleCount: marketResult.eligibleCount,
+        scannedCount: marketResult.markets.length,
+        capped: marketResult.capped,
+      },
     };
   }
 
@@ -186,7 +212,10 @@ async function scanMtfMarkets(
   ]);
 
   try {
-    const markets = (await store.getMarkets()).slice(0, limit);
+    const markets = (await store.getMarkets()).slice(
+      0,
+      maxSymbols ?? MAX_ELIGIBLE_SCAN_SYMBOLS,
+    );
     const settled = await scanMtfMarketBatch({
       markets,
       getResult: (symbol) =>
@@ -197,48 +226,24 @@ async function scanMtfMarkets(
         }),
     });
 
-    return { settled, useLocal: true, scannedMarketCount: markets.length };
+    return {
+      settled,
+      useLocal: true,
+      marketStats: {
+        totalUsdtPairs: markets.length,
+        eligibleCount: markets.length,
+        scannedCount: markets.length,
+        capped: false,
+      },
+    };
   } finally {
     await store.close?.();
   }
 }
 
 async function createMarketDataStore() {
-  if (isCloudflareDeployTarget()) {
-    const { createD1MarketDataStore } = await import("@/lib/storage/d1MarketData");
-    return createD1MarketDataStore();
-  }
-
   const { MarketDataStore } = await import("@/lib/storage/marketData");
   return new MarketDataStore();
-}
-
-type MtfScanSnapshotInput = {
-  createdAt: string;
-  exchange: "binance";
-  mode: "mtf";
-  preset: MtfPreset;
-  timeframes: typeof mtfPresetTimeframes[MtfPreset];
-  limit: number;
-  itemCount: number;
-  errorsCount: number;
-  results: ScanResult[];
-};
-
-async function safePersistScanSnapshotIfAvailable(input: MtfScanSnapshotInput) {
-  if (isCloudflareDeployTarget()) {
-    const { safePersistScanSnapshotToD1 } = await import(
-      "@/lib/storage/d1ScanSnapshots"
-    );
-    return safePersistScanSnapshotToD1(input);
-  }
-
-  if (isLocalPersistenceDisabled()) {
-    return null;
-  }
-
-  const { safePersistScanSnapshot } = await import("@/lib/storage/scanSnapshots");
-  return safePersistScanSnapshot(input);
 }
 
 function localPersistenceUnavailableResponse() {
@@ -296,17 +301,44 @@ function parseSource(value: string | null) {
   return { valid: true as const, value: source as ScanSource };
 }
 
-function parseLimit(value: string | null, fallback: number, max: number) {
-  if (value === null) {
-    return { valid: true as const, value: fallback };
+function getMtfCacheTtl(preset: MtfPreset) {
+  return Math.min(
+    ...mtfPresetTimeframes[preset].map((timeframe) => cacheTtls.scan[timeframe]),
+  );
+}
+
+function parseOptionalMaxSymbols(value: string | null) {
+  if (value === null || value === "" || value === "ALL") {
+    return { valid: true as const, value: null };
   }
 
   const parsed = Number(value);
 
-  if (!Number.isInteger(parsed) || parsed < 1 || parsed > max) {
+  if (
+    !Number.isInteger(parsed) ||
+    parsed < 1 ||
+    parsed > MAX_ELIGIBLE_SCAN_SYMBOLS
+  ) {
     return {
       valid: false as const,
-      error: `limit must be an integer between 1 and ${max}.`,
+      error: `maxSymbols must be an integer between 1 and ${MAX_ELIGIBLE_SCAN_SYMBOLS}.`,
+    };
+  }
+
+  return { valid: true as const, value: parsed };
+}
+
+function parseMinQuoteVolume(value: string | null) {
+  if (value === null || value === "") {
+    return { valid: true as const, value: 0 };
+  }
+
+  const parsed = Number(value);
+
+  if (!Number.isFinite(parsed) || parsed < 0) {
+    return {
+      valid: false as const,
+      error: "minQuoteVolume must be a non-negative number.",
     };
   }
 

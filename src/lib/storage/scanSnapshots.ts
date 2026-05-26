@@ -2,6 +2,7 @@ import { mkdir, readFile, appendFile } from "node:fs/promises";
 import path from "node:path";
 import {
   summarizeScanSnapshots,
+  normalizeStoredScanSnapshot,
   toStoredSnapshot,
   type PersistScanSnapshotInput,
   type ScanSnapshotMode,
@@ -46,7 +47,9 @@ export async function getRecentScanSnapshots(limit = 20) {
     const snapshots = content
       .split("\n")
       .filter(Boolean)
-      .map((line) => JSON.parse(line) as StoredScanSnapshot);
+      .map((line) =>
+        normalizeStoredScanSnapshot(JSON.parse(line) as StoredScanSnapshot),
+      );
 
     return snapshots.slice(-limit).reverse();
   } catch (error) {

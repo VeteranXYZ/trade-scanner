@@ -1,12 +1,12 @@
 "use client";
 
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
 import { useLanguage } from "@/components/providers/LanguageProvider";
 import { ScannerFilters, type ScannerSortKey } from "./ScannerFilters";
 import { ScannerTable } from "./ScannerTable";
 import { SelectedSymbolPanel } from "./SelectedSymbolPanel";
-import { TIMEFRAMES, type Timeframe } from "@/lib/exchanges/types";
+import type { Timeframe } from "@/lib/exchanges/types";
 import type { MtfPreset } from "@/lib/scanner/multiTimeframe";
 import { scannerSignalOrder } from "@/lib/scanner/signal";
 import type {
@@ -22,6 +22,18 @@ type ScanApiResponse = {
   timeframe?: Timeframe;
   preset?: MtfPreset;
   source?: "local" | "remote";
+  universe?: string;
+  eligibleCount?: number;
+  scannedCount?: number;
+  skippedCount?: number;
+  failedCount?: number;
+  minQuoteVolume?: number;
+  maxSymbols?: number | null;
+  capped?: boolean;
+  concurrency?: number;
+  durationMs?: number;
+  cacheTtlSeconds?: number;
+  cacheExpiresAt?: string;
   results: ScanResult[];
   itemCount: number;
   scannedMarketCount?: number;
@@ -29,35 +41,6 @@ type ScanApiResponse = {
   errors?: { symbol: string; message: string }[];
   cached: boolean;
   updatedAt: string;
-};
-
-type MarketDataSummaryResponse = {
-  summary: {
-    marketCount: number;
-    candleCount: number;
-    syncedPairs: number;
-    latestSyncedAt: string | null;
-    failedPairs: number;
-  };
-};
-
-type MarketDataSyncResponse = {
-  mode: "recent" | "incremental" | "backfill";
-  requestedMarkets: number;
-  requestedPairs: number;
-  syncedPairs: number;
-  failedPairs: number;
-  candlesFetched: number;
-  startedAt: string;
-  completedAt: string;
-  summary: MarketDataSummaryResponse["summary"];
-  errors: Array<{ symbol: string; timeframe: Timeframe; message: string }>;
-};
-
-type DataSyncControlsState = {
-  mode: "recent" | "incremental" | "backfill";
-  marketLimit: 50 | 100 | 200 | 500;
-  timeframes: Timeframe[];
 };
 
 export type ScannerMode = "single" | "mtf";
@@ -72,6 +55,8 @@ export type ScannerFiltersState = {
   phase: MarketPhase | "ALL";
   minOpportunityScore: number;
   maxRiskScore: number;
+  minQuoteVolume: number;
+  maxSymbols: 100 | 200 | 400 | 600 | "ALL";
   sortBy: ScannerSortKey;
   limit: 50 | 100 | 200 | "ALL";
 };
@@ -80,24 +65,20 @@ const initialFilters: ScannerFiltersState = {
   mode: "single",
   source: "remote",
   timeframe: "4h",
-  mtfPreset: "swing",
+  mtfPreset: "short",
   signal: "ALL",
   phase: "ALL",
   minOpportunityScore: 0,
   maxRiskScore: 100,
+  minQuoteVolume: 0,
+  maxSymbols: "ALL",
   sortBy: "rankScore",
   limit: 50,
 };
 
 export function ScannerPageClient() {
   const { dictionary: t } = useLanguage();
-  const queryClient = useQueryClient();
   const [filters, setFilters] = useState<ScannerFiltersState>(initialFilters);
-  const [syncControls, setSyncControls] = useState<DataSyncControlsState>({
-    mode: "incremental",
-    marketLimit: 200,
-    timeframes: ["4h"],
-  });
   const [selectedSymbol, setSelectedSymbol] = useState<string | null>(null);
   const scanQuery = useQuery({
     queryKey: [
@@ -106,25 +87,10 @@ export function ScannerPageClient() {
       filters.source,
       filters.timeframe,
       filters.mtfPreset,
-      getApiLimit(filters),
+      filters.maxSymbols,
+      filters.minQuoteVolume,
     ],
     queryFn: () => fetchScan(filters),
-  });
-  const dataSummaryQuery = useQuery({
-    queryKey: ["market-data-summary"],
-    queryFn: fetchMarketDataSummary,
-  });
-  const syncMutation = useMutation({
-    mutationFn: () =>
-      syncMarketData({
-        mode: syncControls.mode,
-        marketLimit: syncControls.marketLimit,
-        timeframes: syncControls.timeframes,
-      }),
-    onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ["market-data-summary"] });
-      void scanQuery.refetch();
-    },
   });
   const filteredRows = useMemo(
     () => filterAndSortResults(scanQuery.data?.results ?? [], filters),
@@ -203,30 +169,7 @@ export function ScannerPageClient() {
         </div>
       </div>
 
-      <LocalDataPanel
-        summary={dataSummaryQuery.data?.summary ?? null}
-        isLoading={dataSummaryQuery.isLoading}
-        isSyncing={syncMutation.isPending}
-        controls={syncControls}
-        syncResult={syncMutation.data ?? null}
-        errorMessage={
-          syncMutation.error instanceof Error ? syncMutation.error.message : null
-        }
-        onControlsChange={setSyncControls}
-        onUseCurrentView={() =>
-          setSyncControls((current) => ({
-            ...current,
-            timeframes: getSyncTimeframes(filters),
-          }))
-        }
-        onUseAllTimeframes={() =>
-          setSyncControls((current) => ({
-            ...current,
-            timeframes: [...TIMEFRAMES],
-          }))
-        }
-        onSync={() => syncMutation.mutate()}
-      />
+      <ScanScopePanel data={scanQuery.data ?? null} />
 
       <div className="grid gap-5 xl:grid-cols-[280px_minmax(0,1fr)_380px]">
         <ScannerFilters filters={filters} onChange={updateFilters} />
@@ -266,178 +209,39 @@ export function ScannerPageClient() {
   );
 }
 
-function LocalDataPanel({
-  summary,
-  isLoading,
-  isSyncing,
-  controls,
-  syncResult,
-  errorMessage,
-  onControlsChange,
-  onUseCurrentView,
-  onUseAllTimeframes,
-  onSync,
-}: {
-  summary: MarketDataSummaryResponse["summary"] | null;
-  isLoading: boolean;
-  isSyncing: boolean;
-  controls: DataSyncControlsState;
-  syncResult: MarketDataSyncResponse | null;
-  errorMessage: string | null;
-  onControlsChange: (controls: DataSyncControlsState) => void;
-  onUseCurrentView: () => void;
-  onUseAllTimeframes: () => void;
-  onSync: () => void;
-}) {
+function ScanScopePanel({ data }: { data: ScanApiResponse | null }) {
   const { dictionary: t } = useLanguage();
-
-  function updateControls(nextControls: Partial<DataSyncControlsState>) {
-    onControlsChange({ ...controls, ...nextControls });
-  }
-
-  function toggleTimeframe(timeframe: Timeframe) {
-    const nextTimeframes = controls.timeframes.includes(timeframe)
-      ? controls.timeframes.filter((item) => item !== timeframe)
-      : [...controls.timeframes, timeframe];
-
-    updateControls({
-      timeframes: nextTimeframes.length > 0 ? nextTimeframes : [timeframe],
-    });
-  }
 
   return (
     <section className="mb-5 rounded-md border border-[var(--border)] bg-[var(--panel)] px-4 py-3">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h2 className="text-sm font-semibold">{t.scanner.localData}</h2>
-          <p className="mt-1 text-xs text-[var(--muted)]">
-            {summary?.latestSyncedAt
-              ? `${t.scanner.latestSync}: ${new Date(
-                  summary.latestSyncedAt,
-                ).toLocaleString()}`
-              : isLoading
-                ? t.common.loading
-                : t.scanner.noLocalData}
-          </p>
-        </div>
-      </div>
+      <h2 className="text-sm font-semibold">{t.scanner.marketUniverse}</h2>
+      <p className="mt-1 text-xs leading-5 text-[var(--muted)]">
+        {t.scanner.cachePolicyNote}
+      </p>
 
       <div className="mt-3 grid gap-2 sm:grid-cols-4">
         <HeaderMetric
-          label={t.scanner.marketsSynced}
-          value={formatInteger(summary?.marketCount)}
+          label={t.scanner.eligibleMarkets}
+          value={formatInteger(data?.eligibleCount)}
         />
         <HeaderMetric
-          label={t.scanner.candlesStored}
-          value={formatInteger(summary?.candleCount)}
+          label={t.scanner.scannedMarkets}
+          value={formatInteger(data?.scannedCount)}
         />
         <HeaderMetric
-          label={t.scanner.syncedPairs}
-          value={formatInteger(summary?.syncedPairs)}
+          label={t.scanner.failedMarkets}
+          value={formatInteger(data?.failedCount)}
         />
         <HeaderMetric
-          label={t.scanner.syncErrors}
-          value={formatInteger(summary?.failedPairs)}
+          label={t.scanner.cacheStatus}
+          value={data?.cached ? t.scanner.cached : t.scanner.live}
         />
       </div>
 
-      <div className="mt-4 grid gap-3 lg:grid-cols-[180px_180px_minmax(0,1fr)_auto] lg:items-end">
-        <label className="text-sm text-[var(--muted)]">
-          <span className="mb-2 block">{t.scanner.syncMode}</span>
-          <select
-            value={controls.mode}
-            onChange={(event) =>
-              updateControls({
-                mode: event.target.value as DataSyncControlsState["mode"],
-              })
-            }
-            className="w-full rounded-md border border-[var(--border)] bg-[#0b0f14] px-3 py-2 text-[var(--foreground)]"
-          >
-            <option value="incremental">{t.scanner.incrementalSync}</option>
-            <option value="recent">{t.scanner.recentSync}</option>
-            <option value="backfill">{t.scanner.backfillSync}</option>
-          </select>
-        </label>
-
-        <label className="text-sm text-[var(--muted)]">
-          <span className="mb-2 block">{t.scanner.marketLimit}</span>
-          <select
-            value={controls.marketLimit}
-            onChange={(event) =>
-              updateControls({
-                marketLimit: Number(
-                  event.target.value,
-                ) as DataSyncControlsState["marketLimit"],
-              })
-            }
-            className="w-full rounded-md border border-[var(--border)] bg-[#0b0f14] px-3 py-2 text-[var(--foreground)]"
-          >
-            <option value={50}>50</option>
-            <option value={100}>100</option>
-            <option value={200}>200</option>
-            <option value={500}>500</option>
-          </select>
-        </label>
-
-        <div>
-          <div className="mb-2 flex flex-wrap items-center gap-2 text-sm text-[var(--muted)]">
-            <span>{t.scanner.syncScope}</span>
-            <button
-              type="button"
-              onClick={onUseCurrentView}
-              className="rounded-md border border-[var(--border)] bg-[#0b0f14] px-2 py-1 text-xs font-semibold text-[var(--foreground)]"
-            >
-              {t.scanner.currentViewScope}
-            </button>
-            <button
-              type="button"
-              onClick={onUseAllTimeframes}
-              className="rounded-md border border-[var(--border)] bg-[#0b0f14] px-2 py-1 text-xs font-semibold text-[var(--foreground)]"
-            >
-              {t.scanner.allTimeframesScope}
-            </button>
-          </div>
-          <div className="flex flex-wrap gap-2">
-            {TIMEFRAMES.map((timeframe) => {
-              const isActive = controls.timeframes.includes(timeframe);
-
-              return (
-                <button
-                  key={timeframe}
-                  type="button"
-                  onClick={() => toggleTimeframe(timeframe)}
-                  className={`rounded-md border px-3 py-2 text-xs font-semibold ${
-                    isActive
-                      ? "border-[var(--foreground)] bg-[#101923] text-[var(--foreground)]"
-                      : "border-[var(--border)] bg-[#0b0f14] text-[var(--muted)]"
-                  }`}
-                >
-                  {t.timeframe[timeframe]}
-                </button>
-              );
-            })}
-          </div>
-        </div>
-
-        <button
-          type="button"
-          onClick={onSync}
-          disabled={isSyncing || controls.timeframes.length === 0}
-          className="rounded-md border border-[var(--border)] bg-[#0b0f14] px-3 py-2 text-sm font-semibold text-[var(--foreground)] disabled:cursor-not-allowed disabled:opacity-60"
-        >
-          {isSyncing ? t.scanner.updatingData : t.scanner.updateLatestData}
-        </button>
-      </div>
-
-      {syncResult && (
+      {data?.cacheExpiresAt && (
         <p className="mt-3 text-xs text-[var(--muted)]">
-          {t.scanner.syncComplete}: {syncResult.candlesFetched}{" "}
-          {t.scanner.candlesStored}, {syncResult.failedPairs}{" "}
-          {t.scanner.syncErrors}
+          {t.scanner.nextRefresh}: {new Date(data.cacheExpiresAt).toLocaleString()}
         </p>
-      )}
-      {errorMessage && (
-        <p className="mt-3 text-xs text-[var(--danger)]">{errorMessage}</p>
       )}
     </section>
   );
@@ -571,70 +375,24 @@ function HeaderMetric({ label, value }: { label: string; value: string }) {
 
 async function fetchScan(filters: ScannerFiltersState) {
   if (filters.mode === "mtf") {
-    return fetchMtfScan(filters.mtfPreset, getApiLimit(filters), filters.source);
+    return fetchMtfScan(filters);
   }
 
-  return fetchSingleTimeframeScan(
-    filters.timeframe,
-    getApiLimit(filters),
-    filters.source,
-  );
+  return fetchSingleTimeframeScan(filters);
 }
 
-async function fetchMarketDataSummary() {
-  const response = await fetch("/api/data/sync");
-
-  if (!response.ok) {
-    const errorBody = (await response.json().catch(() => null)) as
-      | { error?: string; message?: string }
-      | null;
-    throw new Error(
-      errorBody?.message ?? errorBody?.error ?? "Market data request failed.",
-    );
-  }
-
-  return (await response.json()) as MarketDataSummaryResponse;
-}
-
-async function syncMarketData({
-  mode,
-  marketLimit,
-  timeframes,
-}: {
-  mode: "recent" | "incremental" | "backfill";
-  marketLimit: number;
-  timeframes: Timeframe[];
-}) {
-  const response = await fetch("/api/data/sync", {
-    method: "POST",
-    headers: {
-      "content-type": "application/json",
-    },
-    body: JSON.stringify({ mode, marketLimit, timeframes }),
-  });
-
-  if (!response.ok) {
-    const errorBody = (await response.json().catch(() => null)) as
-      | { error?: string; message?: string }
-      | null;
-    throw new Error(
-      errorBody?.message ?? errorBody?.error ?? "Market data sync failed.",
-    );
-  }
-
-  return (await response.json()) as MarketDataSyncResponse;
-}
-
-async function fetchSingleTimeframeScan(
-  timeframe: Timeframe,
-  limit: number,
-  source: ScannerDataSource,
-) {
+async function fetchSingleTimeframeScan(filters: ScannerFiltersState) {
   const params = new URLSearchParams({
-    timeframe,
-    limit: String(limit),
-    source,
+    timeframe: filters.timeframe,
+    source: filters.source,
+    minQuoteVolume: String(filters.minQuoteVolume),
   });
+  const maxSymbols = getApiMaxSymbols(filters);
+
+  if (maxSymbols !== null) {
+    params.set("maxSymbols", String(maxSymbols));
+  }
+
   const response = await fetch(`/api/scan?${params.toString()}`);
 
   if (!response.ok) {
@@ -649,16 +407,18 @@ async function fetchSingleTimeframeScan(
   return (await response.json()) as ScanApiResponse;
 }
 
-async function fetchMtfScan(
-  preset: MtfPreset,
-  limit: number,
-  source: ScannerDataSource,
-) {
+async function fetchMtfScan(filters: ScannerFiltersState) {
   const params = new URLSearchParams({
-    preset,
-    limit: String(limit),
-    source,
+    preset: filters.mtfPreset,
+    source: filters.source,
+    minQuoteVolume: String(filters.minQuoteVolume),
   });
+  const maxSymbols = getApiMaxSymbols(filters);
+
+  if (maxSymbols !== null) {
+    params.set("maxSymbols", String(maxSymbols));
+  }
+
   const response = await fetch(`/api/scan/mtf?${params.toString()}`);
 
   if (!response.ok) {
@@ -677,14 +437,8 @@ function normalizeFilters(filters: ScannerFiltersState): ScannerFiltersState {
   return filters;
 }
 
-function getApiLimit(filters: ScannerFiltersState) {
-  const maxRemoteLimit = filters.mode === "mtf" ? 100 : 200;
-
-  if (filters.limit === "ALL") {
-    return maxRemoteLimit;
-  }
-
-  return Math.min(filters.limit, maxRemoteLimit);
+function getApiMaxSymbols(filters: ScannerFiltersState) {
+  return filters.maxSymbols === "ALL" ? null : filters.maxSymbols;
 }
 
 function limitDisplayRows(
@@ -696,24 +450,6 @@ function limitDisplayRows(
   }
 
   return rows.slice(0, displayLimit);
-}
-
-function getSyncTimeframes(filters: ScannerFiltersState): Timeframe[] {
-  if (filters.mode === "mtf") {
-    switch (filters.mtfPreset) {
-      case "short":
-        return ["1h", "4h", "1d"];
-      case "position":
-        return ["1d", "7d", "1M"];
-      case "full":
-        return ["1h", "4h", "1d", "7d", "1M"];
-      case "swing":
-      default:
-        return ["4h", "1d", "7d"];
-    }
-  }
-
-  return [filters.timeframe];
 }
 
 function formatInteger(value: number | undefined) {
