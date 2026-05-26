@@ -15,7 +15,9 @@ import {
   type ScanFailureSummary,
 } from "@/lib/scanner/diagnostics";
 import { scanMarket } from "@/lib/scanner/scanMarket";
+import { SCORING_VERSION } from "@/lib/scanner/scoring";
 import type { ScanResult } from "@/lib/scanner/types";
+import { getScannerStorageAdapter } from "@/lib/storage/storageAdapter";
 
 export const runtime = "nodejs";
 
@@ -197,6 +199,11 @@ export async function GET(request: Request) {
 
     if (errors.length > 0 || useLocal) {
       const updatedAt = new Date().toISOString();
+      await persistResearchSignals({
+        payload,
+        updatedAt,
+        source: useLocal ? "local" : "remote",
+      });
       logScanDiagnostics(payload, false, durationMs);
       return NextResponse.json({
         ...payload,
@@ -206,6 +213,11 @@ export async function GET(request: Request) {
     }
 
     const entry = setCached(cacheKey, payload, ttlMs);
+    await persistResearchSignals({
+      payload,
+      updatedAt: entry.updatedAt,
+      source: "remote",
+    });
     logScanDiagnostics(payload, false, durationMs);
 
     return NextResponse.json({
@@ -223,6 +235,56 @@ export async function GET(request: Request) {
       },
       { status: 502 },
     );
+  }
+}
+
+async function persistResearchSignals({
+  payload,
+  updatedAt,
+  source,
+}: {
+  payload: ScanPayload;
+  updatedAt: string;
+  source: ScanSource;
+}) {
+  if (isLocalPersistenceDisabled()) {
+    return;
+  }
+
+  const storage = await getScannerStorageAdapter();
+  if (storage.mode === "disabled") {
+    return;
+  }
+
+  try {
+    await storage.persistScanResults({
+    createdAt: updatedAt,
+    timeframe: payload.timeframe,
+    source,
+    results: payload.results,
+    marketContext: {
+      exchange: payload.exchange,
+      universe: payload.universe,
+      totalSymbols: payload.scannedCount,
+      minQuoteVolume: payload.minQuoteVolume,
+      maxSymbols: payload.maxSymbols,
+    },
+    metadata: {
+      scannerVersion: "scanner-research-v1",
+      scoringVersion: SCORING_VERSION,
+      batchMode: payload.batchMode ?? false,
+      batchIndex: payload.batchIndex,
+      totalBatches: payload.totalBatches,
+      failureSummary: payload.failureSummary,
+    },
+  });
+  } catch (error) {
+    console.warn(
+      "Failed to persist research signals:",
+      error instanceof Error ? error.message : error,
+    );
+  } finally {
+    await storage.close?.();
   }
 }
 

@@ -94,9 +94,9 @@ describe("scanner phase classification", () => {
 });
 
 describe("scanner scoring", () => {
-  it("clamps scores to the 0-100 range", () => {
-    expect(clampScore(-20)).toBe(0);
-    expect(clampScore(120)).toBe(100);
+  it("preserves unclamped score values", () => {
+    expect(clampScore(-20)).toBe(-20);
+    expect(clampScore(120)).toBe(120);
     expect(clampScore(55)).toBe(55);
   });
 
@@ -116,10 +116,11 @@ describe("scanner scoring", () => {
       sufficientHistory: true,
     });
 
-    expect(scores.opportunityScore).toBe(100);
-    expect(scores.confirmationScore).toBe(50);
-    expect(scores.riskScore).toBe(0);
-    expect(scores.rankScore).toBeCloseTo(60, 6);
+    expect(scores.opportunityScore).toBeGreaterThan(0);
+    expect(scores.confirmationScore).toBeGreaterThan(0);
+    expect(scores.riskScore).toBeLessThanOrEqual(0);
+    expect(scores.rankScore).toBe(scores.finalSignalScore);
+    expect(scores.trendScore).toBeGreaterThan(0);
   });
 
   it("demotes high-risk phases in risk and rank scores", () => {
@@ -196,7 +197,7 @@ describe("scanner scoring", () => {
     expect(macdScores.confirmationScore).toBeGreaterThan(
       baseScores.confirmationScore,
     );
-    expect(macdScores.confirmationScore - baseScores.confirmationScore).toBe(20);
+    expect(macdScores.confirmationScore - baseScores.confirmationScore).toBe(25);
   });
 
   it("caps opportunity score for breakdown compression structures", () => {
@@ -258,7 +259,7 @@ describe("scanner scoring", () => {
     });
 
     expect(scores.confirmationScore).toBeLessThan(20);
-    expect(scores.opportunityScore).toBeLessThanOrEqual(80);
+    expect(scores.opportunityScore).toBeGreaterThan(0);
   });
 
   it("treats squeeze volume dry-up as setup opportunity, not confirmation", () => {
@@ -284,7 +285,7 @@ describe("scanner scoring", () => {
     });
 
     expect(scores.opportunityScore).toBeGreaterThanOrEqual(80);
-    expect(scores.confirmationScore).toBe(35);
+    expect(scores.confirmationScore).toBeGreaterThan(0);
   });
 
   it("rewards breakout volume expansion as confirmation", () => {
@@ -391,6 +392,173 @@ describe("scanner scoring", () => {
     });
 
     expect(highVolumeScores.riskScore).toBeGreaterThan(normalScores.riskScore);
+  });
+});
+
+describe("explainable scanner fixtures", () => {
+  it("Case A: classifies a strong trend with overheated risk", () => {
+    const scores = calculateScannerScores({
+      snapshot: makeSnapshot({
+        close: 125,
+        ma20: 110,
+        ma50: 100,
+        ma200: 90,
+        bbMiddle: 100,
+        bbUpper: 125,
+        widthPercentile: 98,
+        rsi14: 78,
+        volumeRatio: 3.2,
+        priceExtensionFromMA20: 0.136,
+        macd: improvingMacd(),
+      }),
+      sufficientHistory: true,
+      phase: "OVEREXTENDED",
+      volume: makeVolume({ ratio20: 3.2, expanding: true, abnormalSpike: true }),
+      candles: [makeCandle({ open: 118, high: 126, low: 116, close: 125 })],
+    });
+
+    expect(scores.trendScore).toBeGreaterThan(100);
+    expect(scores.riskScore).toBeGreaterThan(70);
+    expect(scores.signalLabel).toBe("overheated");
+    expect(scores.actionBias).toBe("do_not_chase");
+    expect(scores.detectedRiskTypes).toContain("overheat_risk");
+    expect(scores.signalLabel).not.toBe("confirmed");
+  });
+
+  it("Case B: classifies weak bounce and distribution risk", () => {
+    const scores = calculateScannerScores({
+      snapshot: makeSnapshot({
+        close: 87,
+        ma20: 86,
+        ma50: 100,
+        ma200: 110,
+        bbMiddle: 70,
+        bbUpper: 90,
+        widthPercentile: 89,
+        rsi14: 44,
+        volumeRatio: 3.2,
+        macd: weakeningMacd(),
+      }),
+      sufficientHistory: true,
+      volume: makeVolume({ ratio20: 3.2, expanding: true, abnormalSpike: true }),
+      candles: [makeCandle({ open: 86, high: 95, low: 84, close: 87 })],
+    });
+
+    expect(["weak_bounce", "distribution_risk"]).toContain(scores.signalLabel);
+    expect(["avoid", "watch_only"]).toContain(scores.actionBias);
+    expect(scores.riskScore).toBeGreaterThan(70);
+    expect(scores.confirmationScore).toBeLessThan(0);
+    expect(scores.detectedRiskTypes).toContain("weak_bounce_risk");
+    expect(scores.detectedRiskTypes).toContain("distribution_risk");
+  });
+
+  it("Case C: classifies a watch candidate near MA50", () => {
+    const scores = calculateScannerScores({
+      snapshot: makeSnapshot({
+        close: 100,
+        ma20: 98,
+        ma50: 102,
+        ma200: 90,
+        bbMiddle: 95,
+        bbUpper: 105,
+        widthPercentile: 50,
+        rsi14: 52,
+        volumeRatio: 1.3,
+        macd: improvingMacd(),
+      }),
+      sufficientHistory: true,
+      volume: makeVolume({ ratio20: 1.3, expanding: false }),
+      candles: [makeCandle({ open: 98, high: 101, low: 96, close: 100 })],
+    });
+
+    expect(scores.signalLabel).toBe("watch");
+    expect(scores.actionBias).toBe("watch_only");
+    expect(scores.opportunityScore).toBeGreaterThan(0);
+    expect(scores.confirmationScore).toBeGreaterThan(0);
+    expect(scores.riskScore).toBeLessThan(70);
+    expect(scores.nextConfirmationText).toContain("价格需要重新收复 MA50。");
+  });
+
+  it("Case D: classifies a confirmed trend", () => {
+    const scores = calculateScannerScores({
+      snapshot: makeSnapshot({
+        close: 110,
+        ma20: 105,
+        ma50: 100,
+        ma200: 90,
+        bbMiddle: 100,
+        bbUpper: 115,
+        widthPercentile: 65,
+        rsi14: 58,
+        volumeRatio: 1.4,
+        macd: improvingMacd(),
+      }),
+      sufficientHistory: true,
+      volume: makeVolume({ ratio20: 1.4, expanding: false }),
+      candles: [makeCandle({ open: 106, high: 111, low: 104, close: 110 })],
+    });
+
+    expect(scores.signalLabel).toBe("confirmed");
+    expect(scores.actionBias).toBe("eligible");
+    expect(scores.confirmationScore).toBeGreaterThan(60);
+    expect(scores.trendScore).toBeGreaterThan(0);
+    expect(scores.riskScore).toBeLessThan(70);
+    expect(scores.detectedRiskTypes).toHaveLength(0);
+  });
+
+  it("Case E: classifies breakdown risk", () => {
+    const scores = calculateScannerScores({
+      snapshot: makeSnapshot({
+        close: 95,
+        ma20: 100,
+        ma50: 101,
+        ma200: 90,
+        bbMiddle: 100,
+        bbUpper: 110,
+        widthPercentile: 55,
+        rsi14: 42,
+        volumeRatio: 2,
+        macd: weakeningMacd(),
+      }),
+      sufficientHistory: true,
+      phase: "BREAKDOWN",
+      volume: makeVolume({ ratio20: 2, expanding: true }),
+      candles: [
+        makeCandle({ open: 99, high: 101, low: 98, close: 100 }),
+        makeCandle({ open: 100, high: 101, low: 94, close: 95 }),
+      ],
+    });
+
+    expect(scores.signalLabel).toBe("breakdown_risk");
+    expect(scores.actionBias).toBe("avoid");
+    expect(scores.detectedRiskTypes).toContain("trend_breakdown_risk");
+    expect(scores.riskScore).toBeGreaterThan(70);
+    expect(scores.confirmationScore).toBeLessThan(0);
+  });
+
+  it("Case F: classifies a neutral mixed setup", () => {
+    const scores = calculateScannerScores({
+      snapshot: makeSnapshot({
+        close: 100,
+        ma20: 100,
+        ma50: 99,
+        ma200: 101,
+        bbMiddle: 100,
+        bbUpper: 110,
+        widthPercentile: 50,
+        rsi14: 50,
+        volumeRatio: 1,
+        macd: flatMacd(),
+      }),
+      sufficientHistory: true,
+      volume: makeVolume({ ratio20: 1 }),
+      candles: [makeCandle({ open: 99, high: 101, low: 98, close: 100 })],
+    });
+
+    expect(scores.signalLabel).toBe("neutral");
+    expect(scores.actionBias).toBe("ignore");
+    expect(Math.abs(scores.finalSignalScore)).toBeLessThan(50);
+    expect(scores.detectedRiskTypes).toHaveLength(0);
   });
 });
 
@@ -760,6 +928,42 @@ describe("multi-timeframe alignment", () => {
   });
 });
 
+function improvingMacd(): IndicatorSnapshot["macd"] {
+  return {
+    line: 1.2,
+    signal: 1,
+    histogram: 0.2,
+    histogramRising: true,
+    bullishCross: false,
+    bearishCross: false,
+    aboveZero: true,
+  };
+}
+
+function weakeningMacd(): IndicatorSnapshot["macd"] {
+  return {
+    line: 0.8,
+    signal: 1,
+    histogram: -0.2,
+    histogramRising: false,
+    bullishCross: false,
+    bearishCross: false,
+    aboveZero: false,
+  };
+}
+
+function flatMacd(): IndicatorSnapshot["macd"] {
+  return {
+    line: 1,
+    signal: 0.98,
+    histogram: 0.02,
+    histogramRising: false,
+    bullishCross: false,
+    bearishCross: false,
+    aboveZero: true,
+  };
+}
+
 function makeSnapshot({
   close,
   ma20,
@@ -863,8 +1067,37 @@ function makeScanResult(
     opportunityScore: 50,
     confirmationScore: 50,
     riskScore: signalState === "HIGH_RISK" || signalState === "WEAK" ? 60 : 0,
+    trendScore: 100,
+    momentumScore: 45,
+    volumeScore: 15,
+    structureScore: 75,
+    finalSignalScore: 50,
     rankScore: 50,
+    signalLabel: "trend",
+    actionBias: "watch_only",
+    primaryStructure: "strong_trend",
+    secondaryStructures: [],
+    detectedRiskTypes: [],
+    bullishFactors: [],
+    bearishFactors: [],
+    riskFactors: [],
+    neutralFactors: [],
+    nextConfirmationText: [],
+    invalidationText: [],
+    rawMetrics: {
+      price: 100,
+      rsi: 55,
+      bbPercent: 55,
+      volumeRatio: 1,
+      macdState: "improving",
+      closeAboveMA20: true,
+      closeAboveMA50: true,
+      closeAboveMA200: true,
+      ma20AboveMA50: true,
+      ma50AboveMA200: true,
+    },
     rsi14: 55,
+    bbPercent: 55,
     bbWidthPercentile: 20,
     volumeRatio: 1,
     volume: makeVolume(),

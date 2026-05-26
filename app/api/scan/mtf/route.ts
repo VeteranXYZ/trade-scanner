@@ -18,7 +18,9 @@ import {
   type ScanFailureSummary,
 } from "@/lib/scanner/diagnostics";
 import { scanMarketMultiTimeframe } from "@/lib/scanner/scanMarketMtf";
+import { SCORING_VERSION } from "@/lib/scanner/scoring";
 import type { ScanResult } from "@/lib/scanner/types";
+import { getScannerStorageAdapter } from "@/lib/storage/storageAdapter";
 
 export const runtime = "nodejs";
 
@@ -215,6 +217,11 @@ export async function GET(request: Request) {
 
     if (errors.length > 0 || useLocal) {
       const updatedAt = new Date().toISOString();
+      await persistResearchSignals({
+        payload,
+        updatedAt,
+        source: useLocal ? "local" : "remote",
+      });
       logMtfScanDiagnostics(payload, false, durationMs);
       return NextResponse.json({
         ...payload,
@@ -224,6 +231,11 @@ export async function GET(request: Request) {
     }
 
     const entry = setCached(cacheKey, payload, ttlMs);
+    await persistResearchSignals({
+      payload,
+      updatedAt: entry.updatedAt,
+      source: "remote",
+    });
     logMtfScanDiagnostics(payload, false, durationMs);
 
     return NextResponse.json({
@@ -241,6 +253,58 @@ export async function GET(request: Request) {
       },
       { status: 502 },
     );
+  }
+}
+
+async function persistResearchSignals({
+  payload,
+  updatedAt,
+  source,
+}: {
+  payload: MtfScanPayload;
+  updatedAt: string;
+  source: ScanSource;
+}) {
+  if (isLocalPersistenceDisabled()) {
+    return;
+  }
+
+  const storage = await getScannerStorageAdapter();
+  if (storage.mode === "disabled") {
+    return;
+  }
+
+  try {
+    await storage.persistScanResults({
+    createdAt: updatedAt,
+    timeframe: "mtf",
+    source,
+    results: payload.results,
+    marketContext: {
+      exchange: payload.exchange,
+      universe: payload.universe,
+      totalSymbols: payload.scannedCount,
+      minQuoteVolume: payload.minQuoteVolume,
+      maxSymbols: payload.maxSymbols,
+      preset: payload.preset,
+      timeframes: payload.timeframes,
+    },
+    metadata: {
+      scannerVersion: "scanner-research-v1",
+      scoringVersion: SCORING_VERSION,
+      batchMode: payload.batchMode ?? false,
+      batchIndex: payload.batchIndex,
+      totalBatches: payload.totalBatches,
+      failureSummary: payload.failureSummary,
+    },
+  });
+  } catch (error) {
+    console.warn(
+      "Failed to persist MTF research signals:",
+      error instanceof Error ? error.message : error,
+    );
+  } finally {
+    await storage.close?.();
   }
 }
 

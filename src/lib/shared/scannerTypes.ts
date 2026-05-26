@@ -25,6 +25,43 @@ export type ScannerSignal = {
   summary: string;
 };
 
+export type ScannerSignalLabel =
+  | "confirmed"
+  | "watch"
+  | "trend"
+  | "overheated"
+  | "distribution_risk"
+  | "weak_bounce"
+  | "breakdown_risk"
+  | "weak"
+  | "neutral";
+
+export type ActionBias =
+  | "eligible"
+  | "watch_only"
+  | "do_not_chase"
+  | "avoid"
+  | "ignore";
+
+export type PrimaryStructure =
+  | "strong_trend"
+  | "healthy_pullback"
+  | "trend_repair"
+  | "breakout_attempt"
+  | "overextended"
+  | "distribution_risk"
+  | "weak_bounce"
+  | "trend_breakdown"
+  | "neutral";
+
+export type DetectedRiskType =
+  | "overheat_risk"
+  | "distribution_risk"
+  | "weak_bounce_risk"
+  | "trend_breakdown_risk"
+  | "liquidity_spike_risk"
+  | "failed_breakout_risk";
+
 export type ScannerExplanationKey =
   | "reason.bbWidthLow"
   | "reason.ma20Ma50Converging"
@@ -132,8 +169,50 @@ export type ScanResult = {
   opportunityScore: number;
   confirmationScore: number;
   riskScore: number;
+  trendScore: number;
+  momentumScore: number;
+  volumeScore: number;
+  structureScore: number;
+  finalSignalScore: number;
   rankScore: number;
+  signalLabel: ScannerSignalLabel;
+  actionBias: ActionBias;
+  primaryStructure: PrimaryStructure;
+  secondaryStructures: string[];
+  detectedRiskTypes: DetectedRiskType[];
+  bullishFactors: string[];
+  bearishFactors: string[];
+  riskFactors: string[];
+  neutralFactors: string[];
+  nextConfirmationText: string[];
+  invalidationText: string[];
+  rawMetrics: {
+    price: number;
+    rsi: number | null;
+    bbPercent: number | null;
+    volumeRatio: number | null;
+    macdState: string | null;
+    closeAboveMA20: boolean | null;
+    closeAboveMA50: boolean | null;
+    closeAboveMA200: boolean | null;
+    ma20AboveMA50: boolean | null;
+    ma50AboveMA200: boolean | null;
+    ma20?: number | null;
+    ma50?: number | null;
+    ma200?: number | null;
+    upperWickRatio?: number | null;
+    lowerWickRatio?: number | null;
+    closePositionInCandle?: number | null;
+    bodyRatio?: number | null;
+    isVolumeSpike?: boolean | null;
+    isStrongClose?: boolean | null;
+    isWeakClose?: boolean | null;
+    isLongUpperWick?: boolean | null;
+    isLongLowerWick?: boolean | null;
+    isRedCandle?: boolean | null;
+  };
   rsi14: number | null;
+  bbPercent: number | null;
   bbWidthPercentile: number | null;
   volumeRatio: number | null;
   volume: {

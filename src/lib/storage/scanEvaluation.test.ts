@@ -1,149 +1,183 @@
 import { describe, expect, it } from "vitest";
 import type { Candle } from "@/lib/exchanges/types";
 import {
-  evaluateForwardPerformance,
+  evaluateSignalForward,
+  getSignalPerformanceByLabel,
   summarizeForwardEvaluations,
 } from "./scanEvaluation";
-import type { StoredScanResult, StoredScanSnapshot } from "./scanSnapshots";
+import type { ScanSignalRecord } from "./scanSignalModel";
 
-describe("forward scan evaluation", () => {
-  it("calculates forward return, max upside, and max drawdown", () => {
-    const evaluation = evaluateForwardPerformance({
-      snapshot: makeSnapshot("2026-05-25T00:00:00.000Z"),
-      result: makeResult({ price: 100 }),
-      horizonCandles: 3,
+describe("scan signal forward evaluation", () => {
+  it("calculates return, max return, max drawdown, and outcome with enough candles", () => {
+    const signal = makeSignal({ signalLabel: "confirmed", priceAtSignal: 100 });
+    const evaluation = evaluateSignalForward({
+      signal,
+      horizon: "4h",
       candles: [
-        makeCandle({ index: 0, openTime: Date.parse("2026-05-25T01:00:00.000Z"), close: 102, high: 103, low: 99 }),
-        makeCandle({ index: 1, openTime: Date.parse("2026-05-25T02:00:00.000Z"), close: 104, high: 106, low: 101 }),
-        makeCandle({ index: 2, openTime: Date.parse("2026-05-25T03:00:00.000Z"), close: 105, high: 107, low: 98 }),
+        makeCandle({ closeTime: Date.parse("2026-05-25T01:00:00.000Z"), close: 101, high: 103, low: 99 }),
+        makeCandle({ closeTime: Date.parse("2026-05-25T04:00:00.000Z"), close: 105, high: 107, low: 98 }),
       ],
     });
 
-    expect(evaluation.status).toBe("completed");
-    expect(evaluation.exitPrice).toBe(105);
+    expect(evaluation.priceAtEvaluation).toBe(105);
     expect(evaluation.returnPct).toBe(5);
-    expect(evaluation.maxUpPct).toBeCloseTo(7, 6);
-    expect(evaluation.maxDownPct).toBe(-2);
+    expect(evaluation.maxReturnPct).toBeCloseTo(7, 6);
+    expect(evaluation.maxDrawdownPct).toBe(-2);
+    expect(evaluation.outcomeLabel).toBe("favorable");
   });
 
-  it("marks evaluations pending until enough future candles exist", () => {
-    const evaluation = evaluateForwardPerformance({
-      snapshot: makeSnapshot("2026-05-25T00:00:00.000Z"),
-      result: makeResult({ price: 100 }),
-      horizonCandles: 3,
+  it("marks insufficient_data when future candles do not cover the horizon", () => {
+    const evaluation = evaluateSignalForward({
+      signal: makeSignal({ signalLabel: "watch", priceAtSignal: 100 }),
+      horizon: "24h",
       candles: [
-        makeCandle({ index: 0, openTime: Date.parse("2026-05-25T01:00:00.000Z"), close: 102 }),
+        makeCandle({ closeTime: Date.parse("2026-05-25T04:00:00.000Z"), close: 102 }),
       ],
     });
 
-    expect(evaluation.status).toBe("pending");
-    expect(evaluation.candlesAvailable).toBe(1);
+    expect(evaluation.outcomeLabel).toBe("insufficient_data");
     expect(evaluation.returnPct).toBeNull();
   });
 
-  it("summarizes completed and pending evaluations by signal", () => {
-    const summary = summarizeForwardEvaluations([
-      {
-        ...baseEvaluation("AAAUSDT", "WATCHLIST"),
-        status: "completed",
-        returnPct: 5,
-        maxUpPct: 8,
-        maxDownPct: -1,
-      },
-      {
-        ...baseEvaluation("BBBUSDT", "WATCHLIST"),
-        status: "completed",
-        returnPct: -2,
-        maxUpPct: 1,
-        maxDownPct: -4,
-      },
-      {
-        ...baseEvaluation("CCCUSDT", "WATCHLIST"),
-        status: "pending",
-      },
-    ]);
+  it("treats distribution_risk followed by pullback as favorable risk validation", () => {
+    const evaluation = evaluateSignalForward({
+      signal: makeSignal({ signalLabel: "distribution_risk", priceAtSignal: 100 }),
+      horizon: "4h",
+      candles: [
+        makeCandle({ closeTime: Date.parse("2026-05-25T04:00:00.000Z"), close: 96, high: 101, low: 94 }),
+      ],
+    });
 
+    expect(evaluation.returnPct).toBe(-4);
+    expect(evaluation.maxDrawdownPct).toBe(-6);
+    expect(evaluation.outcomeLabel).toBe("favorable");
+  });
+
+  it("aggregates performance by signalLabel", () => {
+    const confirmed = makeSignal({ id: "confirmed", signalLabel: "confirmed" });
+    const watch = makeSignal({ id: "watch", signalLabel: "watch" });
+    const evaluations = [
+      {
+        ...baseEvaluation({ signalId: confirmed.id, outcomeLabel: "favorable" }),
+        returnPct: 5,
+        maxDrawdownPct: -2,
+      },
+      {
+        ...baseEvaluation({ signalId: confirmed.id, outcomeLabel: "unfavorable" }),
+        returnPct: -3,
+        maxDrawdownPct: -6,
+      },
+      {
+        ...baseEvaluation({ signalId: watch.id, outcomeLabel: "insufficient_data" }),
+        returnPct: null,
+        maxDrawdownPct: null,
+      },
+    ];
+
+    const byLabel = getSignalPerformanceByLabel(evaluations, [confirmed, watch]);
+    const summary = summarizeForwardEvaluations(evaluations, [confirmed, watch]);
+
+    expect(byLabel.confirmed).toMatchObject({
+      count: 2,
+      completedCount: 2,
+      avgReturnPct: 1,
+      avgMaxDrawdownPct: -4,
+      favorableRate: 0.5,
+      unfavorableRate: 0.5,
+    });
     expect(summary.completedCount).toBe(2);
     expect(summary.pendingCount).toBe(1);
-    expect(summary.bySignal.WATCHLIST).toMatchObject({
-      completedCount: 2,
-      pendingCount: 1,
-      hitRate: 0.5,
-      avgReturnPct: 1.5,
-    });
   });
 });
 
-function makeSnapshot(createdAt: string): StoredScanSnapshot {
+function makeSignal(overrides: Partial<ScanSignalRecord> = {}): ScanSignalRecord {
   return {
-    id: "snapshot",
-    createdAt,
-    exchange: "binance",
-    mode: "single",
-    timeframe: "4h",
-    limit: 1,
-    itemCount: 1,
-    errorsCount: 0,
-    results: [],
-  };
-}
-
-function makeResult({ price }: { price: number }): StoredScanResult {
-  return {
+    id: "signal",
+    snapshotId: "snapshot",
     symbol: "BTCUSDT",
     timeframe: "4h",
-    price,
-    phase: "SQUEEZE",
-    signalState: "WATCHLIST",
-    signalLabel: "Watchlist",
-    rankScore: 50,
-    opportunityScore: 80,
-    confirmationScore: 20,
-    riskScore: 10,
+    scanTime: "2026-05-25T00:00:00.000Z",
+    priceAtSignal: 100,
+    scoringVersion: "explainable-v1",
+    finalSignalScore: 50,
+    opportunityScore: 70,
+    confirmationScore: 70,
+    riskScore: 20,
+    trendScore: 100,
+    momentumScore: 45,
+    volumeScore: 20,
+    structureScore: 80,
+    signalLabel: "confirmed",
+    actionBias: "eligible",
+    primaryStructure: "strong_trend",
+    secondaryStructuresJson: "[]",
+    detectedRiskTypesJson: "[]",
+    bullishFactorsJson: "[]",
+    bearishFactorsJson: "[]",
+    riskFactorsJson: "[]",
+    neutralFactorsJson: "[]",
+    nextConfirmationJson: "[]",
+    invalidationJson: "[]",
+    rawMetricsJson: "{}",
+    legacySignal: "CONFIRMED",
+    legacyRankScore: 50,
+    legacyWarningsJson: "[]",
+    ...overrides,
   };
 }
 
 function makeCandle({
-  index,
-  openTime,
+  closeTime,
   close,
   high = close,
   low = close,
 }: {
-  index: number;
-  openTime: number;
+  closeTime: number;
   close: number;
   high?: number;
   low?: number;
 }): Candle {
   return {
-    openTime,
+    openTime: closeTime - 1,
     open: close,
     high,
     low,
     close,
     volume: 1000,
-    closeTime: openTime + index + 1,
+    closeTime,
   };
 }
 
-function baseEvaluation(
-  symbol: string,
-  signalState: "WATCHLIST" | "HIGH_RISK",
-) {
+function baseEvaluation({
+  signalId,
+  outcomeLabel,
+}: {
+  signalId: string;
+  outcomeLabel: "favorable" | "unfavorable" | "insufficient_data";
+}) {
   return {
-    snapshotId: "snapshot",
-    snapshotCreatedAt: "2026-05-25T00:00:00.000Z",
-    symbol,
+    id: `${signalId}:24h`,
+    signalId,
+    symbol: "BTCUSDT",
     timeframe: "4h" as const,
-    phase: "SQUEEZE" as const,
-    signalState,
-    entryPrice: 100,
-    horizonCandles: 3,
-    candlesAvailable: 3,
-    exitPrice: 100,
-    returnPct: null,
-    maxUpPct: null,
-    maxDownPct: null,
+    signalTime: "2026-05-25T00:00:00.000Z",
+    evaluationTime: "2026-05-26T00:00:00.000Z",
+    horizon: "24h" as const,
+    priceAtSignal: 100,
+    priceAtEvaluation: 100,
+    returnPct: 0,
+    maxReturnPct: 0,
+    maxDrawdownPct: 0,
+    stillAboveMA20: true,
+    stillAboveMA50: true,
+    stillAboveMA200: true,
+    rsiAtEvaluation: 55,
+    riskScoreAtEvaluation: 20,
+    confirmationScoreAtEvaluation: 80,
+    signalLabelAtEvaluation: "confirmed" as const,
+    actionBiasAtEvaluation: "eligible" as const,
+    outcomeLabel,
+    notesJson: "[]",
+    metricsJson: "{}",
   };
 }

@@ -8,12 +8,15 @@ import {
 } from "@tanstack/react-table";
 import { useMemo, type ReactNode } from "react";
 import { useLanguage } from "@/components/providers/LanguageProvider";
-import { PhaseBadge } from "./PhaseBadge";
-import { SignalBadge } from "./SignalBadge";
 import {
   SignalSummaryBar,
   type SignalSummaryItem,
 } from "./SignalSummaryBar";
+import {
+  mapActionBiasToChinese,
+  mapSignalLabelToChinese,
+  mapStructureToChinese,
+} from "@/lib/scanner/scoring";
 import type { TableSortKey, TableSortState } from "./ScannerPageClient";
 import type { ScannerSignalState, ScanResult } from "@/lib/shared/scannerTypes";
 
@@ -76,21 +79,38 @@ export function ScannerTable({
         ),
       },
       {
-        accessorKey: "phase",
+        accessorKey: "primaryStructure",
         header: t.scanner.columns.setup,
-        cell: ({ row }) => <PhaseBadge phase={row.original.phase} />,
+        cell: ({ row }) => (
+          <span className="truncate text-[11px] font-semibold text-[var(--foreground)]">
+            {mapStructureToChinese(row.original.primaryStructure)}
+          </span>
+        ),
       },
       {
-        accessorKey: "signal.state",
+        accessorKey: "signalLabel",
         header: t.scanner.columns.signalCompact,
-        cell: ({ row }) => <SignalBadge signal={row.original.signal} />,
+        cell: ({ row }) => <SignalCell result={row.original} />,
       },
       {
-        accessorKey: "rankScore",
+        accessorKey: "actionBias",
+        header: "Action",
+        cell: ({ row }) => (
+          <span className={getActionTextClass(row.original.actionBias)}>
+            {mapActionBiasToChinese(row.original.actionBias)}
+          </span>
+        ),
+      },
+      {
+        accessorKey: "finalSignalScore",
         header: t.scanner.columns.score,
         cell: ({ row }) => (
-          <span className="font-semibold tabular-nums text-[var(--foreground)]">
-            {formatNumber(row.original.rankScore, 1)}
+          <span
+            className={`font-semibold tabular-nums ${getFinalScoreTextClass(
+              row.original.finalSignalScore,
+            )}`}
+          >
+            {formatSigned(row.original.finalSignalScore, 1)}
           </span>
         ),
       },
@@ -98,6 +118,21 @@ export function ScannerTable({
         id: "ocr",
         header: t.scanner.columns.ocr,
         cell: ({ row }) => <CompactScores result={row.original} />,
+      },
+      {
+        accessorKey: "trendScore",
+        header: "Trend",
+        cell: ({ row }) => formatSigned(row.original.trendScore, 0),
+      },
+      {
+        accessorKey: "momentumScore",
+        header: "Momentum",
+        cell: ({ row }) => formatSigned(row.original.momentumScore, 0),
+      },
+      {
+        accessorKey: "volumeScore",
+        header: "Volume",
+        cell: ({ row }) => formatSigned(row.original.volumeScore, 0),
       },
       {
         accessorKey: "rsi14",
@@ -128,12 +163,16 @@ export function ScannerTable({
         id: "warnings",
         header: t.scanner.columns.warnCompact,
         cell: ({ row }) =>
+          row.original.detectedRiskTypes.length > 0 ||
           row.original.warnings.length > 0 ? (
             <span
-              aria-label={`${row.original.warnings.length} ${t.scanner.warnings}`}
+              aria-label={`${
+                row.original.detectedRiskTypes.length ||
+                row.original.warnings.length
+              } ${t.scanner.warnings}`}
               className="inline-flex border border-[#8f6b24]/40 bg-[#1b1710] px-1 py-0.5 text-[10px] font-semibold text-[var(--warning)]"
             >
-              W{row.original.warnings.length}
+              W{row.original.detectedRiskTypes.length || row.original.warnings.length}
             </span>
           ) : (
             <span className="text-[var(--muted)]">-</span>
@@ -201,7 +240,7 @@ export function ScannerTable({
         />
       ) : (
         <div className="min-h-0 flex-1 overflow-auto">
-          <table className="w-full min-w-[690px] table-fixed border-collapse text-left text-xs">
+          <table className="w-full min-w-[940px] table-fixed border-collapse text-left text-xs">
             <thead className="sticky top-0 z-10 bg-[#090f15] text-[10px] uppercase text-[var(--muted)] shadow-[0_1px_0_var(--border)]">
               {table.getHeaderGroups().map((headerGroup) => (
                 <tr key={headerGroup.id}>
@@ -307,14 +346,28 @@ function MaStatus({ result }: { result: ScanResult }) {
 
 function CompactScores({ result }: { result: ScanResult }) {
   return (
-    <span className="inline-flex items-center gap-1 font-mono text-[11px] tabular-nums">
-      <span className="text-[var(--accent)]">O{result.opportunityScore.toFixed(0)}</span>
+    <span className="inline-flex items-center gap-1 font-mono text-[10px] tabular-nums">
+      <span className="text-[var(--accent)]">
+        O {formatSigned(result.opportunityScore, 0)}
+      </span>
       <span className="text-[#60a5fa]">
-        C{result.confirmationScore.toFixed(0)}
+        C {formatSigned(result.confirmationScore, 0)}
       </span>
       <span className={getRiskTextClass(result.riskScore)}>
-        R{result.riskScore.toFixed(0)}
+        R {formatSigned(result.riskScore, 0)}
       </span>
+    </span>
+  );
+}
+
+function SignalCell({ result }: { result: ScanResult }) {
+  return (
+    <span
+      className={`inline-flex h-5 items-center border px-1.5 text-[11px] font-semibold leading-none ${getSignalTextClass(
+        result.signalLabel,
+      )}`}
+    >
+      {mapSignalLabelToChinese(result.signalLabel)}
     </span>
   );
 }
@@ -346,15 +399,66 @@ function MacdCell({ result }: { result: ScanResult }) {
 }
 
 function getRiskTextClass(riskScore: number) {
-  if (riskScore >= 55) {
+  if (riskScore > 100) {
     return "text-[var(--danger)]";
   }
 
-  if (riskScore >= 30) {
+  if (riskScore > 70) {
     return "text-[var(--warning)]";
   }
 
-  return "text-[var(--accent)]";
+  return "text-[var(--muted)]";
+}
+
+function getFinalScoreTextClass(finalSignalScore: number) {
+  if (finalSignalScore > 100) {
+    return "text-[var(--accent)]";
+  }
+
+  if (finalSignalScore > 50) {
+    return "text-[#60d394]";
+  }
+
+  if (finalSignalScore < 0) {
+    return "text-[var(--danger)]";
+  }
+
+  return "text-[var(--foreground)]";
+}
+
+function getActionTextClass(actionBias: ScanResult["actionBias"]) {
+  switch (actionBias) {
+    case "eligible":
+      return "font-semibold text-[var(--accent)]";
+    case "watch_only":
+      return "font-semibold text-[#60a5fa]";
+    case "do_not_chase":
+      return "font-semibold text-[var(--warning)]";
+    case "avoid":
+      return "font-semibold text-[var(--danger)]";
+    case "ignore":
+      return "text-[var(--muted)]";
+  }
+}
+
+function getSignalTextClass(signalLabel: ScanResult["signalLabel"]) {
+  switch (signalLabel) {
+    case "confirmed":
+      return "border-[#2f7d46] bg-[#132119] text-[var(--accent)]";
+    case "watch":
+    case "trend":
+      return "border-[#2563eb]/45 bg-[#0c1726] text-[#60a5fa]";
+    case "overheated":
+      return "border-[#8f6b24]/50 bg-[#1b1710] text-[var(--warning)]";
+    case "distribution_risk":
+    case "breakdown_risk":
+      return "border-[#7f1d1d]/60 bg-[#1b1010] text-[var(--danger)]";
+    case "weak_bounce":
+    case "weak":
+      return "border-[#6b7280]/45 bg-[#111820] text-[var(--muted)]";
+    case "neutral":
+      return "border-[var(--border)] bg-[#0b0f14] text-[var(--muted)]";
+  }
 }
 
 function StateMessage({ title, message }: { title: string; message: string }) {
@@ -376,20 +480,31 @@ function formatNumber(value: number, decimals: number) {
   return value.toFixed(decimals);
 }
 
+function formatSigned(value: number, decimals: number) {
+  const formatted = value.toFixed(decimals);
+  return value > 0 ? `+${formatted}` : formatted;
+}
+
 function getColumnClass(columnId: string) {
   switch (columnId) {
     case "rank":
       return "w-[26px]";
     case "symbol":
       return "w-[78px]";
-    case "phase":
-      return "w-[102px]";
-    case "signal_state":
+    case "primaryStructure":
+      return "w-[92px]";
+    case "signalLabel":
       return "w-[72px]";
-    case "rankScore":
-      return "w-12";
+    case "actionBias":
+      return "w-[78px]";
+    case "finalSignalScore":
+      return "w-[56px]";
     case "ocr":
-      return "w-[84px]";
+      return "w-[122px]";
+    case "trendScore":
+    case "momentumScore":
+    case "volumeScore":
+      return "w-[58px]";
     case "rsi14":
     case "bbWidthPercentile":
       return "w-[38px]";
@@ -449,11 +564,11 @@ function getSortKeyForColumn(columnId: string): TableSortKey | null {
       return "rank";
     case "symbol":
       return "symbol";
-    case "phase":
+    case "primaryStructure":
       return "phase";
-    case "signal_state":
+    case "signalLabel":
       return "signal";
-    case "rankScore":
+    case "finalSignalScore":
       return "score";
     case "ocr":
       return "ocr";

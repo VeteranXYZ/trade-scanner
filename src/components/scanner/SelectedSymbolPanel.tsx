@@ -8,6 +8,12 @@ import { StrategyReadPanel } from "./StrategyReadPanel";
 import { HistoricalBehaviorPanel } from "./HistoricalBehaviorPanel";
 import type { ScanResult } from "@/lib/shared/scannerTypes";
 import { formatScannerExplanation } from "@/lib/i18n/formatScannerExplanation";
+import {
+  mapActionBiasToChinese,
+  mapRiskTypeToChinese,
+  mapSignalLabelToChinese,
+  mapStructureToChinese,
+} from "@/lib/scanner/scoring";
 import type { ReactNode } from "react";
 
 type SelectedSymbolPanelProps = {
@@ -53,15 +59,72 @@ export function SelectedSymbolPanel({ result }: SelectedSymbolPanelProps) {
         </div>
 
         <div className="mb-2 grid grid-cols-4 gap-1">
-          <Metric label={t.common.rank} value={result.rankScore.toFixed(1)} />
-          <Metric label="O" value={result.opportunityScore.toFixed(0)} />
-          <Metric label="C" value={result.confirmationScore.toFixed(0)} />
-          <Metric label="R" value={result.riskScore.toFixed(0)} />
+          <Metric label="Final" value={formatSigned(result.finalSignalScore, 1)} />
+          <Metric label="O" value={formatSigned(result.opportunityScore, 0)} />
+          <Metric label="C" value={formatSigned(result.confirmationScore, 0)} />
+          <Metric label="R" value={formatSigned(result.riskScore, 0)} />
         </div>
 
         <p className="mb-2 border-l-2 border-[var(--border)] bg-[#0b0f14]/45 px-2 py-1 text-[11px] leading-5 text-[var(--muted)]">
-          {t.signalSummary[result.signal.state]}
+          {mapSignalLabelToChinese(result.signalLabel)} /{" "}
+          {mapActionBiasToChinese(result.actionBias)}
         </p>
+
+        <InspectorSection title="Score Breakdown">
+          <div className="grid grid-cols-2 gap-1">
+            <Metric
+              label="Opportunity"
+              value={formatSigned(result.opportunityScore, 0)}
+            />
+            <Metric
+              label="Confirmation"
+              value={formatSigned(result.confirmationScore, 0)}
+            />
+            <Metric
+              label="Risk (越高越危险)"
+              value={formatSigned(result.riskScore, 0)}
+            />
+            <Metric label="Trend" value={formatSigned(result.trendScore, 0)} />
+            <Metric
+              label="Momentum"
+              value={formatSigned(result.momentumScore, 0)}
+            />
+            <Metric label="Volume" value={formatSigned(result.volumeScore, 0)} />
+            <Metric
+              label="Structure"
+              value={formatSigned(result.structureScore, 0)}
+            />
+            <Metric
+              label="Final"
+              value={formatSigned(result.finalSignalScore, 1)}
+            />
+          </div>
+        </InspectorSection>
+
+        <InspectorSection title="Structure Diagnosis">
+          <div className="space-y-1">
+            <KeyValue
+              label="Primary"
+              value={mapStructureToChinese(result.primaryStructure)}
+            />
+            <KeyValue
+              label="Signal"
+              value={mapSignalLabelToChinese(result.signalLabel)}
+            />
+            <KeyValue
+              label="Action"
+              value={mapActionBiasToChinese(result.actionBias)}
+            />
+            <TagList
+              label="Secondary"
+              items={result.secondaryStructures}
+            />
+            <TagList
+              label="Risk Types"
+              items={result.detectedRiskTypes.map(mapRiskTypeToChinese)}
+            />
+          </div>
+        </InspectorSection>
 
         {result.multiTimeframe && (
           <div className="mb-2 border-t border-[var(--border)] pt-2 text-xs leading-5 text-[var(--muted)]">
@@ -143,6 +206,21 @@ export function SelectedSymbolPanel({ result }: SelectedSymbolPanelProps) {
               value={formatVolumeState(result, t)}
             />
           </div>
+        </InspectorSection>
+
+        <InspectorSection title="Reasons">
+          <FactorList title="多头因素" items={result.bullishFactors} />
+          <FactorList title="空头因素" items={result.bearishFactors} />
+          <FactorList title="风险因素" items={result.riskFactors} />
+          <FactorList title="中性因素" items={result.neutralFactors} />
+        </InspectorSection>
+
+        <InspectorSection title="Next Confirmation">
+          <PlainList items={result.nextConfirmationText} />
+        </InspectorSection>
+
+        <InspectorSection title="Invalidation">
+          <PlainList items={result.invalidationText} />
         </InspectorSection>
 
         <div className="space-y-2 border-t border-[var(--border)] pt-2">
@@ -230,8 +308,68 @@ function InspectorSection({
   );
 }
 
+function TagList({ label, items }: { label: string; items: string[] }) {
+  return (
+    <div className="border-b border-[var(--border)] pb-1 last:border-b-0 last:pb-0">
+      <div className="mb-1 text-[10px] uppercase tracking-wide text-[var(--muted)]">
+        {label}
+      </div>
+      {items.length > 0 ? (
+        <div className="flex flex-wrap gap-1">
+          {items.map((item) => (
+            <span
+              key={item}
+              className="border border-[var(--border)] bg-[#0b0f14] px-1.5 py-0.5 text-[10px] text-[var(--foreground)]"
+            >
+              {item}
+            </span>
+          ))}
+        </div>
+      ) : (
+        <span className="text-xs text-[var(--muted)]">n/a</span>
+      )}
+    </div>
+  );
+}
+
+function FactorList({ title, items }: { title: string; items: string[] }) {
+  if (items.length === 0) {
+    return null;
+  }
+
+  return (
+    <div className="mb-2 last:mb-0">
+      <h4 className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-[var(--muted)]">
+        {title}
+      </h4>
+      <PlainList items={items} />
+    </div>
+  );
+}
+
+function PlainList({ items }: { items: string[] }) {
+  if (items.length === 0) {
+    return <span className="text-xs text-[var(--muted)]">n/a</span>;
+  }
+
+  return (
+    <ul className="space-y-1 text-xs leading-5 text-[var(--foreground)]">
+      {items.map((item) => (
+        <li key={item} className="border-l-2 border-[var(--border)] pl-2">
+          {item}
+        </li>
+      ))}
+    </ul>
+  );
+}
+
 function formatNullable(value: number | null, decimals: number) {
   return value === null ? "n/a" : value.toFixed(decimals);
+}
+
+function formatSigned(value: number, decimals: number) {
+  const formatted = value.toFixed(decimals);
+  return value > 0 ? `+${formatted}` : formatted;
 }
 
 function formatPrice(value: number) {

@@ -87,8 +87,8 @@ export function HistoryPageClient() {
     queryFn: () => fetchHistory(50),
   });
   const evaluationQuery = useQuery({
-    queryKey: ["scan-history-evaluation", 10, 3, 50],
-    queryFn: () => fetchEvaluation({ limit: 10, horizon: 3, resultLimit: 50 }),
+    queryKey: ["scan-history-evaluation", 10, "24h", 50],
+    queryFn: () => fetchEvaluation({ limit: 10, horizon: "24h", resultLimit: 50 }),
     enabled: (historyQuery.data?.snapshots.length ?? 0) > 0,
   });
   const data = historyQuery.data;
@@ -518,7 +518,7 @@ async function fetchEvaluation({
   resultLimit,
 }: {
   limit: number;
-  horizon: number;
+  horizon: "24h";
   resultLimit: number;
 }) {
   const params = new URLSearchParams({

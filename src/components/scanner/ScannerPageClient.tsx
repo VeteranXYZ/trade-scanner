@@ -63,6 +63,32 @@ type ScanApiResponse = {
   updatedAt: string;
 };
 
+type ResearchBucket = {
+  count: number;
+  completedCount: number;
+  pendingCount: number;
+  avgReturnPct: number | null;
+  avgMaxDrawdownPct: number | null;
+  favorableRate: number | null;
+  unfavorableRate: number | null;
+};
+
+type ResearchEvaluationResponse = {
+  storageMode: "jsonl" | "sqlite" | "disabled";
+  horizon: "24h";
+  itemCount: number;
+  signalsCount: number;
+  summary: {
+    evaluationCount: number;
+    completedCount: number;
+    pendingCount: number;
+    insufficientDataCount?: number;
+    latestEvaluationTime?: string | null;
+    bySignalLabel: Record<string, ResearchBucket>;
+    byRiskType: Record<string, ResearchBucket>;
+  };
+};
+
 type BatchProgress = {
   mode: ScannerMode;
   batchIndex: number;
@@ -167,6 +193,11 @@ export function ScannerPageClient() {
     () => getAlignmentSummary(scanQuery.data?.results ?? []),
     [scanQuery.data?.results],
   );
+  const researchQuery = useQuery({
+    queryKey: ["scanner-research-evaluation", "24h"],
+    queryFn: fetchResearchEvaluation,
+    retry: false,
+  });
   const selectedResult =
     rows.find((row) => row.symbol === selectedSymbol) ?? rows[0] ?? null;
 
@@ -232,6 +263,12 @@ export function ScannerPageClient() {
         <ScannerFilters filters={filters} onChange={updateFilters} />
         <div className="min-w-0 space-y-1.5 xl:flex xl:min-h-0 xl:flex-col">
           <MtfAlignmentSummary items={alignmentSummary} />
+          <ResearchEvaluationPanel
+            data={researchQuery.data ?? null}
+            isLoading={researchQuery.isLoading || researchQuery.isFetching}
+            isError={researchQuery.isError}
+            onRefresh={() => void researchQuery.refetch()}
+          />
           <ScannerTable
             rows={rows}
             signalSummary={signalSummary}
@@ -261,6 +298,111 @@ export function ScannerPageClient() {
         <SelectedSymbolPanel result={selectedResult} />
       </div>
     </section>
+  );
+}
+
+function ResearchEvaluationPanel({
+  data,
+  isLoading,
+  isError,
+  onRefresh,
+}: {
+  data: ResearchEvaluationResponse | null;
+  isLoading: boolean;
+  isError: boolean;
+  onRefresh: () => void;
+}) {
+  const enoughData = data !== null && data.summary.completedCount > 0;
+  const confirmed = data?.summary.bySignalLabel.confirmed;
+  const overheated = data?.summary.bySignalLabel.overheated;
+  const distribution = data?.summary.bySignalLabel.distribution_risk;
+  const weakBounce = data?.summary.bySignalLabel.weak_bounce;
+  const topLabel = getTopLabel(data?.summary.bySignalLabel, "best");
+  const worstRiskType = getTopLabel(data?.summary.byRiskType, "worst");
+  const storageLabel = data ? formatStorageMode(data.storageMode) : "n/a";
+
+  return (
+    <section className="border border-[var(--border)] bg-[var(--panel)] px-2.5 py-1.5">
+      <div className="mb-1.5 flex items-center justify-between gap-2">
+        <h2 className="text-[10px] font-semibold uppercase tracking-wide text-[var(--muted)]">
+          Research / Evaluation
+        </h2>
+        <button
+          type="button"
+          onClick={onRefresh}
+          disabled={isLoading}
+          className="h-6 border border-[var(--border)] px-2 text-[10px] font-semibold text-[var(--foreground)] disabled:cursor-not-allowed disabled:opacity-60"
+        >
+          {isLoading ? "Evaluating" : "Refresh"}
+        </button>
+      </div>
+      {isError || !enoughData ? (
+        <div className="flex flex-wrap gap-2 text-[11px] text-[var(--muted)]">
+          <span>Storage: {storageLabel}</span>
+          <span>Not enough evaluated data yet.</span>
+        </div>
+      ) : (
+        <div className="grid gap-1 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5">
+          <ResearchMetric
+            label="Storage"
+            value={storageLabel}
+          />
+          <ResearchMetric
+            label="Recorded"
+            value={String(data.signalsCount)}
+          />
+          <ResearchMetric
+            label="Evaluated"
+            value={String(data.summary.completedCount)}
+          />
+          <ResearchMetric
+            label="Pending"
+            value={String(data.summary.pendingCount)}
+          />
+          <ResearchMetric
+            label="Insufficient"
+            value={String(data.summary.insufficientDataCount ?? 0)}
+          />
+          <ResearchMetric
+            label="Latest Eval"
+            value={formatShortDateTime(data.summary.latestEvaluationTime)}
+          />
+          <ResearchMetric
+            label="Scoring"
+            value="explainable-v1"
+          />
+          <ResearchMetric
+            label="Confirmed 24h Avg"
+            value={formatSignedPercent(confirmed?.avgReturnPct)}
+          />
+          <ResearchMetric
+            label="Overheated DD"
+            value={formatSignedPercent(overheated?.avgMaxDrawdownPct)}
+          />
+          <ResearchMetric
+            label="Distribution Unfav"
+            value={formatPercentRatio(distribution?.unfavorableRate)}
+          />
+          <ResearchMetric
+            label="Weak Bounce MA50"
+            value={formatPercentRatio(weakBounce?.unfavorableRate)}
+          />
+          <ResearchMetric label="Top Label" value={topLabel} />
+          <ResearchMetric label="Worst Risk" value={worstRiskType} />
+        </div>
+      )}
+    </section>
+  );
+}
+
+function ResearchMetric({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="border border-[var(--border)] bg-[#0b0f14]/60 px-1.5 py-1">
+      <div className="truncate text-[10px] text-[var(--muted)]">{label}</div>
+      <div className="mt-0.5 truncate text-xs font-semibold tabular-nums">
+        {value}
+      </div>
+    </div>
   );
 }
 
@@ -395,6 +537,16 @@ async function fetchScan(
   }
 
   return fetchSingleTimeframeScan(filters, options);
+}
+
+async function fetchResearchEvaluation() {
+  const response = await fetch("/api/history/evaluate?horizon=24h&limit=500");
+
+  if (!response.ok) {
+    return null;
+  }
+
+  return (await response.json()) as ResearchEvaluationResponse;
 }
 
 export async function fetchSingleTimeframeScan(
@@ -755,6 +907,59 @@ function formatDuration(value: number | undefined) {
   }
 
   return `${(value / 1000).toFixed(1)} s`;
+}
+
+function formatSignedPercent(value: number | null | undefined) {
+  if (value === null || value === undefined) {
+    return "n/a";
+  }
+
+  const formatted = `${value.toFixed(2)}%`;
+  return value > 0 ? `+${formatted}` : formatted;
+}
+
+function formatPercentRatio(value: number | null | undefined) {
+  if (value === null || value === undefined) {
+    return "n/a";
+  }
+
+  return `${(value * 100).toFixed(1)}%`;
+}
+
+function getTopLabel(
+  buckets: Record<string, ResearchBucket> | undefined,
+  mode: "best" | "worst",
+) {
+  const rows = Object.entries(buckets ?? {}).filter(
+    ([, bucket]) => bucket.completedCount > 0 && bucket.avgReturnPct !== null,
+  );
+
+  if (rows.length === 0) {
+    return "n/a";
+  }
+
+  rows.sort((left, right) =>
+    mode === "best"
+      ? (right[1].avgReturnPct ?? 0) - (left[1].avgReturnPct ?? 0)
+      : (left[1].avgReturnPct ?? 0) - (right[1].avgReturnPct ?? 0),
+  );
+
+  return rows[0][0];
+}
+
+function formatStorageMode(mode: ResearchEvaluationResponse["storageMode"]) {
+  switch (mode) {
+    case "sqlite":
+      return "SQLite";
+    case "jsonl":
+      return "JSONL";
+    case "disabled":
+      return "Disabled";
+  }
+}
+
+function formatShortDateTime(value: string | null | undefined) {
+  return value ? new Date(value).toLocaleString() : "n/a";
 }
 
 function formatTime(value: string | undefined) {

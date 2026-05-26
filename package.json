@@ -10,7 +10,12 @@
     "deploy:cloudflare": "opennextjs-cloudflare deploy",
     "start": "next start",
     "lint": "eslint .",
-    "test": "vitest run"
+    "test": "vitest run",
+    "research:migrate": "node scripts/run-ts.mjs scripts/research.ts migrate",
+    "research:evaluate": "node scripts/run-ts.mjs scripts/research.ts evaluate",
+    "research:prune": "node scripts/run-ts.mjs scripts/research.ts prune",
+    "research:stats": "node scripts/run-ts.mjs scripts/research.ts stats",
+    "research:inspect": "node scripts/run-ts.mjs scripts/research.ts inspect"
   },
   "dependencies": {
     "@tanstack/react-query": "5.100.14",

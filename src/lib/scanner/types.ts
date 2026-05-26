@@ -1,11 +1,15 @@
 export type {
   MarketPhase,
+  ActionBias,
+  DetectedRiskType,
   MultiTimeframeAlignment,
   MultiTimeframeResultSummary,
   MultiTimeframeScanSummary,
+  PrimaryStructure,
   ScannerExplanation,
   ScannerExplanationKey,
   ScannerSignal,
+  ScannerSignalLabel,
   ScannerSignalState,
   ScanResult,
 } from "@/lib/shared/scannerTypes";

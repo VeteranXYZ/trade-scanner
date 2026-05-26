@@ -30,9 +30,9 @@ describe("scanner compact table", () => {
       </LanguageProvider>,
     );
 
-    expect(html).toContain("O75");
-    expect(html).toContain("C88");
-    expect(html).toContain("R12");
+    expect(html).toContain("O +75");
+    expect(html).toContain("C +88");
+    expect(html).toContain("R +12");
     expect(html).toContain("W1");
     expect(html).toContain("MACD");
     expect(html).toContain("20");
@@ -100,8 +100,37 @@ function makeResult(overrides: Partial<ScanResult> = {}): ScanResult {
     opportunityScore: 75,
     confirmationScore: 88,
     riskScore: 12,
+    trendScore: 110,
+    momentumScore: 45,
+    volumeScore: 40,
+    structureScore: 90,
+    finalSignalScore: 69.8,
     rankScore: 69.8,
+    signalLabel: "watch",
+    actionBias: "watch_only",
+    primaryStructure: "breakout_attempt",
+    secondaryStructures: [],
+    detectedRiskTypes: [],
+    bullishFactors: [],
+    bearishFactors: [],
+    riskFactors: [],
+    neutralFactors: [],
+    nextConfirmationText: [],
+    invalidationText: [],
+    rawMetrics: {
+      price: 100,
+      rsi: 61,
+      bbPercent: 55,
+      volumeRatio: 1.8,
+      macdState: "improving",
+      closeAboveMA20: true,
+      closeAboveMA50: true,
+      closeAboveMA200: true,
+      ma20AboveMA50: true,
+      ma50AboveMA200: true,
+    },
     rsi14: 61,
+    bbPercent: 55,
     bbWidthPercentile: 24,
     volumeRatio: 1.8,
     volume: {

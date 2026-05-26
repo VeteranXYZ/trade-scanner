@@ -56,6 +56,7 @@ Open:
 
 ```bash
 npm run lint
+npm test
 npm run build
 npm run build:cloudflare
 npm run preview:cloudflare
@@ -306,13 +307,112 @@ TTL values:
 
 This cache resets when the server process restarts.
 
+## Signal Research Storage
+
+Local Node.js runs can record scanner output for research. The default mode is
+SQLite-first structured storage at `.data/scanner-research.sqlite`, with JSONL kept
+as a fallback and migration source. This is research infrastructure only: it does
+not place trades, does not connect to private exchange endpoints, and does not use
+real trading API keys.
+
+Configure storage with:
+
+- `SCANNER_RESEARCH_STORAGE=sqlite` for local structured storage.
+- `SCANNER_RESEARCH_STORAGE=jsonl` for legacy JSONL files.
+- `SCANNER_RESEARCH_STORAGE=disabled` to keep live scanner results but skip research writes.
+
+Legacy JSONL files are `.data/scan-signal-snapshots.jsonl`,
+`.data/scan-signals.jsonl`, and `.data/signal-forward-evaluations.jsonl`.
+SQLite stores the same records in `scan_snapshots`, `scan_signals`,
+`scan_signal_risk_types`, and `signal_forward_evaluations`.
+
+The current scoring version is `explainable-v1`; it is stored on every signal so
+future scoring changes can be evaluated separately. The first retention policy is
+conservative and documented in code: scan snapshots and scan signals are intended to
+retain 30 days, and forward evaluations 90 days. Automatic pruning is not enabled;
+use the manual prune command below when you want to apply retention.
+
+### Research Storage Operations
+
+The project includes lightweight maintenance commands for local development and
+future VPS scheduling:
+
+```bash
+npm run research:migrate
+npm run research:evaluate -- --horizon=24h --limit=100
+npm run research:prune -- --dry-run --signal-days=30
+npm run research:prune -- --execute --signal-days=30 --snapshot-days=30 --evaluation-days=90
+npm run research:stats
+npm run research:inspect -- --symbol=BTCUSDT --limit=10
+```
+
+Command behavior:
+
+- `research:migrate` imports the legacy JSONL files into SQLite. It is idempotent
+  and uses record ids plus `signal_id + horizon` uniqueness to avoid duplicate
+  forward evaluations.
+- `research:evaluate` checks pending signals for a completed future horizon. It
+  supports `--horizon=1h|4h|24h|3d|7d`, `--limit=100`, and supported scanner
+  `--timeframe=4h|1d|1w|1M`.
+- `research:prune` is dry-run by default. Add `--execute` to delete old rows using
+  the provided retention windows.
+- `research:stats` prints storage mode, database path in local development, record
+  counts, scoring version distribution, label/action/risk/timeframe counts, pending
+  evaluations, insufficient data count, and latest scan/evaluation times.
+- `research:inspect` prints recent signals with scores, labels, risk types, and
+  any saved evaluation status.
+
+Forward evaluation runs through `/api/history/evaluate?horizon=24h&limit=500`. It
+only evaluates candles that already exist in local synced market data. If there are
+no completed horizons yet, the scanner Research / Evaluation panel shows
+`Not enough evaluated data yet.` An `insufficient_data` outcome means the signal is
+stored, but the local candle database does not yet contain enough later candles for
+that horizon. It is not a failure and it is not a forecast.
+
+The status API `/api/history/research-stats` returns the same basic storage summary
+for the UI and local checks without exposing secrets.
+
+### VPS Evaluation Scheduling
+
+Do not deploy these examples directly from this repository state; they are reference
+commands for a future Oracle VPS or PostgreSQL-backed deployment. Keep the scanner
+job that records new signals separate from the evaluation job that validates
+already-recorded signals.
+
+Cron examples:
+
+```cron
+*/30 * * * * cd /path/to/project && npm run research:evaluate -- --horizon=1h --limit=100
+0 */4 * * * cd /path/to/project && npm run research:evaluate -- --horizon=4h --limit=100
+30 0 * * * cd /path/to/project && npm run research:evaluate -- --horizon=24h --limit=200
+```
+
+Minimal systemd timer shape:
+
+```ini
+# /etc/systemd/system/scanner-research-evaluate.service
+[Service]
+WorkingDirectory=/path/to/project
+ExecStart=/usr/bin/npm run research:evaluate -- --horizon=24h --limit=200
+
+# /etc/systemd/system/scanner-research-evaluate.timer
+[Timer]
+OnCalendar=*-*-* 00:30:00
+Persistent=true
+```
+
+The evaluation job does not pull a full Binance history by itself. It evaluates
+signals only when future candles are already present in the local market-data store.
+The result is a statistical research record, not a trading recommendation or return
+guarantee.
+
 ## Known Limitations
 
 - The cache is in-memory and not shared across server instances.
 - Scoring rules are MVP heuristics and should be tuned with observation.
 - The scanner only supports Binance Spot USDT markets.
 - Symbol detail supports 4h and 1d in the UI.
-- There is no historical signal storage, database-backed backtesting, or portfolio/PnL simulation.
+- Signal research storage is local SQLite/JSONL research infrastructure, not trading advice or portfolio/PnL simulation.
 - The selected-symbol historical behavior review is per-symbol, lazy-loaded, no-database, and research-only.
 - There are no user accounts or saved watchlists.
 - `npm audit` currently reports a moderate advisory from Next's transitive `postcss <8.5.10` dependency. `npm audit fix --force` would install a breaking downgrade, so it has not been applied.

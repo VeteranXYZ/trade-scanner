@@ -3,8 +3,7 @@ import { calculateIndicatorSnapshot } from "@/lib/indicators";
 import { getReasons, getInvalidation, getNextConfirmation } from "./explanations";
 import { determineMarketPhase } from "./marketPhase";
 import { getRiskWarnings } from "./riskFilters";
-import { calculateScannerScores } from "./scoring";
-import { deriveScannerSignal } from "./signal";
+import { buildLegacySignal, calculateScannerScores } from "./scoring";
 import type { ScanResult } from "./types";
 import { getVolumeAnalysis } from "./volumeAnalysis";
 
@@ -24,8 +23,9 @@ export function scanCandles(
     sufficientHistory,
     phase,
     volume,
+    candles: closedCandles,
   });
-  const signal = deriveScannerSignal({ phase, ...scores });
+  const signal = buildLegacySignal(scores.signalLabel, scores.actionBias);
   const lastClosedCandle = closedCandles.at(-1);
 
   return {
@@ -37,6 +37,7 @@ export function scanCandles(
     signal,
     ...scores,
     rsi14: snapshot.rsi14,
+    bbPercent: scores.rawMetrics.bbPercent,
     bbWidthPercentile: snapshot.bollinger.widthPercentile,
     volumeRatio: snapshot.volume.ratio20,
     volume,

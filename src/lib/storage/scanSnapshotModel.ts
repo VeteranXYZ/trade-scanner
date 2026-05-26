@@ -31,9 +31,24 @@ export type StoredScanResult = {
   signalState: ScannerSignalState;
   signalLabel: string;
   rankScore: number;
+  finalSignalScore?: number;
   opportunityScore: number;
   confirmationScore: number;
   riskScore: number;
+  trendScore?: number;
+  momentumScore?: number;
+  volumeScore?: number;
+  structureScore?: number;
+  actionBias?: ScanResult["actionBias"];
+  primaryStructure?: ScanResult["primaryStructure"];
+  secondaryStructures?: string[];
+  detectedRiskTypes?: ScanResult["detectedRiskTypes"];
+  rawMetrics?: ScanResult["rawMetrics"];
+  bullishFactors?: string[];
+  bearishFactors?: string[];
+  riskFactors?: string[];
+  nextConfirmation?: string[];
+  invalidation?: string[];
   multiTimeframe?: {
     alignment: MultiTimeframeAlignment;
     label: string;
@@ -70,9 +85,24 @@ export function toStoredResult(result: ScanResult): StoredScanResult {
     signalState: result.signal.state,
     signalLabel: result.signal.label,
     rankScore: result.rankScore,
+    finalSignalScore: result.finalSignalScore,
     opportunityScore: result.opportunityScore,
     confirmationScore: result.confirmationScore,
     riskScore: result.riskScore,
+    trendScore: result.trendScore,
+    momentumScore: result.momentumScore,
+    volumeScore: result.volumeScore,
+    structureScore: result.structureScore,
+    actionBias: result.actionBias,
+    primaryStructure: result.primaryStructure,
+    secondaryStructures: result.secondaryStructures,
+    detectedRiskTypes: result.detectedRiskTypes,
+    rawMetrics: result.rawMetrics,
+    bullishFactors: result.bullishFactors,
+    bearishFactors: result.bearishFactors,
+    riskFactors: result.riskFactors,
+    nextConfirmation: result.nextConfirmationText,
+    invalidation: result.invalidationText,
     multiTimeframe: result.multiTimeframe
       ? {
           alignment: result.multiTimeframe.alignment,
