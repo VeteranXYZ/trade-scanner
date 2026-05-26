@@ -8,6 +8,7 @@ import type { MarketPhase, ScannerSignalState } from "@/lib/shared/scannerTypes"
 import type { ScannerFiltersState } from "./ScannerPageClient";
 import { useLanguage } from "@/components/providers/LanguageProvider";
 import { TIMEFRAMES } from "@/lib/shared/timeframes";
+import { isLocalSourceEnabledInUi } from "./sourceUi";
 
 export type ScannerSortKey =
   | "rankScore"
@@ -40,6 +41,7 @@ const signalOptions: Array<ScannerSignalState | "ALL"> = [
 
 export function ScannerFilters({ filters, onChange }: ScannerFiltersProps) {
   const { dictionary: t } = useLanguage();
+  const localSourceEnabled = isLocalSourceEnabledInUi();
   const presets: Array<{ label: string; filters: ScannerFiltersState }> = [
     { label: t.scanner.resetView, filters: defaultScannerFilters },
     {
@@ -93,9 +95,9 @@ export function ScannerFilters({ filters, onChange }: ScannerFiltersProps) {
   }
 
   return (
-    <aside className="rounded-md border border-[var(--border)] bg-[var(--panel)] p-3 xl:h-full xl:overflow-y-auto">
-      <h2 className="mb-2 text-sm font-semibold">{t.scanner.filters}</h2>
-      <div className="space-y-3 text-xs text-[var(--muted)]">
+    <aside className="border border-[var(--border)] bg-[var(--panel)] p-2.5 xl:h-full xl:overflow-y-auto">
+      <h2 className="mb-1.5 text-sm font-semibold leading-none">{t.scanner.filters}</h2>
+      <div className="space-y-2.5 text-xs text-[var(--muted)]">
         <FilterSection title={t.scanner.sectionScan}>
           <label className="block">
             <span className="mb-1 block text-[11px] uppercase tracking-wide">
@@ -118,14 +120,17 @@ export function ScannerFilters({ filters, onChange }: ScannerFiltersProps) {
               {t.scanner.source}
             </span>
             <select
-              value={filters.source}
+              value={localSourceEnabled ? filters.source : "remote"}
+              disabled={!localSourceEnabled}
               onChange={(event) =>
                 update("source", event.target.value as ScannerFiltersState["source"])
               }
-              className={controlClass}
+              className={`${controlClass} disabled:cursor-not-allowed disabled:opacity-70`}
             >
               <option value="remote">{t.scanner.remoteBinanceSource}</option>
-              <option value="local">{t.scanner.localSyncedSource}</option>
+              {localSourceEnabled && (
+                <option value="local">{t.scanner.localSyncedSource}</option>
+              )}
             </select>
           </label>
 
@@ -343,7 +348,7 @@ export function ScannerFilters({ filters, onChange }: ScannerFiltersProps) {
                 key={preset.label}
                 type="button"
                 onClick={() => onChange(preset.filters)}
-                className="min-h-7 rounded border border-[var(--border)] bg-[#0b0f14] px-2 py-1 text-left text-[11px] font-semibold text-[var(--foreground)] transition hover:border-[var(--foreground)]"
+                className="min-h-6 border border-[var(--border)] bg-[#0b0f14] px-1.5 py-0.5 text-left text-[10px] font-semibold text-[var(--foreground)] transition hover:border-[var(--foreground)]"
               >
                 {preset.label}
               </button>
@@ -356,7 +361,7 @@ export function ScannerFilters({ filters, onChange }: ScannerFiltersProps) {
 }
 
 const controlClass =
-  "h-8 w-full rounded border border-[var(--border)] bg-[#0b0f14] px-2 text-xs text-[var(--foreground)]";
+  "h-7 w-full border border-[var(--border)] bg-[#0b0f14] px-2 text-xs text-[var(--foreground)]";
 
 const defaultScannerFilters: ScannerFiltersState = {
   mode: "single",
@@ -381,8 +386,8 @@ function FilterSection({
   children: ReactNode;
 }) {
   return (
-    <section className="space-y-2 border-t border-[var(--border)] pt-2 first:border-t-0 first:pt-0">
-      <h3 className="text-[11px] font-semibold uppercase tracking-wide text-[var(--muted-2)]">
+    <section className="space-y-1.5 border-t border-[var(--border)] pt-2 first:border-t-0 first:pt-0">
+      <h3 className="text-[10px] font-semibold uppercase tracking-wide text-[var(--muted-2)]">
         {title}
       </h3>
       {children}

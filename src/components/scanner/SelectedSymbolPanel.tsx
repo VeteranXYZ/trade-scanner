@@ -18,8 +18,8 @@ export function SelectedSymbolPanel({ result }: SelectedSymbolPanelProps) {
 
   if (!result) {
     return (
-      <aside className="rounded-md border border-[var(--border)] bg-[var(--panel)] p-3 xl:h-full xl:overflow-y-auto">
-        <h2 className="text-sm font-semibold">{t.scanner.selectedSymbol}</h2>
+      <aside className="border border-[var(--border)] bg-[var(--panel)] p-2.5 xl:h-full xl:overflow-y-auto">
+        <h2 className="text-sm font-semibold leading-none">{t.scanner.selectedSymbol}</h2>
         <p className="mt-2 text-xs leading-5 text-[var(--muted)]">
           {t.scanner.selectedEmpty}
         </p>
@@ -29,15 +29,15 @@ export function SelectedSymbolPanel({ result }: SelectedSymbolPanelProps) {
 
   return (
     <aside className="xl:h-full xl:overflow-y-auto">
-      <section className="rounded-md border border-[var(--border)] bg-[var(--panel)] p-3">
-        <div className="mb-3 flex items-start justify-between gap-3">
+      <section className="border border-[var(--border)] bg-[var(--panel)] p-2.5">
+        <div className="mb-2 flex items-start justify-between gap-2">
           <div>
-            <h2 className="text-lg font-semibold leading-tight">{result.symbol}</h2>
-            <div className="mt-1.5 flex flex-wrap gap-1.5">
+            <h2 className="text-base font-semibold leading-tight">{result.symbol}</h2>
+            <div className="mt-1 flex flex-wrap gap-1">
               <PhaseBadge phase={result.phase} />
               <SignalBadge signal={result.signal} />
               {result.multiTimeframe && (
-                <span className="inline-flex h-5 items-center rounded border border-[var(--border)] bg-[#0b0f14] px-1.5 text-[11px] font-semibold text-[var(--foreground)]">
+                <span className="inline-flex h-5 items-center border border-[var(--border)] bg-[#0b0f14] px-1.5 text-[11px] font-semibold text-[var(--foreground)]">
                   {t.alignment[result.multiTimeframe.alignment]}
                 </span>
               )}
@@ -45,32 +45,32 @@ export function SelectedSymbolPanel({ result }: SelectedSymbolPanelProps) {
           </div>
           <Link
             href={`/symbol/${result.exchange}/${result.symbol}`}
-            className="h-7 rounded border border-[var(--border)] px-2 py-1 text-xs font-semibold text-[var(--foreground)]"
+            className="h-6 border border-[var(--border)] px-2 py-0.5 text-[11px] font-semibold text-[var(--foreground)]"
           >
             {t.common.detail}
           </Link>
         </div>
 
-        <div className="mb-3 grid grid-cols-4 gap-1.5">
+        <div className="mb-2 grid grid-cols-4 gap-1">
           <Metric label={t.common.rank} value={result.rankScore.toFixed(1)} />
           <Metric label="O" value={result.opportunityScore.toFixed(0)} />
           <Metric label="C" value={result.confirmationScore.toFixed(0)} />
           <Metric label="R" value={result.riskScore.toFixed(0)} />
         </div>
 
-        <p className="mb-3 border-l-2 border-[var(--border)] bg-[#0b0f14]/60 px-2 py-1.5 text-xs leading-5 text-[var(--muted)]">
+        <p className="mb-2 border-l-2 border-[var(--border)] bg-[#0b0f14]/45 px-2 py-1 text-[11px] leading-5 text-[var(--muted)]">
           {t.signalSummary[result.signal.state]}
         </p>
 
         {result.multiTimeframe && (
-          <div className="mb-3 border-t border-[var(--border)] pt-3 text-xs leading-5 text-[var(--muted)]">
+          <div className="mb-2 border-t border-[var(--border)] pt-2 text-xs leading-5 text-[var(--muted)]">
             <div className="font-semibold text-[var(--foreground)]">
               {t.alignment[result.multiTimeframe.alignment]}
             </div>
             <p className="mt-1">
               {t.alignmentSummary[result.multiTimeframe.alignment]}
             </p>
-            <div className="mt-2 grid grid-cols-3 gap-1.5">
+            <div className="mt-1.5 grid grid-cols-3 gap-1">
               <Metric
                 label={t.scanner.mtfRank}
                 value={result.multiTimeframe.rankScore.toFixed(1)}
@@ -84,11 +84,11 @@ export function SelectedSymbolPanel({ result }: SelectedSymbolPanelProps) {
                 value={String(result.multiTimeframe.riskCount)}
               />
             </div>
-            <div className="mt-2 space-y-1.5">
+            <div className="mt-1.5 space-y-1">
               {result.multiTimeframe.timeframeResults.map((timeframeResult) => (
                 <div
                   key={timeframeResult.timeframe}
-                  className="rounded border border-[var(--border)] bg-[#0b0f14]/70 px-2 py-1.5"
+                  className="border border-[var(--border)] bg-[#0b0f14]/55 px-2 py-1"
                 >
                   <div className="mb-1.5 flex items-center justify-between gap-2">
                     <span className="text-xs font-semibold text-[var(--foreground)]">
@@ -109,49 +109,49 @@ export function SelectedSymbolPanel({ result }: SelectedSymbolPanelProps) {
         )}
 
         <InspectorSection title={t.scanner.marketMetrics}>
-          <div className="grid grid-cols-2 gap-1.5">
-            <Metric label={t.common.price} value={formatPrice(result.price)} />
-            <Metric
+          <div className="space-y-1">
+            <KeyValue label={t.common.price} value={formatPrice(result.price)} />
+            <KeyValue
               label={t.scanner.columns.rsi}
               value={formatNullable(result.rsi14, 1)}
             />
-            <Metric
+            <KeyValue
               label={t.common.volume}
               value={formatNullable(result.volumeRatio, 2)}
             />
-            <Metric label={t.scanner.macd} value={formatMacdStatus(result, t)} />
+            <KeyValue label={t.scanner.macd} value={formatMacdStatus(result, t)} />
           </div>
         </InspectorSection>
 
         <InspectorSection title={t.scanner.volumeDetails}>
-          <div className="grid grid-cols-2 gap-1.5">
-            <Metric
+          <div className="space-y-1">
+            <KeyValue
               label={t.scanner.volumeLatest}
               value={formatCompactNumber(result.volume.latest)}
             />
-            <Metric
+            <KeyValue
               label={t.scanner.volumeMa20}
               value={formatNullable(result.volume.ma20, 0)}
             />
-            <Metric
+            <KeyValue
               label={t.scanner.volumeRatio20}
               value={formatNullable(result.volume.ratio20, 2)}
             />
-            <Metric
+            <KeyValue
               label={t.scanner.volumeState}
               value={formatVolumeState(result, t)}
             />
           </div>
         </InspectorSection>
 
-        <div className="space-y-3 border-t border-[var(--border)] pt-3">
+        <div className="space-y-2 border-t border-[var(--border)] pt-2">
           <ReasonList title={t.scanner.reasons} items={result.reasons} />
           {result.warnings.length > 0 && (
             <div>
-              <h3 className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-[var(--muted)]">
+              <h3 className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-[var(--muted)]">
                 {t.scanner.warnings}
               </h3>
-              <div className="space-y-1.5">
+              <div className="space-y-1">
                 {result.warnings.map((warning) => (
                   <RiskBadge
                     key={`${warning.key}-${JSON.stringify(warning.params ?? {})}`}
@@ -168,7 +168,7 @@ export function SelectedSymbolPanel({ result }: SelectedSymbolPanelProps) {
           <ReasonList title={t.scanner.invalidation} items={result.invalidation} />
         </div>
 
-        <div className="mt-3">
+        <div className="mt-2">
           <StrategyReadPanel result={result} />
         </div>
       </section>
@@ -178,11 +178,24 @@ export function SelectedSymbolPanel({ result }: SelectedSymbolPanelProps) {
 
 function Metric({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded border border-[var(--border)] bg-[#0b0f14]/80 px-2 py-1.5">
+    <div className="border border-[var(--border)] bg-[#0b0f14]/65 px-1.5 py-1">
       <div className="truncate text-[10px] uppercase tracking-wide text-[var(--muted)]">
         {label}
       </div>
       <div className="mt-0.5 truncate text-xs font-semibold tabular-nums">{value}</div>
+    </div>
+  );
+}
+
+function KeyValue({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex min-h-6 items-center justify-between gap-3 border-b border-[var(--border)] pb-1 last:border-b-0 last:pb-0">
+      <span className="truncate text-[10px] uppercase tracking-wide text-[var(--muted)]">
+        {label}
+      </span>
+      <span className="truncate text-right text-xs font-semibold tabular-nums text-[var(--foreground)]">
+        {value}
+      </span>
     </div>
   );
 }
@@ -195,8 +208,8 @@ function InspectorSection({
   children: ReactNode;
 }) {
   return (
-    <section className="mb-3 border-t border-[var(--border)] pt-3">
-      <h3 className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-[var(--muted)]">
+    <section className="mb-2 border-t border-[var(--border)] pt-2">
+      <h3 className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-[var(--muted)]">
         {title}
       </h3>
       {children}

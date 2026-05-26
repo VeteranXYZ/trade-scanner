@@ -12,14 +12,14 @@ export function ReasonList({ title, items }: ReasonListProps) {
 
   return (
     <div>
-      <h3 className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-[var(--muted)]">
+      <h3 className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-[var(--muted)]">
         {title}
       </h3>
-      <ul className="space-y-1.5 text-xs leading-5 text-[var(--foreground)]">
+      <ul className="space-y-1 text-[11px] leading-5 text-[var(--foreground)]">
         {items.map((item) => (
           <li
             key={`${item.key}-${JSON.stringify(item.params ?? {})}`}
-            className="rounded border border-[var(--border)] bg-[#0b0f14]/80 px-2 py-1.5"
+            className="border-l border-[var(--border)] bg-[#0b0f14]/45 px-2 py-0.5"
           >
             {formatScannerExplanation(item, t)}
           </li>

@@ -6,6 +6,7 @@ import { useLanguage } from "@/components/providers/LanguageProvider";
 import { ScannerFilters, type ScannerSortKey } from "./ScannerFilters";
 import { ScannerTable } from "./ScannerTable";
 import { SelectedSymbolPanel } from "./SelectedSymbolPanel";
+import { isLocalSourceEnabledInUi, SCANNER_BUILD_MARKER } from "./sourceUi";
 import { scannerSignalOrder } from "@/lib/shared/scannerConfig";
 import type { MtfPreset } from "@/lib/shared/scannerConfig";
 import type {
@@ -161,10 +162,10 @@ export function ScannerPageClient() {
   }
 
   return (
-    <section className="mx-auto flex min-h-[calc(100vh-1px)] max-w-[1800px] flex-col px-3 py-3">
-      <div className="mb-2 rounded-md border border-[var(--border)] bg-[var(--panel)] px-3 py-2">
-        <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-[var(--muted)]">
-          <h1 className="mr-1 text-lg font-semibold text-[var(--foreground)]">
+    <section className="mx-auto flex min-h-[calc(100vh-1px)] max-w-[1800px] flex-col px-2 py-2">
+      <div className="mb-1.5 border border-[var(--border)] bg-[#070b0f] px-2.5 py-1.5 font-mono shadow-[inset_3px_0_0_rgba(96,165,250,0.35)]">
+        <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[11px] leading-5 text-[var(--muted)]">
+          <h1 className="mr-1 text-sm font-semibold text-[var(--foreground)]">
             {t.scanner.title}
           </h1>
           <span>· Binance Spot USDT</span>
@@ -198,13 +199,14 @@ export function ScannerPageClient() {
           </span>
           <span>· {formatDuration(scanQuery.data?.durationMs)}</span>
           <span>· {t.scanner.nextRefresh} {formatTime(scanQuery.data?.cacheExpiresAt)}</span>
+          <span className="text-[var(--muted-2)]">· {SCANNER_BUILD_MARKER}</span>
         </div>
         <ScanScopePanel data={scanQuery.data ?? null} progress={batchProgress} />
       </div>
 
-      <div className="grid min-h-0 flex-1 gap-3 xl:h-[calc(100vh-92px)] xl:grid-cols-[260px_minmax(0,1fr)_340px]">
+      <div className="grid min-h-0 flex-1 gap-2 xl:h-[calc(100vh-72px)] xl:grid-cols-[252px_minmax(0,1fr)_330px]">
         <ScannerFilters filters={filters} onChange={updateFilters} />
-        <div className="min-w-0 space-y-2 xl:flex xl:min-h-0 xl:flex-col">
+        <div className="min-w-0 space-y-1.5 xl:flex xl:min-h-0 xl:flex-col">
           <MtfAlignmentSummary items={alignmentSummary} />
           <ScannerTable
             rows={rows}
@@ -246,21 +248,21 @@ export function ScanScopePanel({
   const { dictionary: t } = useLanguage();
 
   return (
-    <div className="mt-1 border-t border-[var(--border)] pt-1.5">
-      <div className="flex flex-wrap gap-x-3 gap-y-1 text-[11px] leading-5 text-[var(--muted)]">
+    <div className="mt-1 border-t border-[var(--border)] pt-1">
+      <div className="flex flex-wrap gap-x-3 gap-y-0.5 text-[10px] leading-4 text-[var(--muted-2)]">
         <span>{t.scanner.marketUniverse}: {t.scanner.allEligible}</span>
         <span>{t.scanner.cachePolicyNote}</span>
         <span>{t.scanner.cloudflareBatchNote}</span>
       </div>
 
       {data?.capped && (
-        <div className="mt-1 rounded border border-[var(--warning)]/50 bg-[#2b2111]/70 px-2 py-1 text-[11px] font-semibold text-[var(--warning)]">
+        <div className="mt-1 border border-[var(--warning)]/40 bg-[#1b1710] px-2 py-0.5 text-[10px] font-semibold text-[var(--warning)]">
           {t.scanner.cappedWarning}
         </div>
       )}
 
       {progress && (
-        <div className="mt-1 rounded border border-[var(--border)] bg-[#0b0f14] px-2 py-1 text-[11px] text-[var(--muted)]">
+        <div className="mt-0.5 border border-[var(--border)] bg-[#0b0f14] px-2 py-0.5 text-[10px] text-[var(--muted)]">
           <span className="font-semibold text-[var(--foreground)]">
             {progress.mode === "mtf"
               ? t.scanner.scanningMtfBatch
@@ -279,7 +281,7 @@ export function ScanScopePanel({
       )}
 
       {data?.failureSummary && (
-        <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-[11px] text-[var(--muted)]">
+        <div className="mt-0.5 flex flex-wrap gap-x-3 gap-y-0.5 text-[10px] text-[var(--muted-2)]">
           <span>
             {t.scanner.insufficientHistory}:{" "}
             {formatInteger(data.failureSummary.insufficientHistory)}
@@ -318,31 +320,31 @@ function MtfAlignmentSummary({
   const total = items.reduce((sum, item) => sum + item.count, 0);
 
   return (
-    <section className="rounded-md border border-[var(--border)] bg-[var(--panel)] px-3 py-2">
-      <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
-        <h2 className="text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">
+    <section className="border border-[var(--border)] bg-[var(--panel)] px-2.5 py-1.5">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <h2 className="text-[10px] font-semibold uppercase tracking-wide text-[var(--muted)]">
           {t.scanner.mtfAlignmentSummary}
         </h2>
-        <span className="text-xs text-[var(--muted)]">
+        <span className="text-[11px] text-[var(--muted)]">
           {total > 0 ? `${total} ${t.scanner.scanned}` : t.scanner.noMtfAlignment}
         </span>
       </div>
       {total > 0 ? (
-        <div className="grid gap-1.5 sm:grid-cols-2 lg:grid-cols-5">
+        <div className="mt-1.5 grid gap-1 sm:grid-cols-2 lg:grid-cols-5">
           {items.map((item) => (
             <div
               key={item.alignment}
-              className="rounded border border-[var(--border)] bg-[#0b0f14]/80 px-2 py-1.5"
+              className="border border-[var(--border)] bg-[#0b0f14]/60 px-1.5 py-1"
             >
-              <div className="truncate text-xs text-[var(--muted)]">
+              <div className="truncate text-[10px] text-[var(--muted)]">
                 {t.alignment[item.alignment]}
               </div>
-              <div className="mt-0.5 text-sm font-semibold tabular-nums">
+              <div className="mt-0.5 text-xs font-semibold tabular-nums">
                 {item.count}
               </div>
-              <div className="mt-1 h-1 overflow-hidden rounded-full bg-[#111820]">
+              <div className="mt-1 h-0.5 overflow-hidden bg-[#111820]">
                 <div
-                  className="h-full rounded-full bg-[var(--accent)]"
+                  className="h-full bg-[var(--accent)]"
                   style={{ width: `${(item.count / total) * 100}%` }}
                 />
               </div>
@@ -689,7 +691,11 @@ async function getScannerErrorMessage({
 }
 
 function normalizeFilters(filters: ScannerFiltersState): ScannerFiltersState {
-  return filters;
+  if (isLocalSourceEnabledInUi()) {
+    return filters;
+  }
+
+  return { ...filters, source: "remote" };
 }
 
 function getApiMaxSymbols(filters: ScannerFiltersState) {

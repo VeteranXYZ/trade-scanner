@@ -1,10 +1,14 @@
 import { renderToStaticMarkup } from "react-dom/server";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { LanguageProvider } from "@/components/providers/LanguageProvider";
 import { ScannerFilters } from "./ScannerFilters";
 import { ScanScopePanel, type ScannerFiltersState } from "./ScannerPageClient";
 
 describe("scanner timeframe filters", () => {
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
   it("renders medium-to-large timeframes only", () => {
     const html = renderToStaticMarkup(
       <LanguageProvider>
@@ -20,6 +24,19 @@ describe("scanner timeframe filters", () => {
     expect(html).not.toContain(">1H<");
     expect(html).toContain("Max Symbols Scanned");
     expect(html).toContain("Caps the eligible scan universe");
+  });
+
+  it("does not expose the local source option for Cloudflare production", () => {
+    vi.stubEnv("NEXT_PUBLIC_DEPLOY_TARGET", "cloudflare");
+
+    const html = renderToStaticMarkup(
+      <LanguageProvider>
+        <ScannerFilters filters={makeFilters()} onChange={() => undefined} />
+      </LanguageProvider>,
+    );
+
+    expect(html).toContain("Remote Binance");
+    expect(html).not.toContain("Local Synced Data");
   });
 });
 

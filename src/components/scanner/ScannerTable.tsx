@@ -126,7 +126,7 @@ export function ScannerTable({
           row.original.warnings.length > 0 ? (
             <span
               aria-label={`${row.original.warnings.length} ${t.scanner.warnings}`}
-              className="inline-flex rounded border border-[#8f6b24]/40 bg-[#2b2111]/70 px-1.5 py-0.5 text-[11px] font-semibold text-[var(--warning)]"
+              className="inline-flex border border-[#8f6b24]/40 bg-[#1b1710] px-1 py-0.5 text-[10px] font-semibold text-[var(--warning)]"
             >
               W{row.original.warnings.length}
             </span>
@@ -146,11 +146,11 @@ export function ScannerTable({
   });
 
   return (
-    <section className="min-w-0 overflow-hidden rounded-md border border-[var(--border)] bg-[var(--panel)] xl:flex xl:min-h-0 xl:flex-1 xl:flex-col">
-      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[var(--border)] px-3 py-2">
+    <section className="min-w-0 overflow-hidden border border-[var(--border)] bg-[var(--panel)] xl:flex xl:min-h-0 xl:flex-1 xl:flex-col">
+      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[var(--border)] px-2.5 py-1.5">
         <div>
-          <h2 className="text-sm font-semibold">{t.scanner.results}</h2>
-          <p className="mt-0.5 text-[11px] text-[var(--muted)]">
+          <h2 className="text-sm font-semibold leading-none">{t.scanner.results}</h2>
+          <p className="mt-1 text-[10px] text-[var(--muted)]">
             {updatedAt
               ? `${sourceItemCount} ${t.scanner.scanned} · ${
                   cached ? t.common.cached : t.common.fresh
@@ -164,7 +164,7 @@ export function ScannerTable({
           type="button"
           onClick={onRefresh}
           disabled={isFetching}
-          className="h-7 rounded border border-[var(--border)] px-2 text-xs font-semibold text-[var(--foreground)] disabled:cursor-not-allowed disabled:opacity-60"
+          className="h-6 border border-[var(--border)] px-2 text-[11px] font-semibold text-[var(--foreground)] disabled:cursor-not-allowed disabled:opacity-60"
         >
           {isFetching ? t.common.refreshing : t.common.refresh}
         </button>
@@ -177,7 +177,7 @@ export function ScannerTable({
       />
 
       {partialErrors.length > 0 && (
-        <div className="border-b border-[var(--border)] bg-[#2b2111] px-3 py-2 text-xs text-[var(--warning)]">
+        <div className="border-b border-[var(--border)] bg-[#1b1710] px-2.5 py-1 text-[11px] text-[var(--warning)]">
           {partialErrors.length} {t.scanner.partialErrors}
         </div>
       )}
@@ -197,13 +197,13 @@ export function ScannerTable({
       ) : (
         <div className="min-h-0 flex-1 overflow-auto">
           <table className="w-full min-w-[690px] table-fixed border-collapse text-left text-xs">
-            <thead className="sticky top-0 z-10 bg-[#0a1016] text-[11px] uppercase text-[var(--muted)] shadow-[0_1px_0_var(--border)]">
+            <thead className="sticky top-0 z-10 bg-[#090f15] text-[10px] uppercase text-[var(--muted)] shadow-[0_1px_0_var(--border)]">
               {table.getHeaderGroups().map((headerGroup) => (
                 <tr key={headerGroup.id}>
                   {headerGroup.headers.map((header) => (
                     <th
                       key={header.id}
-                      className={`whitespace-nowrap px-1.5 py-1.5 font-semibold ${getColumnClass(
+                      className={`whitespace-nowrap px-1.5 py-1 font-semibold ${getColumnClass(
                         header.id,
                       )}`}
                     >
@@ -233,13 +233,19 @@ export function ScannerTable({
                       }
                     }}
                     className={`cursor-pointer border-t border-[var(--border)] transition ${
-                      isSelected ? "bg-[#10231a]" : "hover:bg-[#101923]"
+                      isSelected ? "bg-[#0d1b15]" : "hover:bg-[#101923]/75"
                     }`}
                   >
-                    {row.getVisibleCells().map((cell) => (
+                    {row.getVisibleCells().map((cell, cellIndex) => (
                       <td
                         key={cell.id}
-                        className={`h-8 overflow-hidden whitespace-nowrap px-1.5 py-1 align-middle ${getColumnClass(
+                        className={`h-[34px] overflow-hidden whitespace-nowrap border-l-2 px-1.5 py-0.5 align-middle ${
+                          cellIndex === 0 && isSelected
+                            ? "border-l-[var(--accent)]"
+                            : cellIndex === 0
+                              ? "border-l-transparent"
+                              : "border-l-transparent"
+                        } ${getColumnClass(
                           cell.column.id,
                         )}`}
                       >
@@ -265,11 +271,11 @@ function MaStatus({ result }: { result: ScanResult }) {
   ] as const;
 
   return (
-    <div className="flex gap-1">
+    <div className="flex gap-0.5">
       {items.map(([label, active]) => (
         <span
           key={label}
-          className={`inline-flex h-5 min-w-7 items-center justify-center rounded border px-1 text-[11px] font-semibold ${
+          className={`inline-flex h-4 min-w-5 items-center justify-center border px-0.5 text-[10px] font-semibold ${
             active
               ? "border-[#2f7d46] bg-[#132119] text-[var(--accent)]"
               : "border-[var(--border)] bg-[#0b0f14] text-[var(--muted)]"

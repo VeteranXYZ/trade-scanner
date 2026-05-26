@@ -2744,19 +2744,10 @@ Trading/security risk: none
 
 ## MVP Dependency Decision
 
-Use this by default:
-
-```json
-{
-  "dependencies": {
-    "lightweight-charts": "latest",
-    "technicalindicators": "latest",
-    "@tanstack/react-table": "latest",
-    "@tanstack/react-query": "latest",
-    "p-limit": "latest"
-  }
-}
-```
+Dependencies must be pinned to explicit versions in `package.json` and kept
+consistent with `package-lock.json`. Do not use `"latest"` ranges in project
+dependencies or documentation examples. Version upgrades should be intentional,
+reviewed, and verified with the standard test/build commands.
 
 Do not add:
 

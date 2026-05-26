@@ -43,6 +43,9 @@ npm install
 npm run dev
 ```
 
+Dependency versions are pinned in `package.json` and `package-lock.json`; do not
+use `"latest"` ranges for Phase 1 stabilization work.
+
 Open:
 
 - `http://127.0.0.1:3000/`
