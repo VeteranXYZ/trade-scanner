@@ -16,5 +16,14 @@ export type IndicatorSnapshot = {
     ma20: number | null;
     ratio: number | null;
   };
+  macd: {
+    line: number | null;
+    signal: number | null;
+    histogram: number | null;
+    histogramRising: boolean;
+    bullishCross: boolean;
+    bearishCross: boolean;
+    aboveZero: boolean;
+  };
   priceExtensionFromMA20: number | null;
 };

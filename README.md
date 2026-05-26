@@ -94,14 +94,17 @@ D1 is not configured in `wrangler.jsonc` for Phase 1. The old migration workflow
 
 ### Cloudflare Free Batching
 
-Cloudflare Workers Free can hit the external subrequest limit if one invocation scans hundreds of symbols. As a temporary Phase 1 solution, the Scanner UI processes full-market single-timeframe scans through sequential frontend batches:
+Cloudflare Workers Free can hit the external subrequest limit if one invocation scans hundreds of symbols. As a temporary Phase 1 solution, the Scanner UI processes full-market scans through sequential frontend batches:
 
-- Default batch size: `35`
-- Maximum API batch size: `40`
 - API form: `/api/scan?source=remote&timeframe=4h&batchMode=true&batchSize=35&cursor=0`
+- MTF API form: `/api/scan/mtf?source=remote&preset=short&batchMode=true&batchSize=15&cursor=0`
+- Single-timeframe default batch size: `35`
+- Single-timeframe maximum API batch size: `40`
+- MTF default batch size: `15`
+- MTF maximum API batch size: `20`
 - The frontend requests one batch at a time, merges results, deduplicates by symbol/timeframe, then sorts by `rankScore`.
 
-Numeric `maxSymbols` requests such as `maxSymbols=20` still use the normal single-call scan path. Workers Paid may remove the need for this batching later. D1, KV, R2, Queues, and Durable Objects are not required for this phase.
+MTF batches are smaller because each symbol needs candles for multiple timeframes. Numeric `maxSymbols` requests such as `maxSymbols=20` still use the normal single-call scan path. Workers Paid may remove the need for this batching later. D1, KV, R2, Queues, and Durable Objects are not required for this phase.
 
 ## Timeframes
 
@@ -178,7 +181,10 @@ Implemented:
 - RSI14
 - Volume MA20
 - Volume Ratio
+- MACD 12/26/9
 - Price extension from MA20
+
+MACD is used as a confirmation input for momentum improvement, crosses, and weakening warnings. It is not treated as a standalone trading signal. KDJ is intentionally not included in Phase 1 to avoid adding noisy or overfit confirmation layers.
 
 Short candle arrays return `null` for unavailable indicators instead of throwing.
 
@@ -225,6 +231,7 @@ GET /api/scan?source=remote&timeframe=4h&maxSymbols=200&minQuoteVolume=10000000
 GET /api/scan?source=remote&timeframe=4h&maxSymbols=all
 GET /api/scan?source=remote&timeframe=4h&batchMode=true&batchSize=35&cursor=0
 GET /api/scan/mtf?source=remote&preset=short
+GET /api/scan/mtf?source=remote&preset=short&batchMode=true&batchSize=15&cursor=0
 ```
 
 Responses include:

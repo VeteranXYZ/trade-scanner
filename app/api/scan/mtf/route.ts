@@ -22,6 +22,8 @@ import type { ScanResult } from "@/lib/scanner/types";
 export const runtime = "nodejs";
 
 const MAX_ELIGIBLE_SCAN_SYMBOLS = 600;
+const DEFAULT_MTF_BATCH_SIZE = 15;
+const MAX_MTF_BATCH_SIZE = 20;
 const MTF_SCAN_CONCURRENCY = 3;
 const SCAN_UNIVERSE = "all-eligible-usdt";
 const SUPPORTED_PRESETS = new Set<MtfPreset>([
@@ -39,6 +41,8 @@ type MtfScanPayload = {
   mode: "mtf";
   preset: MtfPreset;
   timeframes: typeof mtfPresetTimeframes[MtfPreset];
+  primaryTimeframe: string;
+  confirmationTimeframe: string | null;
   source: ScanSource;
   universe: typeof SCAN_UNIVERSE;
   totalUsdtPairs: number;
@@ -60,6 +64,15 @@ type MtfScanPayload = {
   results: ScanResult[];
   itemCount: number;
   errors?: ScanErrorSample[];
+  batchMode?: true;
+  cursor?: number;
+  nextCursor?: number | null;
+  hasMore?: boolean;
+  batchSize?: number;
+  batchIndex?: number;
+  totalBatches?: number;
+  totalEligibleCount?: number;
+  scannedInBatch?: number;
 };
 
 export async function GET(request: Request) {
@@ -71,6 +84,9 @@ export async function GET(request: Request) {
     searchParams.get("maxSymbols") ?? searchParams.get("limit"),
   );
   const minQuoteVolume = parseMinQuoteVolume(searchParams.get("minQuoteVolume"));
+  const batchMode = parseBatchMode(searchParams.get("batchMode"));
+  const batchSize = parseBatchSize(searchParams.get("batchSize"));
+  const cursor = parseCursor(searchParams.get("cursor"));
 
   if (!isPreset(preset)) {
     return NextResponse.json(
@@ -91,6 +107,10 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: minQuoteVolume.error }, { status: 400 });
   }
 
+  if (!cursor.valid) {
+    return NextResponse.json({ error: cursor.error }, { status: 400 });
+  }
+
   if (source.value === "local" && isLocalPersistenceDisabled()) {
     return localPersistenceUnavailableResponse();
   }
@@ -98,12 +118,18 @@ export async function GET(request: Request) {
   try {
     const ttlMs = getMtfCacheTtl(preset);
     const cacheTtlSeconds = Math.floor(ttlMs / 1000);
+    const timeframes = mtfPresetTimeframes[preset];
     const cacheKey = cacheKeys.mtfScan({
       source: source.value,
       preset,
+      primaryTimeframe: timeframes[0],
+      confirmationTimeframe: timeframes[1],
       universe: SCAN_UNIVERSE,
       maxSymbols: maxSymbols.value,
       minQuoteVolume: minQuoteVolume.value,
+      batchMode,
+      cursor: batchMode ? cursor.value : undefined,
+      batchSize: batchMode ? batchSize : undefined,
       filters: "none",
     });
     const cachedEntry =
@@ -120,11 +146,12 @@ export async function GET(request: Request) {
       });
     }
 
-    const { settled, useLocal, marketStats } = await scanMtfMarkets(
+    const { settled, useLocal, marketStats, batch } = await scanMtfMarkets(
       preset,
       source.value,
       maxSymbols.value,
       minQuoteVolume.value,
+      batchMode ? { cursor: cursor.value, batchSize } : null,
     );
     const successful = settled.flatMap((item) => (item.result ? [item.result] : []));
     const results = successful
@@ -143,7 +170,9 @@ export async function GET(request: Request) {
       exchange: "binance",
       mode: "mtf",
       preset,
-      timeframes: mtfPresetTimeframes[preset],
+      timeframes,
+      primaryTimeframe: timeframes[0],
+      confirmationTimeframe: timeframes[1] ?? null,
       source: useLocal ? "local" : "remote",
       universe: SCAN_UNIVERSE,
       totalUsdtPairs: marketStats.totalUsdtPairs,
@@ -165,6 +194,19 @@ export async function GET(request: Request) {
       results,
       itemCount: results.length,
       errors: errors.length > 0 ? errors.slice(0, 10) : undefined,
+      ...(batch
+        ? {
+            batchMode: true,
+            cursor: batch.cursor,
+            nextCursor: batch.nextCursor,
+            hasMore: batch.hasMore,
+            batchSize: batch.batchSize,
+            batchIndex: batch.batchIndex,
+            totalBatches: batch.totalBatches,
+            totalEligibleCount: batch.totalEligibleCount,
+            scannedInBatch: batch.scannedInBatch,
+          }
+        : {}),
     };
 
     if (errors.length > 0 || useLocal) {
@@ -202,6 +244,7 @@ async function scanMtfMarkets(
   source: ScanSource,
   maxSymbols: number | null,
   minQuoteVolume: number,
+  batch: { cursor: number; batchSize: number } | null,
 ) {
   if (source === "remote") {
     const marketResult = await getEligibleUsdtMarkets({
@@ -209,18 +252,32 @@ async function scanMtfMarkets(
       minQuoteVolume,
       safetyCap: MAX_ELIGIBLE_SCAN_SYMBOLS,
     });
+    const batchMeta = getBatchMeta({
+      batch,
+      totalEligibleCount: marketResult.eligibleCount,
+      availableCount: marketResult.markets.length,
+    });
+    const markets = batchMeta
+      ? marketResult.markets.slice(batchMeta.cursor, batchMeta.nextCursor ?? undefined)
+      : marketResult.markets;
     const settled = await scanMtfMarketBatch({
-      markets: marketResult.markets,
+      markets,
       getResult: (symbol) => scanMarketMultiTimeframe(symbol, preset),
     });
 
     return {
       settled,
       useLocal: false,
+      batch: batchMeta
+        ? {
+            ...batchMeta,
+            scannedInBatch: markets.length,
+          }
+        : null,
       marketStats: {
         totalUsdtPairs: marketResult.totalUsdtPairs,
         eligibleCount: marketResult.eligibleCount,
-        scannedCount: marketResult.markets.length,
+        scannedCount: markets.length,
         filteredLowVolume: marketResult.filteredLowVolume,
         excludedStableOrLeveraged: marketResult.excludedStableOrLeveraged,
         capped: marketResult.capped,
@@ -234,10 +291,18 @@ async function scanMtfMarkets(
   ]);
 
   try {
-    const markets = (await store.getMarkets()).slice(
+    const allMarkets = (await store.getMarkets()).slice(
       0,
       maxSymbols ?? MAX_ELIGIBLE_SCAN_SYMBOLS,
     );
+    const batchMeta = getBatchMeta({
+      batch,
+      totalEligibleCount: allMarkets.length,
+      availableCount: allMarkets.length,
+    });
+    const markets = batchMeta
+      ? allMarkets.slice(batchMeta.cursor, batchMeta.nextCursor ?? undefined)
+      : allMarkets;
     const settled = await scanMtfMarketBatch({
       markets,
       getResult: (symbol) =>
@@ -251,9 +316,15 @@ async function scanMtfMarkets(
     return {
       settled,
       useLocal: true,
+      batch: batchMeta
+        ? {
+            ...batchMeta,
+            scannedInBatch: markets.length,
+          }
+        : null,
       marketStats: {
-        totalUsdtPairs: markets.length,
-        eligibleCount: markets.length,
+        totalUsdtPairs: allMarkets.length,
+        eligibleCount: allMarkets.length,
         scannedCount: markets.length,
         filteredLowVolume: 0,
         excludedStableOrLeveraged: 0,
@@ -263,6 +334,36 @@ async function scanMtfMarkets(
   } finally {
     await store.close?.();
   }
+}
+
+function getBatchMeta({
+  batch,
+  totalEligibleCount,
+  availableCount,
+}: {
+  batch: { cursor: number; batchSize: number } | null;
+  totalEligibleCount: number;
+  availableCount: number;
+}) {
+  if (!batch) {
+    return null;
+  }
+
+  const totalBatches = Math.max(1, Math.ceil(availableCount / batch.batchSize));
+  const nextCursor = Math.min(batch.cursor + batch.batchSize, availableCount);
+
+  return {
+    cursor: batch.cursor,
+    nextCursor: nextCursor < availableCount ? nextCursor : null,
+    hasMore: nextCursor < availableCount,
+    batchSize: batch.batchSize,
+    batchIndex: Math.min(
+      totalBatches,
+      Math.floor(batch.cursor / batch.batchSize) + 1,
+    ),
+    totalBatches,
+    totalEligibleCount,
+  };
 }
 
 function getLatestClosedCandleTime(results: ScanResult[]) {
@@ -392,6 +493,41 @@ function parseMinQuoteVolume(value: string | null) {
     return {
       valid: false as const,
       error: "minQuoteVolume must be a non-negative number.",
+    };
+  }
+
+  return { valid: true as const, value: parsed };
+}
+
+function parseBatchMode(value: string | null) {
+  return value === "true" || value === "1";
+}
+
+function parseBatchSize(value: string | null) {
+  if (value === null || value === "") {
+    return DEFAULT_MTF_BATCH_SIZE;
+  }
+
+  const parsed = Number(value);
+
+  if (!Number.isInteger(parsed) || parsed < 1) {
+    return DEFAULT_MTF_BATCH_SIZE;
+  }
+
+  return Math.min(parsed, MAX_MTF_BATCH_SIZE);
+}
+
+function parseCursor(value: string | null) {
+  if (value === null || value === "") {
+    return { valid: true as const, value: 0 };
+  }
+
+  const parsed = Number(value);
+
+  if (!Number.isInteger(parsed) || parsed < 0) {
+    return {
+      valid: false as const,
+      error: "cursor must be a non-negative integer.",
     };
   }
 

@@ -131,6 +131,7 @@ export function SelectedSymbolPanel({ result }: SelectedSymbolPanelProps) {
             label={t.common.volume}
             value={formatNullable(result.volumeRatio, 2)}
           />
+          <Metric label={t.scanner.macd} value={formatMacdStatus(result, t)} />
         </div>
 
         <div className="space-y-4">
@@ -186,4 +187,27 @@ function formatPrice(value: number) {
   }
 
   return value.toFixed(6);
+}
+
+function formatMacdStatus(
+  result: ScanResult,
+  dictionary: ReturnType<typeof useLanguage>["dictionary"],
+) {
+  if (!result.macd) {
+    return dictionary.scanner.macdUnavailable;
+  }
+
+  if (result.macd.bearishCross || !result.macd.histogramRising) {
+    return dictionary.scanner.macdWeakening;
+  }
+
+  if (result.macd.bullishCross) {
+    return dictionary.scanner.macdBullishCross;
+  }
+
+  if (result.macd.aboveZero) {
+    return dictionary.scanner.macdAboveZero;
+  }
+
+  return dictionary.scanner.macdImproving;
 }

@@ -34,6 +34,9 @@ export type ScannerExplanationKey =
   | "reason.volumeExpanding"
   | "reason.ma20AboveMa50"
   | "reason.priceAboveMa200"
+  | "reason.macdHistogramRising"
+  | "reason.macdBullishCross"
+  | "reason.macdAboveZero"
   | "reason.phaseClassification"
   | "reason.limitedHistory"
   | "confirmation.closeAboveUpperBollinger"
@@ -61,6 +64,8 @@ export type ScannerExplanationKey =
   | "warning.rsiBelow45"
   | "warning.longUpperWick"
   | "warning.weakCompressionBelowTrend"
+  | "warning.macdBearishCross"
+  | "warning.macdMomentumWeakening"
   | "warning.insufficientHistory";
 
 export type ScannerExplanation = {
@@ -114,6 +119,15 @@ export type ScanResult = {
   rsi14: number | null;
   bbWidthPercentile: number | null;
   volumeRatio: number | null;
+  macd?: {
+    line: number;
+    signal: number;
+    histogram: number;
+    histogramRising: boolean;
+    bullishCross: boolean;
+    bearishCross: boolean;
+    aboveZero: boolean;
+  };
   maStatus: {
     aboveMA20: boolean;
     aboveMA50: boolean;

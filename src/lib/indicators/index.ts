@@ -4,6 +4,7 @@ import {
   calculateWidthPercentile,
 } from "./bollinger";
 import { calculateSma } from "./movingAverage";
+import { calculateMacdSnapshot } from "./macd";
 import { calculateRsi } from "./rsi";
 import type { IndicatorSnapshot } from "./types";
 import { calculateVolumeSnapshot } from "./volume";
@@ -24,6 +25,7 @@ export function calculateIndicatorSnapshot(candles: Candle[]): IndicatorSnapshot
     90,
   );
   const volume = calculateVolumeSnapshot(volumes);
+  const macd = calculateMacdSnapshot(closes);
 
   return {
     close,
@@ -39,6 +41,7 @@ export function calculateIndicatorSnapshot(candles: Candle[]): IndicatorSnapshot
     },
     rsi14: calculateRsi(closes, 14),
     volume,
+    macd,
     // Keep this as a decimal value; 0.08 means price is 8% above MA20.
     priceExtensionFromMA20:
       ma20 !== null && ma20 !== 0 ? (close - ma20) / ma20 : null,
@@ -52,6 +55,7 @@ export {
   calculateWidthPercentile,
 } from "./bollinger";
 export { calculateSma, calculateSmaSeries } from "./movingAverage";
+export { calculateMacdSnapshot } from "./macd";
 export { calculateRsi, calculateRsiSeries } from "./rsi";
 export { calculateVolumeSnapshot } from "./volume";
 export type { IndicatorSnapshot } from "./types";

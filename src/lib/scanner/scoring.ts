@@ -19,7 +19,7 @@ export function calculateScannerScores({
   sufficientHistory,
   phase,
 }: ScoreInput): ScannerScores {
-  const confirmationScore = calculateConfirmationScore(snapshot);
+  const confirmationScore = calculateConfirmationScore(snapshot, phase);
   const riskScore = calculateRiskScore(snapshot, sufficientHistory, phase);
   const opportunityScore = capOpportunityScore({
     opportunityScore: calculateOpportunityScore(snapshot, sufficientHistory),
@@ -121,7 +121,7 @@ function calculateOpportunityScore(
   return clampScore(score);
 }
 
-function calculateConfirmationScore(snapshot: IndicatorSnapshot) {
+function calculateConfirmationScore(snapshot: IndicatorSnapshot, phase?: MarketPhase) {
   let score = 0;
 
   if (snapshot.bollinger.upper !== null && snapshot.close > snapshot.bollinger.upper) {
@@ -146,6 +146,28 @@ function calculateConfirmationScore(snapshot: IndicatorSnapshot) {
 
   if (isBetween(snapshot.rsi14, 55, 72)) {
     score += 15;
+  }
+
+  if (snapshot.macd.histogramRising) {
+    score += 5;
+  }
+
+  if (snapshot.macd.bullishCross) {
+    score += 10;
+  }
+
+  if (
+    snapshot.macd.aboveZero &&
+    (phase === "TRENDING" || phase === "BREAKOUT_ATTEMPT")
+  ) {
+    score += 5;
+  }
+
+  if (
+    snapshot.macd.bearishCross &&
+    (phase === "TRENDING" || phase === "BREAKOUT_ATTEMPT")
+  ) {
+    score -= 10;
   }
 
   return clampScore(score);

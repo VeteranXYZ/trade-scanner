@@ -106,6 +106,7 @@ MVP scope:
   - RSI14
   - Volume MA20
   - Volume Ratio
+  - MACD 12/26/9
   - Price extension from MA20
 - Output:
   - Market phase
@@ -226,9 +227,14 @@ When those flags are active, Cloudflare production uses `source=remote` only. `s
 Cloudflare Workers Free has a strict external subrequest limit per Worker invocation. Full eligible-market scans must therefore use a temporary sequential frontend batching path in Phase 1:
 
 - `/api/scan?source=remote&timeframe=4h&batchMode=true&batchSize=35&cursor=0`
-- Default batch size: `35`
-- Maximum safe API batch size: `40`
+- `/api/scan/mtf?source=remote&preset=short&batchMode=true&batchSize=15&cursor=0`
+- Single-timeframe default batch size: `35`
+- Single-timeframe maximum safe API batch size: `40`
+- MTF default batch size: `15`
+- MTF maximum safe API batch size: `20`
 - The frontend requests one batch at a time, appends results, deduplicates, and sorts the final combined result set by `rankScore`.
+
+MTF batches are smaller because each symbol requires candle requests for multiple timeframes such as `4h` and `1d`.
 
 Do not add D1, KV, R2, Queues, Durable Objects, or database persistence for this temporary batching solution. Workers Paid may remove the need for frontend batching later.
 
@@ -437,6 +443,15 @@ export type ScanResult = {
   rsi14: number | null;
   bbWidthPercentile: number | null;
   volumeRatio: number | null;
+  macd?: {
+    line: number;
+    signal: number;
+    histogram: number;
+    histogramRising: boolean;
+    bullishCross: boolean;
+    bearishCross: boolean;
+    aboveZero: boolean;
+  };
 
   maStatus: {
     aboveMA20: boolean;
@@ -589,7 +604,10 @@ Calculate:
 - RSI14
 - Volume MA20
 - Volume Ratio
+- MACD 12/26/9
 - Price extension from MA20
+
+MACD is a conservative confirmation input only. It can support confirmation when histogram momentum improves, a bullish cross appears, or MACD remains above zero in constructive phases. It must not become a standalone trading signal. KDJ is intentionally excluded from Phase 1 to reduce noise and overfitting.
 
 ### 6.4 Null behavior
 
@@ -1136,7 +1154,27 @@ Response:
 }
 ```
 
-### 12.4 Error handling
+### 12.4 `/api/scan/mtf`
+
+Purpose:
+
+- Scan the same eligible universe across a preset group of timeframes and return merged MTF results.
+
+Query params:
+
+```txt
+source=remote
+preset=short
+maxSymbols=all
+minQuoteVolume=0
+batchMode=true
+batchSize=15
+cursor=0
+```
+
+MTF full-market scans should use `batchMode=true` on Cloudflare Workers Free. The response includes the same batch metadata as `/api/scan`, plus `mode: "mtf"`, `preset`, `timeframes`, `primaryTimeframe`, and `confirmationTimeframe`.
+
+### 12.5 Error handling
 
 One symbol failure must not fail the whole scan.
 
@@ -1274,6 +1312,7 @@ Required:
 - RSI
 - BB Width Percentile
 - Volume Ratio
+- MACD status
 - MA Status
 - Warnings
 

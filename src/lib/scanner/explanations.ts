@@ -58,6 +58,18 @@ export function getReasons({
     reasons.push({ key: "reason.priceAboveMa200" });
   }
 
+  if (snapshot.macd.histogramRising) {
+    reasons.push({ key: "reason.macdHistogramRising" });
+  }
+
+  if (snapshot.macd.bullishCross) {
+    reasons.push({ key: "reason.macdBullishCross" });
+  }
+
+  if (snapshot.macd.aboveZero) {
+    reasons.push({ key: "reason.macdAboveZero" });
+  }
+
   if (reasons.length === 0 && sufficientHistory) {
     reasons.push({ key: "reason.phaseClassification", params: { phase } });
   }

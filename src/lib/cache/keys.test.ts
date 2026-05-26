@@ -42,4 +42,24 @@ describe("scanner cache policy", () => {
 
     expect(key).toContain("batch:35:35");
   });
+
+  it("includes MTF batch cursor, size, and core timeframes in MTF scan keys", () => {
+    const key = cacheKeys.mtfScan({
+      source: "remote",
+      preset: "short",
+      primaryTimeframe: "4h",
+      confirmationTimeframe: "1d",
+      universe: "all-eligible-usdt",
+      maxSymbols: null,
+      minQuoteVolume: 0,
+      batchMode: true,
+      cursor: 15,
+      batchSize: 15,
+      filters: "none",
+    });
+
+    expect(key).toContain("primary:4h");
+    expect(key).toContain("confirm:1d");
+    expect(key).toContain("batch:15:15");
+  });
 });

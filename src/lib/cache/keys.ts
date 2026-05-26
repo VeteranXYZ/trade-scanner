@@ -7,6 +7,8 @@ export type ScanCacheKeyOptions = {
   source: string;
   timeframe?: Timeframe;
   preset?: string;
+  primaryTimeframe?: Timeframe;
+  confirmationTimeframe?: Timeframe;
   universe: string;
   maxSymbols: number | null;
   minQuoteVolume: number;
@@ -54,10 +56,15 @@ export const cacheKeys = {
   mtfScan: ({
     source,
     preset,
+    primaryTimeframe,
+    confirmationTimeframe,
     universe,
     maxSymbols,
     minQuoteVolume,
     filters = "none",
+    batchMode = false,
+    cursor,
+    batchSize,
   }: ScanCacheKeyOptions) =>
     [
       "scan",
@@ -65,9 +72,12 @@ export const cacheKeys = {
       "mtf",
       source,
       preset,
+      `primary:${primaryTimeframe ?? "preset"}`,
+      `confirm:${confirmationTimeframe ?? "preset"}`,
       universe,
       `max:${maxSymbols ?? "all"}`,
       `minQuote:${minQuoteVolume}`,
+      batchMode ? `batch:${cursor ?? 0}:${batchSize ?? "default"}` : "batch:none",
       `filters:${filters}`,
     ].join(":"),
 };

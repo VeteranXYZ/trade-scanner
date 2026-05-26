@@ -100,6 +100,7 @@ export const dictionaries = {
       cloudflareBatchNote:
         "Full-market scans are processed in small batches on Cloudflare Free.",
       scanningBatch: "Scanning batch",
+      scanningMtfBatch: "Scanning MTF batch",
       loadingTitle: "Loading Scan",
       loadingMessage: "Fetching public Binance market data and calculating scanner results.",
       errorTitle: "Scan Error",
@@ -109,6 +110,12 @@ export const dictionaries = {
       selectedSymbol: "Selected Symbol",
       selectedEmpty:
         "Select a scanner row to review its structure, risks, confirmation conditions, and invalidation context.",
+      macd: "MACD",
+      macdImproving: "Improving",
+      macdBullishCross: "Bullish cross",
+      macdAboveZero: "Above zero",
+      macdWeakening: "Weakening",
+      macdUnavailable: "n/a",
       currentSignal: "Current Signal",
       mtfContext: "MTF Context",
       mtfRank: "MTF Rank",
@@ -322,6 +329,11 @@ export const dictionaries = {
         "MA20 is above MA50, supporting short-term trend structure.",
       "reason.priceAboveMa200":
         "Price is above MA200, keeping long-term structure constructive.",
+      "reason.macdHistogramRising":
+        "MACD histogram is rising, supporting momentum confirmation.",
+      "reason.macdBullishCross":
+        "MACD line crossed above its signal line, showing improving momentum.",
+      "reason.macdAboveZero": "MACD is above zero, supporting trend momentum.",
       "reason.phaseClassification":
         "Current indicators classify the market as {phase}.",
       "reason.limitedHistory":
@@ -373,6 +385,10 @@ export const dictionaries = {
         "The latest candle has a long upper wick, showing supply overhead.",
       "warning.weakCompressionBelowTrend":
         "Compression exists, but price remains below key trend levels.",
+      "warning.macdBearishCross":
+        "MACD line crossed below its signal line while structure needs confirmation.",
+      "warning.macdMomentumWeakening":
+        "Price is extended while MACD histogram is no longer improving.",
       "warning.insufficientHistory":
         "Candle history is insufficient for the full indicator set.",
     } satisfies Record<ScannerExplanationKey, string>,
@@ -472,6 +488,7 @@ export const dictionaries = {
         "本扫描器针对中大周期选币优化。结果可能被缓存，以提升稳定性并降低请求成本。",
       cloudflareBatchNote: "Cloudflare Free 上的全市场扫描会分成小批次顺序处理。",
       scanningBatch: "正在扫描批次",
+      scanningMtfBatch: "正在扫描多周期批次",
       loadingTitle: "正在扫描",
       loadingMessage: "正在获取 Binance 公共行情并计算扫描结果。",
       errorTitle: "扫描错误",
@@ -480,6 +497,12 @@ export const dictionaries = {
       partialErrors: "个标的扫描失败；当前显示部分结果。",
       selectedSymbol: "选中标的",
       selectedEmpty: "选择一行查看结构、风险、确认条件和失效条件。",
+      macd: "MACD",
+      macdImproving: "动能改善",
+      macdBullishCross: "金叉改善",
+      macdAboveZero: "零轴上方",
+      macdWeakening: "动能转弱",
+      macdUnavailable: "n/a",
       currentSignal: "当前信号",
       mtfContext: "多周期背景",
       mtfRank: "共振分",
@@ -670,6 +693,9 @@ export const dictionaries = {
       "reason.volumeExpanding": "成交量高于 20 根 K 线均量并正在放大。",
       "reason.ma20AboveMa50": "MA20 位于 MA50 上方，短期趋势结构较好。",
       "reason.priceAboveMa200": "价格位于 MA200 上方，长期结构仍偏建设性。",
+      "reason.macdHistogramRising": "MACD 柱状图正在抬升，动能确认改善。",
+      "reason.macdBullishCross": "MACD 线向上穿过信号线，动能正在改善。",
+      "reason.macdAboveZero": "MACD 位于零轴上方，对趋势动能有支持。",
       "reason.phaseClassification": "当前指标将市场归类为{phase}。",
       "reason.limitedHistory": "K 线历史不足，排名置信度会降低。",
       "confirmation.closeAboveUpperBollinger":
@@ -702,6 +728,8 @@ export const dictionaries = {
       "warning.longUpperWick": "最新 K 线有较长上影线，上方抛压明显。",
       "warning.weakCompressionBelowTrend":
         "存在压缩结构，但价格仍低于关键趋势位置。",
+      "warning.macdBearishCross": "MACD 线下穿信号线，当前结构确认转弱。",
+      "warning.macdMomentumWeakening": "价格处于延伸状态，但 MACD 柱状图不再改善。",
       "warning.insufficientHistory": "K 线历史不足，无法完整计算所有指标。",
     } satisfies Record<ScannerExplanationKey, string>,
     timeframe: {

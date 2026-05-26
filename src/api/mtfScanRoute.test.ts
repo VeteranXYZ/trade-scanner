@@ -3,13 +3,14 @@ import { GET } from "../../app/api/scan/mtf/route";
 import { clearMemoryCache } from "@/lib/cache/memory";
 
 const getEligibleUsdtMarketsMock = vi.hoisted(() => vi.fn());
+const scanMarketMultiTimeframeMock = vi.hoisted(() => vi.fn());
 
 vi.mock("@/lib/exchanges/binance", () => ({
   getEligibleUsdtMarkets: getEligibleUsdtMarketsMock,
 }));
 
 vi.mock("@/lib/scanner/scanMarketMtf", () => ({
-  scanMarketMultiTimeframe: vi.fn(),
+  scanMarketMultiTimeframe: scanMarketMultiTimeframeMock,
 }));
 
 vi.mock("@/lib/storage/scanSnapshots", () => {
@@ -30,6 +31,7 @@ describe("MTF scan API timeframe defaults", () => {
       excludedStableOrLeveraged: 0,
       capped: false,
     });
+    scanMarketMultiTimeframeMock.mockReset();
   });
 
   it("defaults to the 4h + 1d core scan", async () => {
@@ -54,4 +56,186 @@ describe("MTF scan API timeframe defaults", () => {
       excludedStableOrLeveraged: 0,
     });
   });
+
+  it("returns MTF batch metadata and scans only the requested slice", async () => {
+    const markets = Array.from({ length: 40 }, (_, index) => ({
+      exchange: "binance",
+      symbol: `MTF${index.toString().padStart(2, "0")}USDT`,
+    }));
+    getEligibleUsdtMarketsMock.mockResolvedValue({
+      markets,
+      totalUsdtPairs: 44,
+      eligibleCount: 40,
+      filteredLowVolume: 2,
+      excludedStableOrLeveraged: 2,
+      capped: false,
+    });
+    scanMarketMultiTimeframeMock.mockImplementation((symbol: string) =>
+      makeResult(symbol),
+    );
+
+    const response = await GET(
+      new Request(
+        "http://localhost/api/scan/mtf?source=remote&preset=short&batchMode=true&batchSize=15&cursor=15",
+      ),
+    );
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(body).toMatchObject({
+      mode: "mtf",
+      preset: "short",
+      primaryTimeframe: "4h",
+      confirmationTimeframe: "1d",
+      batchMode: true,
+      cursor: 15,
+      nextCursor: 30,
+      hasMore: true,
+      batchSize: 15,
+      batchIndex: 2,
+      totalBatches: 3,
+      totalEligibleCount: 40,
+      scannedInBatch: 15,
+      scannedCount: 15,
+    });
+    expect(scanMarketMultiTimeframeMock).toHaveBeenCalledTimes(15);
+    expect(scanMarketMultiTimeframeMock).toHaveBeenCalledWith("MTF15USDT", "short");
+    expect(scanMarketMultiTimeframeMock).toHaveBeenLastCalledWith(
+      "MTF29USDT",
+      "short",
+    );
+  });
+
+  it("defaults MTF batchSize to 15", async () => {
+    const markets = Array.from({ length: 16 }, (_, index) => ({
+      exchange: "binance",
+      symbol: `DEFAULT${index}USDT`,
+    }));
+    getEligibleUsdtMarketsMock.mockResolvedValue({
+      markets,
+      totalUsdtPairs: 16,
+      eligibleCount: 16,
+      filteredLowVolume: 0,
+      excludedStableOrLeveraged: 0,
+      capped: false,
+    });
+    scanMarketMultiTimeframeMock.mockImplementation((symbol: string) =>
+      makeResult(symbol),
+    );
+
+    const response = await GET(
+      new Request("http://localhost/api/scan/mtf?source=remote&batchMode=true"),
+    );
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(body.batchSize).toBe(15);
+    expect(body.nextCursor).toBe(15);
+    expect(body.hasMore).toBe(true);
+    expect(scanMarketMultiTimeframeMock).toHaveBeenCalledTimes(15);
+  });
+
+  it("clamps MTF batchSize above 20 to the safe maximum", async () => {
+    const markets = Array.from({ length: 30 }, (_, index) => ({
+      exchange: "binance",
+      symbol: `SAFE${index}USDT`,
+    }));
+    getEligibleUsdtMarketsMock.mockResolvedValue({
+      markets,
+      totalUsdtPairs: 30,
+      eligibleCount: 30,
+      filteredLowVolume: 0,
+      excludedStableOrLeveraged: 0,
+      capped: false,
+    });
+    scanMarketMultiTimeframeMock.mockImplementation((symbol: string) =>
+      makeResult(symbol),
+    );
+
+    const response = await GET(
+      new Request(
+        "http://localhost/api/scan/mtf?source=remote&batchMode=true&batchSize=99",
+      ),
+    );
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(body.batchSize).toBe(20);
+    expect(body.scannedInBatch).toBe(20);
+    expect(scanMarketMultiTimeframeMock).toHaveBeenCalledTimes(20);
+  });
+
+  it("classifies MTF subrequest limit failures separately", async () => {
+    getEligibleUsdtMarketsMock.mockResolvedValue({
+      markets: [{ exchange: "binance", symbol: "AAAUSDT" }],
+      totalUsdtPairs: 1,
+      eligibleCount: 1,
+      filteredLowVolume: 0,
+      excludedStableOrLeveraged: 0,
+      capped: false,
+    });
+    scanMarketMultiTimeframeMock.mockImplementation(() => {
+      throw new Error("Too many subrequests by single Worker invocation.");
+    });
+
+    const response = await GET(
+      new Request("http://localhost/api/scan/mtf?source=remote&batchMode=true"),
+    );
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(body.failureSummary.subrequestLimitExceeded).toBe(1);
+    expect(body.failureSummary.indicatorFailed).toBe(0);
+    expect(body.failureSummary.fetchFailed).toBe(0);
+  });
 });
+
+function makeResult(symbol: string) {
+  return {
+    exchange: "binance",
+    symbol,
+    timeframe: "4h",
+    price: 100,
+    phase: "SQUEEZE",
+    signal: {
+      state: "WATCHLIST",
+      label: "WATCHLIST",
+      summary: "WATCHLIST",
+    },
+    multiTimeframe: {
+      alignment: "EARLY_4H_SIGNAL",
+      label: "Early Signal",
+      summary: "4H structure is improving before full daily confirmation.",
+      constructiveCount: 1,
+      riskCount: 0,
+      rankScore: 80,
+      timeframes: ["4h", "1d"],
+      timeframeResults: [],
+    },
+    opportunityScore: 70,
+    confirmationScore: 50,
+    riskScore: 20,
+    rankScore: 80,
+    rsi14: 55,
+    bbWidthPercentile: 20,
+    volumeRatio: 1,
+    maStatus: {
+      aboveMA20: true,
+      aboveMA50: true,
+      aboveMA200: true,
+      ma20AboveMA50: true,
+      ma50AboveMA200: true,
+    },
+    reasons: [],
+    warnings: [],
+    nextConfirmation: [],
+    invalidation: [],
+    dataQuality: {
+      candleCount: 300,
+      sufficientHistory: true,
+      missingIndicators: [],
+      usesClosedCandles: true,
+      lastClosedCandleTime: Date.parse("2026-05-25T00:00:00.000Z"),
+    },
+  };
+}

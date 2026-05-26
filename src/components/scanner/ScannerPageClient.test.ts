@@ -3,6 +3,7 @@ import {
   filterAndSortResults,
   getSignalSummary,
   mergeBatchScanResponses,
+  shouldUseBatchedMtfScan,
   shouldUseBatchedScan,
   type ScannerFiltersState,
 } from "./ScannerPageClient";
@@ -147,6 +148,14 @@ describe("scanner batched fetch helpers", () => {
     expect(shouldUseBatchedScan(makeFilters({ mode: "mtf" }))).toBe(false);
   });
 
+  it("uses batched MTF scan mode for full remote MTF scans only", () => {
+    expect(shouldUseBatchedMtfScan(makeFilters({ mode: "mtf" }))).toBe(true);
+    expect(
+      shouldUseBatchedMtfScan(makeFilters({ mode: "mtf", maxSymbols: 100 })),
+    ).toBe(false);
+    expect(shouldUseBatchedMtfScan(makeFilters({ mode: "single" }))).toBe(false);
+  });
+
   it("combines, deduplicates, and sorts batch results by rank score", () => {
     const merged = mergeBatchScanResponses([
       {
@@ -256,6 +265,90 @@ describe("scanner batched fetch helpers", () => {
       excludedStableOrLeveraged: 1,
     });
   });
+
+  it("combines MTF batches by exchange and symbol before sorting", () => {
+    const merged = mergeBatchScanResponses([
+      {
+        exchange: "binance",
+        mode: "mtf",
+        preset: "short",
+        source: "remote",
+        universe: "all-eligible-usdt",
+        eligibleCount: 3,
+        scannedCount: 2,
+        scannedInBatch: 2,
+        failedCount: 0,
+        skippedCount: 0,
+        cached: true,
+        cacheTtlSeconds: 3600,
+        cacheExpiresAt: "2026-05-25T11:00:00.000Z",
+        updatedAt: "2026-05-25T10:00:00.000Z",
+        durationMs: 100,
+        batchMode: true,
+        batchIndex: 1,
+        totalBatches: 2,
+        totalEligibleCount: 3,
+        hasMore: true,
+        nextCursor: 2,
+        failureSummary: emptyFailureSummary(),
+        results: [
+          makeResult({
+            symbol: "AAAUSDT",
+            signalState: "WATCHLIST",
+            phase: "SQUEEZE",
+            rankScore: 30,
+          }),
+          makeResult({
+            symbol: "BBBUSDT",
+            signalState: "WATCHLIST",
+            phase: "SQUEEZE",
+            rankScore: 90,
+          }),
+        ],
+        itemCount: 2,
+      },
+      {
+        exchange: "binance",
+        mode: "mtf",
+        preset: "short",
+        source: "remote",
+        universe: "all-eligible-usdt",
+        eligibleCount: 3,
+        scannedCount: 1,
+        scannedInBatch: 1,
+        failedCount: 0,
+        skippedCount: 0,
+        cached: true,
+        cacheTtlSeconds: 3600,
+        cacheExpiresAt: "2026-05-25T11:00:00.000Z",
+        updatedAt: "2026-05-25T10:01:00.000Z",
+        durationMs: 100,
+        batchMode: true,
+        batchIndex: 2,
+        totalBatches: 2,
+        totalEligibleCount: 3,
+        hasMore: false,
+        nextCursor: null,
+        failureSummary: emptyFailureSummary(),
+        results: [
+          makeResult({
+            symbol: "AAAUSDT",
+            signalState: "WATCHLIST",
+            phase: "SQUEEZE",
+            rankScore: 70,
+          }),
+        ],
+        itemCount: 1,
+      },
+    ]);
+
+    expect(merged.results.map((result) => result.symbol)).toEqual([
+      "BBBUSDT",
+      "AAAUSDT",
+    ]);
+    expect(merged.mode).toBe("mtf");
+    expect(merged.scannedCount).toBe(3);
+  });
 });
 
 function makeFilters(
@@ -333,5 +426,16 @@ function makeSignal(state: ScannerSignalState): ScannerSignal {
     state,
     label: state,
     summary: state,
+  };
+}
+
+function emptyFailureSummary() {
+  return {
+    insufficientHistory: 0,
+    fetchFailed: 0,
+    indicatorFailed: 0,
+    subrequestLimitExceeded: 0,
+    filteredLowVolume: 0,
+    excludedStableOrLeveraged: 0,
   };
 }

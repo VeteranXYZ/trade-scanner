@@ -32,9 +32,15 @@ export function scanCandles(
     rsi14: snapshot.rsi14,
     bbWidthPercentile: snapshot.bollinger.widthPercentile,
     volumeRatio: snapshot.volume.ratio,
+    macd: getMacdStatus(snapshot),
     maStatus: getMaStatus(snapshot),
     reasons: getReasons({ phase, snapshot, sufficientHistory, timeframe }),
-    warnings: getRiskWarnings({ snapshot, candles: closedCandles, sufficientHistory }),
+    warnings: getRiskWarnings({
+      phase,
+      snapshot,
+      candles: closedCandles,
+      sufficientHistory,
+    }),
     nextConfirmation: getNextConfirmation({
       phase,
       snapshot,
@@ -49,6 +55,26 @@ export function scanCandles(
       usesClosedCandles: true,
       lastClosedCandleTime: lastClosedCandle?.closeTime ?? null,
     },
+  };
+}
+
+function getMacdStatus(snapshot: ReturnType<typeof calculateIndicatorSnapshot>) {
+  if (
+    snapshot.macd.line === null ||
+    snapshot.macd.signal === null ||
+    snapshot.macd.histogram === null
+  ) {
+    return undefined;
+  }
+
+  return {
+    line: snapshot.macd.line,
+    signal: snapshot.macd.signal,
+    histogram: snapshot.macd.histogram,
+    histogramRising: snapshot.macd.histogramRising,
+    bullishCross: snapshot.macd.bullishCross,
+    bearishCross: snapshot.macd.bearishCross,
+    aboveZero: snapshot.macd.aboveZero,
   };
 }
 
@@ -89,6 +115,7 @@ function getMissingIndicators(snapshot: ReturnType<typeof calculateIndicatorSnap
   if (snapshot.rsi14 === null) missing.push("rsi14");
   if (snapshot.volume.ma20 === null) missing.push("volumeMa20");
   if (snapshot.volume.ratio === null) missing.push("volumeRatio");
+  if (snapshot.macd.line === null) missing.push("macd");
   if (snapshot.priceExtensionFromMA20 === null) {
     missing.push("priceExtensionFromMA20");
   }

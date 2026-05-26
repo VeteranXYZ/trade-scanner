@@ -7,6 +7,7 @@ import {
   calculateMultiTimeframeRankScore,
   summarizeMultiTimeframe,
 } from "./multiTimeframe";
+import { getRiskWarnings } from "./riskFilters";
 import { scanCandles } from "./scanCandles";
 import { calculateScannerScores, clampScore } from "./scoring";
 import { deriveScannerSignal } from "./signal";
@@ -147,6 +148,56 @@ describe("scanner scoring", () => {
     expect(overextendedScores.rankScore).toBeLessThan(neutralScores.rankScore);
   });
 
+  it("lets MACD improve confirmation score modestly", () => {
+    const baseSnapshot = makeSnapshot({
+      close: 112,
+      ma20: 105,
+      ma50: 100,
+      ma200: 90,
+      bbMiddle: 100,
+      bbUpper: 110,
+      widthPercentile: 40,
+      rsi14: 64,
+      volumeRatio: 1.4,
+    });
+    const macdSnapshot = makeSnapshot({
+      close: 112,
+      ma20: 105,
+      ma50: 100,
+      ma200: 90,
+      bbMiddle: 100,
+      bbUpper: 110,
+      widthPercentile: 40,
+      rsi14: 64,
+      volumeRatio: 1.4,
+      macd: {
+        line: 1.2,
+        signal: 1,
+        histogram: 0.2,
+        histogramRising: true,
+        bullishCross: true,
+        bearishCross: false,
+        aboveZero: true,
+      },
+    });
+
+    const baseScores = calculateScannerScores({
+      snapshot: baseSnapshot,
+      sufficientHistory: true,
+      phase: "BREAKOUT_ATTEMPT",
+    });
+    const macdScores = calculateScannerScores({
+      snapshot: macdSnapshot,
+      sufficientHistory: true,
+      phase: "BREAKOUT_ATTEMPT",
+    });
+
+    expect(macdScores.confirmationScore).toBeGreaterThan(
+      baseScores.confirmationScore,
+    );
+    expect(macdScores.confirmationScore - baseScores.confirmationScore).toBe(20);
+  });
+
   it("caps opportunity score for breakdown compression structures", () => {
     const scores = calculateScannerScores({
       snapshot: makeSnapshot({
@@ -200,7 +251,7 @@ describe("scanner candle quality", () => {
           makeCandle({
             openTime: index * 1000,
             closeTime: index * 1000 + 999,
-            close: 100,
+            close: 100 + index * 0.1,
           }),
         ),
         makeCandle({
@@ -211,13 +262,80 @@ describe("scanner candle quality", () => {
       ];
       const result = scanCandles("BTCUSDT", "4h", candles);
 
-      expect(result.price).toBe(100);
+      expect(result.price).toBeCloseTo(119.9, 6);
       expect(result.dataQuality.candleCount).toBe(200);
       expect(result.dataQuality.usesClosedCandles).toBe(true);
       expect(result.dataQuality.lastClosedCandleTime).toBe(199_999);
+      expect(result.macd?.line).toBeDefined();
     } finally {
       vi.useRealTimers();
     }
+  });
+});
+
+describe("scanner MACD warnings", () => {
+  it("warns when price is extended but MACD momentum is weakening", () => {
+    const warnings = getRiskWarnings({
+      phase: "BREAKOUT_ATTEMPT",
+      snapshot: makeSnapshot({
+        close: 112,
+        ma20: 105,
+        ma50: 100,
+        ma200: 90,
+        bbMiddle: 100,
+        bbUpper: 110,
+        widthPercentile: 40,
+        rsi14: 64,
+        volumeRatio: 1.4,
+        macd: {
+          line: 1,
+          signal: 0.8,
+          histogram: 0.2,
+          histogramRising: false,
+          bullishCross: false,
+          bearishCross: false,
+          aboveZero: true,
+        },
+      }),
+      candles: [makeCandle()],
+      sufficientHistory: true,
+    });
+
+    expect(warnings).toContainEqual({
+      key: "warning.macdMomentumWeakening",
+    });
+  });
+
+  it("warns on MACD bearish cross during a constructive structure", () => {
+    const warnings = getRiskWarnings({
+      phase: "TRENDING",
+      snapshot: makeSnapshot({
+        close: 105,
+        ma20: 102,
+        ma50: 100,
+        ma200: 90,
+        bbMiddle: 102,
+        bbUpper: 110,
+        widthPercentile: 40,
+        rsi14: 60,
+        volumeRatio: 1.2,
+        macd: {
+          line: 0.8,
+          signal: 1,
+          histogram: -0.2,
+          histogramRising: false,
+          bullishCross: false,
+          bearishCross: true,
+          aboveZero: true,
+        },
+      }),
+      candles: [makeCandle()],
+      sufficientHistory: true,
+    });
+
+    expect(warnings).toContainEqual({
+      key: "warning.macdBearishCross",
+    });
   });
 });
 
@@ -356,6 +474,15 @@ function makeSnapshot({
   rsi14,
   volumeRatio,
   priceExtensionFromMA20 = ma20 ? (close - ma20) / ma20 : null,
+  macd = {
+    line: null,
+    signal: null,
+    histogram: null,
+    histogramRising: false,
+    bullishCross: false,
+    bearishCross: false,
+    aboveZero: false,
+  },
 }: {
   close: number;
   ma20: number | null;
@@ -367,6 +494,7 @@ function makeSnapshot({
   rsi14: number | null;
   volumeRatio: number | null;
   priceExtensionFromMA20?: number | null;
+  macd?: IndicatorSnapshot["macd"];
 }): IndicatorSnapshot {
   return {
     close,
@@ -392,6 +520,7 @@ function makeSnapshot({
       ma20: volumeRatio === null ? null : 1000 / volumeRatio,
       ratio: volumeRatio,
     },
+    macd,
     priceExtensionFromMA20,
   };
 }

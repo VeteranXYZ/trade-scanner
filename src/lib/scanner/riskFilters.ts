@@ -1,14 +1,16 @@
 import type { Candle } from "@/lib/exchanges/types";
 import type { IndicatorSnapshot } from "@/lib/indicators";
-import type { ScannerExplanation } from "./types";
+import type { MarketPhase, ScannerExplanation } from "./types";
 
 type RiskWarningInput = {
+  phase: MarketPhase;
   snapshot: IndicatorSnapshot;
   candles: Candle[];
   sufficientHistory: boolean;
 };
 
 export function getRiskWarnings({
+  phase,
   snapshot,
   candles,
   sufficientHistory,
@@ -54,6 +56,22 @@ export function getRiskWarnings({
       (snapshot.ma200 !== null && snapshot.close < snapshot.ma200))
   ) {
     warnings.push({ key: "warning.weakCompressionBelowTrend" });
+  }
+
+  if (
+    snapshot.macd.bearishCross &&
+    (phase === "BREAKOUT_ATTEMPT" || phase === "TRENDING")
+  ) {
+    warnings.push({ key: "warning.macdBearishCross" });
+  }
+
+  if (
+    snapshot.bollinger.upper !== null &&
+    snapshot.close > snapshot.bollinger.upper &&
+    snapshot.macd.histogram !== null &&
+    !snapshot.macd.histogramRising
+  ) {
+    warnings.push({ key: "warning.macdMomentumWeakening" });
   }
 
   if (latestCandle && hasLongUpperWick(latestCandle)) {
