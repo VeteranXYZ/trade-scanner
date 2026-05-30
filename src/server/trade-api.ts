@@ -74,6 +74,11 @@ const server = http.createServer(async (request, response) => {
       return;
     }
 
+    if (url.pathname === "/api/market-data/coverage") {
+      await handleMarketDataCoverage(response, url);
+      return;
+    }
+
     if (url.pathname === "/api/scan/latest") {
       await handleLatestScan(response, url);
       return;
@@ -297,6 +302,64 @@ async function handleMarketSyncJobs(response: http.ServerResponse, url: URL) {
   } catch (error) {
     sendJson(response, 503, {
       ok: false,
+      error: sanitizeConnectionError(error, "POSTGRES_UNAVAILABLE"),
+    });
+  } finally {
+    await store.close().catch(() => undefined);
+  }
+}
+
+async function handleMarketDataCoverage(response: http.ServerResponse, url: URL) {
+  const timeframe = url.searchParams.get("timeframe")?.trim() ?? "4h";
+  const limit = parseBoundedInteger({
+    value: url.searchParams.get("limit"),
+    fallback: 100,
+    min: 1,
+    max: 500,
+    name: "limit",
+  });
+
+  if (!/^[A-Za-z0-9]{1,8}$/.test(timeframe)) {
+    sendJson(response, 400, {
+      ok: false,
+      service: serviceName,
+      error: "INVALID_TIMEFRAME",
+    });
+    return;
+  }
+
+  if (!limit.valid) {
+    sendJson(response, 400, { ok: false, service: serviceName, error: limit.error });
+    return;
+  }
+
+  const store = new PgMarketDataStore();
+
+  try {
+    const { rows, summary } = await store.listMarketDataCoverage({
+      timeframe,
+      limit: limit.value,
+    });
+
+    sendJson(response, 200, {
+      ok: true,
+      timeframe,
+      itemCount: rows.length,
+      summary,
+      rows,
+    });
+  } catch (error) {
+    sendJson(response, 503, {
+      ok: false,
+      timeframe,
+      itemCount: 0,
+      summary: {
+        totalSymbols: 0,
+        healthy: 0,
+        belowMinimum: 0,
+        stale: 0,
+      },
+      rows: [],
       error: sanitizeConnectionError(error, "POSTGRES_UNAVAILABLE"),
     });
   } finally {

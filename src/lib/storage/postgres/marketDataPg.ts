@@ -65,6 +65,27 @@ export type MarketDataSyncJobRecord = {
   finishedAt: string | null;
 };
 
+export type MarketDataCoverageRow = {
+  symbolId: number;
+  symbol: string;
+  timeframe: string;
+  candleCount: number;
+  firstOpenTime: string | null;
+  latestOpenTime: string | null;
+  latestCloseTime: string | null;
+  latestOpenTimeMs: number | null;
+  latestCloseTimeMs: number | null;
+  isBelowScannerMinimum: boolean;
+  isStale: boolean;
+};
+
+export type MarketDataCoverageSummary = {
+  totalSymbols: number;
+  healthy: number;
+  belowMinimum: number;
+  stale: number;
+};
+
 type SymbolRow = {
   id: string;
   exchange: string;
@@ -113,6 +134,17 @@ type MarketDataSyncJobRow = {
   params: Record<string, unknown>;
   started_at: Date | string;
   finished_at: Date | string | null;
+};
+
+type MarketDataCoverageQueryRow = {
+  symbol_id: string;
+  symbol: string;
+  candle_count: string;
+  first_open_time: Date | string | null;
+  latest_open_time: Date | string | null;
+  latest_close_time: Date | string | null;
+  latest_open_time_ms: string | null;
+  latest_close_time_ms: string | null;
 };
 
 type UpsertCandleRow = {
@@ -456,6 +488,53 @@ export class PgMarketDataStore {
     return result.rows.map(toMarketDataSyncJobRecord);
   }
 
+  async listMarketDataCoverage({
+    timeframe,
+    limit = 100,
+    minCandles = 200,
+  }: {
+    timeframe: string;
+    limit?: number;
+    minCandles?: number;
+  }) {
+    const staleBeforeMs = Date.now() - getStaleThresholdMs(timeframe);
+    const result = await this.pool.query<MarketDataCoverageQueryRow>(
+      `
+        SELECT
+          s.id AS symbol_id,
+          s.symbol,
+          COUNT(c.id) AS candle_count,
+          MIN(c.open_time) AS first_open_time,
+          MAX(c.open_time) AS latest_open_time,
+          MAX(c.close_time) AS latest_close_time,
+          MAX(c.open_time_ms) AS latest_open_time_ms,
+          MAX(c.close_time_ms) AS latest_close_time_ms
+        FROM symbols s
+        LEFT JOIN market_candles c
+          ON c.symbol_id = s.id
+          AND c.timeframe = $1
+        WHERE s.exchange = 'binance'
+          AND s.market = 'spot'
+          AND s.is_enabled = true
+        GROUP BY s.id, s.symbol
+        ORDER BY COALESCE(COUNT(c.id), 0) ASC, s.symbol ASC
+        LIMIT $2
+      `,
+      [timeframe, limit],
+    );
+    const rows = result.rows.map((row) =>
+      toMarketDataCoverageRow({
+        row,
+        timeframe,
+        minCandles,
+        staleBeforeMs,
+      }),
+    );
+    const summary = summarizeMarketDataCoverage(rows);
+
+    return { rows, summary };
+  }
+
   private async getSymbolForUpdate(client: PoolClient, symbol: string) {
     const result = await client.query<SymbolRow>(
       `
@@ -525,6 +604,81 @@ function toMarketDataSyncJobRecord(
     startedAt: new Date(row.started_at).toISOString(),
     finishedAt: row.finished_at ? new Date(row.finished_at).toISOString() : null,
   };
+}
+
+function toMarketDataCoverageRow({
+  row,
+  timeframe,
+  minCandles,
+  staleBeforeMs,
+}: {
+  row: MarketDataCoverageQueryRow;
+  timeframe: string;
+  minCandles: number;
+  staleBeforeMs: number;
+}): MarketDataCoverageRow {
+  const candleCount = Number(row.candle_count);
+  const latestCloseTimeMs =
+    row.latest_close_time_ms === null ? null : Number(row.latest_close_time_ms);
+  const isBelowScannerMinimum = candleCount < minCandles;
+  const isStale = latestCloseTimeMs === null || latestCloseTimeMs < staleBeforeMs;
+
+  return {
+    symbolId: Number(row.symbol_id),
+    symbol: row.symbol,
+    timeframe,
+    candleCount,
+    firstOpenTime: row.first_open_time
+      ? new Date(row.first_open_time).toISOString()
+      : null,
+    latestOpenTime: row.latest_open_time
+      ? new Date(row.latest_open_time).toISOString()
+      : null,
+    latestCloseTime: row.latest_close_time
+      ? new Date(row.latest_close_time).toISOString()
+      : null,
+    latestOpenTimeMs:
+      row.latest_open_time_ms === null ? null : Number(row.latest_open_time_ms),
+    latestCloseTimeMs,
+    isBelowScannerMinimum,
+    isStale,
+  };
+}
+
+function summarizeMarketDataCoverage(
+  rows: MarketDataCoverageRow[],
+): MarketDataCoverageSummary {
+  const belowMinimum = rows.filter((row) => row.isBelowScannerMinimum).length;
+  const stale = rows.filter((row) => row.isStale).length;
+
+  return {
+    totalSymbols: rows.length,
+    healthy: rows.length - new Set([
+      ...rows
+        .filter((row) => row.isBelowScannerMinimum || row.isStale)
+        .map((row) => row.symbol),
+    ]).size,
+    belowMinimum,
+    stale,
+  };
+}
+
+function getStaleThresholdMs(timeframe: string) {
+  const hour = 60 * 60 * 1000;
+  const day = 24 * hour;
+
+  switch (timeframe) {
+    case "1h":
+      return 3 * hour;
+    case "4h":
+      return 12 * hour;
+    case "1d":
+      return 3 * day;
+    case "1w":
+      return 14 * day;
+    default:
+      return 24 * hour;
+  }
 }
 
 function toNullableNumber(value: number | string | null) {
