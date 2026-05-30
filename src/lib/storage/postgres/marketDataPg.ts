@@ -86,6 +86,13 @@ export type MarketDataCoverageSummary = {
   stale: number;
 };
 
+export type SymbolCandleCoverage = {
+  candleCount: number;
+  earliestOpenTimeMs: number | null;
+  latestOpenTimeMs: number | null;
+  latestCloseTimeMs: number | null;
+};
+
 type SymbolRow = {
   id: string;
   exchange: string;
@@ -118,6 +125,13 @@ type CandleRow = {
 
 type LatestCandleRow = {
   latest_open_time_ms: string | null;
+};
+
+type SymbolCandleCoverageRow = {
+  candle_count: string;
+  earliest_open_time_ms: string | null;
+  latest_open_time_ms: string | null;
+  latest_close_time_ms: string | null;
 };
 
 type MarketDataSyncJobRow = {
@@ -417,6 +431,47 @@ export class PgMarketDataStore {
 
     const latest = result.rows[0]?.latest_open_time_ms;
     return latest === null || latest === undefined ? null : Number(latest);
+  }
+
+  async getCandleCoverageForSymbol({
+    symbol,
+    timeframe,
+  }: {
+    symbol: string;
+    timeframe: string;
+  }): Promise<SymbolCandleCoverage> {
+    const result = await this.pool.query<SymbolCandleCoverageRow>(
+      `
+        SELECT
+          COUNT(*) AS candle_count,
+          MIN(open_time_ms) AS earliest_open_time_ms,
+          MAX(open_time_ms) AS latest_open_time_ms,
+          MAX(close_time_ms) AS latest_close_time_ms
+        FROM market_candles
+        WHERE exchange = 'binance'
+          AND market = 'spot'
+          AND symbol = $1
+          AND timeframe = $2
+      `,
+      [symbol.toUpperCase(), timeframe],
+    );
+    const row = result.rows[0];
+
+    return {
+      candleCount: Number(row?.candle_count ?? 0),
+      earliestOpenTimeMs:
+        row?.earliest_open_time_ms === null || row?.earliest_open_time_ms === undefined
+          ? null
+          : Number(row.earliest_open_time_ms),
+      latestOpenTimeMs:
+        row?.latest_open_time_ms === null || row?.latest_open_time_ms === undefined
+          ? null
+          : Number(row.latest_open_time_ms),
+      latestCloseTimeMs:
+        row?.latest_close_time_ms === null || row?.latest_close_time_ms === undefined
+          ? null
+          : Number(row.latest_close_time_ms),
+    };
   }
 
   async createMarketDataSyncJob(input: MarketDataSyncJobInput) {

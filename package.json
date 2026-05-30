@@ -20,6 +20,7 @@
     "research:inspect": "node scripts/run-ts.mjs scripts/research.ts inspect",
     "market:sync": "node scripts/run-ts.mjs scripts/market.ts sync",
     "market:sync:pg": "node scripts/run-ts.mjs scripts/market-sync-pg.ts",
+    "market:backfill:pg": "node scripts/run-ts.mjs scripts/market-backfill-pg.ts",
     "market:coverage:pg": "node scripts/run-ts.mjs scripts/market-coverage-pg.ts",
     "market:stats": "node scripts/run-ts.mjs scripts/market.ts stats",
     "market:inspect": "node scripts/run-ts.mjs scripts/market.ts inspect",
