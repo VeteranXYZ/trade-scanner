@@ -1,5 +1,5 @@
-import { ScannerPageClient } from "@/components/scanner/ScannerPageClient";
+import { LatestScanPageClient } from "@/components/scanner/LatestScanPageClient";
 
 export default function ScannerPage() {
-  return <ScannerPageClient />;
+  return <LatestScanPageClient />;
 }
