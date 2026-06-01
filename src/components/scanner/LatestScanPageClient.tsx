@@ -3,7 +3,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { Fragment, useMemo, useState, type ReactNode } from "react";
 import {
-  formatActionDisplay,
   formatDateTime,
   formatGroupHint,
   formatGroupLabel,
@@ -15,8 +14,10 @@ import {
   getLatestScanGroupCount,
   getLatestScanGroupSummaryChips,
   getLatestScanScoreRows,
+  getLatestScanActionDisplay,
   getReviewStatusNote,
   getReviewStatusReasons,
+  getVisibleReviewReason,
   latestScanGroupOrder,
   normalizeGroupKey,
   toTitleCase,
@@ -576,6 +577,8 @@ function LatestScanRow({
   isExpanded: boolean;
   onToggleDetails: () => void;
 }) {
+  const visibleReason = getVisibleReviewReason(item);
+
   return (
     <tr
       className={
@@ -594,10 +597,15 @@ function LatestScanRow({
         <div>{formatSignalLabel(item.signalLabel)}</div>
       </td>
       <td className="px-2 py-1.5">
-        <div>{formatActionDisplay(item.actionBias, item.detectedRiskTypes)}</div>
+        <div>{getLatestScanActionDisplay(item)}</div>
         <div className="mt-1 text-[10px] font-semibold text-[var(--muted)]">
           {getReviewStatusNote(item)}
         </div>
+        {visibleReason && (
+          <div className="mt-0.5 text-[10px] text-[var(--muted-2)]">
+            {visibleReason}
+          </div>
+        )}
       </td>
       <td className="px-2 py-1.5">{formatStructure(item.primaryStructure)}</td>
       <td className="px-2 py-1.5">

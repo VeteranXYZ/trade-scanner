@@ -129,13 +129,20 @@ describe("scan result grouping", () => {
     });
   });
 
-  it("sorts watch rows by clean positive, caution, and negative priority", () => {
+  it("sorts watch rows by review tier and rank", () => {
     const sorted = [
       {
         symbol: "NEGUSDT",
         resultGroup: "watch" as const,
         primaryStructure: "healthy_pullback",
         rankScore: -5,
+        riskScore: 0,
+      },
+      {
+        symbol: "LOWPOSUSDT",
+        resultGroup: "watch" as const,
+        primaryStructure: "neutral",
+        rankScore: 200,
         riskScore: 0,
       },
       {
@@ -163,9 +170,10 @@ describe("scan result grouping", () => {
     ].sort(compareScanResultGroupItems);
 
     expect(sorted.map((item) => item.symbol)).toEqual([
-      "CLEANLOWRISKUSDT",
       "CLEANHIGHRISKUSDT",
+      "CLEANLOWRISKUSDT",
       "CAUTIONUSDT",
+      "LOWPOSUSDT",
       "NEGUSDT",
     ]);
   });

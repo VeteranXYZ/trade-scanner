@@ -194,6 +194,29 @@ export function formatActionDisplay(
   return formatActionBias(actionBias);
 }
 
+export function getLatestScanActionDisplay(item: {
+  actionBias?: string | null;
+  detectedRiskTypes?: unknown;
+  resultGroup?: string | null;
+  reviewTier?: string | null;
+}) {
+  const resultGroup = normalizeGroupKey(item.resultGroup);
+
+  if (resultGroup === "watch") {
+    if (item.reviewTier === "watch_caution") {
+      return "Caution review";
+    }
+
+    if (item.reviewTier === "watch_low") {
+      return "Low priority review";
+    }
+
+    return "Review only";
+  }
+
+  return formatActionDisplay(item.actionBias, item.detectedRiskTypes);
+}
+
 export function formatReviewTierLabel(value: string | null | undefined) {
   return isLatestScanReviewTier(value)
     ? reviewTierLabels[value]
@@ -264,6 +287,44 @@ export function getReviewStatusReasons(item: {
   }
 
   return reasons;
+}
+
+export function getVisibleReviewReason(item: {
+  detectedRiskTypes?: unknown;
+  primaryStructure?: string | null;
+  rankScore?: number | null;
+  resultGroup?: string | null;
+  reviewTier?: string | null;
+}) {
+  const resultGroup = normalizeGroupKey(item.resultGroup);
+
+  if (resultGroup !== "watch") {
+    return null;
+  }
+
+  const riskLabels = getDetectedRiskTypeLabels(item.detectedRiskTypes);
+
+  if (riskLabels.some((label) => label.toLowerCase() === "weak bounce risk")) {
+    return "Weak bounce risk";
+  }
+
+  if (riskLabels.length > 0 || item.reviewTier === "watch_caution") {
+    return "Detected risk";
+  }
+
+  if (typeof item.rankScore === "number" && item.rankScore < 0) {
+    return "Negative rank";
+  }
+
+  if (item.primaryStructure === "neutral") {
+    return "Neutral setup";
+  }
+
+  if (item.reviewTier === "watch_low") {
+    return "Setup not clean";
+  }
+
+  return "Needs confirmation";
 }
 
 export function formatQualityTier(value: string | null | undefined) {

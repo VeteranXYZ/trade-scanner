@@ -11,11 +11,13 @@ import {
   formatScore,
   formatSignalLabel,
   getDetectedRiskTypeLabels,
+  getLatestScanActionDisplay,
   getLatestScanGroupCount,
   getLatestScanGroupSummaryChips,
   getLatestScanScoreRows,
   getReviewStatusNote,
   getReviewStatusReasons,
+  getVisibleReviewReason,
   getResultGroupSortOrder,
   hasDetectedRiskTypes,
   normalizeGroupKey,
@@ -58,6 +60,11 @@ describe("latest scan UI helpers", () => {
       formatReviewTierLabel("watch_high"),
       formatReviewTierLabel("watch_caution"),
       formatReviewTierLabel("watch_low"),
+      getLatestScanActionDisplay({
+        resultGroup: "watch",
+        actionBias: "eligible",
+        reviewTier: "watch_low",
+      }),
     ].join(" ");
 
     expect(combinedLabels).not.toMatch(/\b(buy|sell|entry|long|short)\b/i);
@@ -106,6 +113,58 @@ describe("latest scan UI helpers", () => {
     expect(formatActionDisplay("do_not_chase", [])).toBe("Do not chase");
     expect(formatActionDisplay("ignore", [])).toBe("Ignore");
     expect(formatActionDisplay("watch_only", [])).toBe("Watch Only");
+  });
+
+  it("uses conservative Watch action labels and visible reasons", () => {
+    const neutralEligibleWatch = {
+      resultGroup: "watch",
+      actionBias: "eligible",
+      reviewTier: "watch_low",
+      primaryStructure: "neutral",
+      rankScore: 112.75,
+      detectedRiskTypes: [],
+    };
+    const cautionWatch = {
+      resultGroup: "watch",
+      actionBias: "eligible",
+      reviewTier: "watch_caution",
+      primaryStructure: "strong_trend",
+      rankScore: 128,
+      detectedRiskTypes: ["overheat_risk"],
+    };
+    const weakBounceWatch = {
+      resultGroup: "watch",
+      actionBias: "watch_only",
+      reviewTier: "watch_caution",
+      primaryStructure: "weak_bounce",
+      rankScore: 12,
+      detectedRiskTypes: ["weak_bounce_risk"],
+    };
+    const negativeWatch = {
+      resultGroup: "watch",
+      actionBias: "watch_only",
+      reviewTier: "watch_low",
+      primaryStructure: "healthy_pullback",
+      rankScore: -5,
+      detectedRiskTypes: [],
+    };
+
+    expect(getLatestScanActionDisplay(neutralEligibleWatch)).toBe(
+      "Low priority review",
+    );
+    expect(getLatestScanActionDisplay(cautionWatch)).toBe("Caution review");
+    expect(
+      getLatestScanActionDisplay({
+        resultGroup: "watch",
+        actionBias: "watch_only",
+        reviewTier: "watch_high",
+      }),
+    ).toBe("Review only");
+    expect(getLatestScanActionDisplay(neutralEligibleWatch)).not.toBe("Eligible");
+    expect(getVisibleReviewReason(neutralEligibleWatch)).toBe("Neutral setup");
+    expect(getVisibleReviewReason(cautionWatch)).toBe("Detected risk");
+    expect(getVisibleReviewReason(weakBounceWatch)).toBe("Weak bounce risk");
+    expect(getVisibleReviewReason(negativeWatch)).toBe("Negative rank");
   });
 
   it("explains review status from API fields or safe fallbacks", () => {

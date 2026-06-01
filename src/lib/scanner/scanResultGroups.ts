@@ -65,11 +65,9 @@ const DISPLAY_GROUP_ORDER: Record<ScanResultGroup, number> = {
 
 const WATCH_REVIEW_TIER_ORDER: Partial<Record<ScanResultReviewTier, number>> = {
   watch_high: 0,
-  watch_low: 1,
-  watch_caution: 2,
+  watch_caution: 1,
+  watch_low: 2,
 };
-
-const WATCH_CLOSE_RANK_DELTA = 5;
 
 export function classifyScanResultGroup(
   signal: ScanResultGroupInput,
@@ -303,13 +301,6 @@ function compareWatchItems<T extends ScanResultGroupInput & { symbol?: string }>
 ) {
   const leftRank = left.rankScore ?? Number.NEGATIVE_INFINITY;
   const rightRank = right.rankScore ?? Number.NEGATIVE_INFINITY;
-  const leftNegative = leftRank < 0;
-  const rightNegative = rightRank < 0;
-
-  if (leftNegative !== rightNegative) {
-    return leftNegative ? 1 : -1;
-  }
-
   const leftReview = getScanResultReview({ ...left, resultGroup: "watch" });
   const rightReview = getScanResultReview({ ...right, resultGroup: "watch" });
   const reviewDelta =
@@ -321,16 +312,6 @@ function compareWatchItems<T extends ScanResultGroupInput & { symbol?: string }>
   }
 
   const rankDelta = rightRank - leftRank;
-
-  if (Math.abs(rankDelta) <= WATCH_CLOSE_RANK_DELTA) {
-    const riskDelta =
-      (left.riskScore ?? Number.POSITIVE_INFINITY) -
-      (right.riskScore ?? Number.POSITIVE_INFINITY);
-
-    if (riskDelta !== 0) {
-      return riskDelta;
-    }
-  }
 
   if (rankDelta !== 0) {
     return rankDelta;
