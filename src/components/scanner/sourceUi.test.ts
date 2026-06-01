@@ -1,9 +1,26 @@
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { isCachedSourceEnabledInUi, isLocalSourceEnabledInUi } from "./sourceUi";
 
+const ORIGINAL_ENV = { ...process.env };
+const SOURCE_UI_ENV_KEYS = [
+  "NEXT_PUBLIC_DEPLOY_TARGET",
+  "DEPLOY_TARGET",
+  "NEXT_PUBLIC_SCANNER_ENABLE_CACHED_SOURCE",
+] as const;
+
 describe("scanner source UI", () => {
-  afterEach(() => {
+  beforeEach(() => {
     vi.unstubAllEnvs();
+    process.env = { ...ORIGINAL_ENV, NODE_ENV: "test" };
+
+    for (const key of SOURCE_UI_ENV_KEYS) {
+      delete process.env[key];
+    }
+  });
+
+  afterAll(() => {
+    vi.unstubAllEnvs();
+    process.env = ORIGINAL_ENV;
   });
 
   it("keeps local source available outside Cloudflare production flags", () => {
