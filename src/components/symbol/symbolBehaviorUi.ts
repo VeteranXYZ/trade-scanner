@@ -96,6 +96,49 @@ export type SymbolBehaviorSampleHint = {
   tone: "stronger" | "limited" | "small" | "none";
 };
 
+export type BehaviorReadoutContextType =
+  | "opportunity"
+  | "risk"
+  | "neutral"
+  | "unknown";
+
+export type BehaviorReadoutTone =
+  | "constructive"
+  | "weak"
+  | "risk"
+  | "mixed"
+  | "insufficient";
+
+export type BehaviorReadoutAgreement =
+  | "aligned_positive"
+  | "aligned_negative"
+  | "mixed"
+  | "short_only"
+  | "insufficient";
+
+export type BehaviorReadoutInput = {
+  resultGroup?: string | null;
+  currentGroup?: string | null;
+  signalLabel?: string | null;
+  sampleSize?: BehaviorNumericValue;
+  horizons?: SymbolBehavior["horizons"];
+  warnings?: string[] | null;
+};
+
+export type BehaviorReadout = {
+  label: string;
+  tone: BehaviorReadoutTone;
+  contextType: BehaviorReadoutContextType;
+  sampleConfidenceLabel: string;
+  selectedHorizonLabel: string;
+  selectedHorizon: SymbolBehaviorHorizonKey | null;
+  horizonAgreement: BehaviorReadoutAgreement;
+  horizonAgreementLabel: string;
+  historicalBiasLabel: string;
+  summaryText: string;
+  caveats: string[];
+};
+
 export const symbolBehaviorHorizonKeys = ["1", "3", "5"] as const;
 
 export function toBehaviorNumber(value: unknown) {
@@ -237,6 +280,71 @@ export function getBehaviorSampleHint(
     label: "No completed observations",
     detail: "More completed scanner history is needed.",
     tone: "none",
+  };
+}
+
+export function buildBehaviorReadout(
+  input: BehaviorReadoutInput,
+): BehaviorReadout {
+  const overallSampleSize = Math.max(
+    0,
+    Math.trunc(toBehaviorNumber(input.sampleSize) ?? 0),
+  );
+  const horizonRows = getBehaviorHorizonRows({ horizons: input.horizons });
+  const usableRows = horizonRows.filter(isUsableReadoutHorizon);
+  const selected = selectBehaviorReadoutHorizon(usableRows);
+  const selectedSampleSize = selected?.sampleSize ?? 0;
+  const contextType = getBehaviorReadoutContextType(
+    input.resultGroup ?? input.currentGroup,
+  );
+  const horizonAgreement = getBehaviorHorizonAgreement(usableRows);
+  const caveats = buildBehaviorReadoutCaveats({
+    selectedSampleSize,
+    overallSampleSize,
+    horizonAgreement,
+    warnings: input.warnings,
+  });
+
+  if (!selected) {
+    return {
+      label: "Insufficient sample",
+      tone: "insufficient",
+      contextType,
+      sampleConfidenceLabel: getBehaviorReadoutSampleConfidence(0),
+      selectedHorizonLabel: "No usable horizon",
+      selectedHorizon: null,
+      horizonAgreement,
+      horizonAgreementLabel: getBehaviorHorizonAgreementLabel(horizonAgreement),
+      historicalBiasLabel: "Not enough usable horizon data",
+      summaryText:
+        "Not enough completed follow-through observations are available for a conservative readout.",
+      caveats,
+    };
+  }
+
+  const label = getBehaviorReadoutLabel({ selected, contextType });
+  const tone = getBehaviorReadoutTone({ label, contextType });
+
+  return {
+    label,
+    tone,
+    contextType,
+    sampleConfidenceLabel: getBehaviorReadoutSampleConfidence(selectedSampleSize),
+    selectedHorizonLabel: selected.label,
+    selectedHorizon: selected.horizon,
+    horizonAgreement,
+    horizonAgreementLabel: getBehaviorHorizonAgreementLabel(horizonAgreement),
+    historicalBiasLabel: `${formatBehaviorPercent(
+      selected.medianReturnPct,
+    )} median, ${formatBehaviorWinRate(
+      selected.winRatePct,
+    )} positive rate in this sample`,
+    summaryText: getBehaviorReadoutSummaryText({
+      label,
+      selectedHorizonLabel: selected.label,
+      contextType,
+    }),
+    caveats,
   };
 }
 
@@ -383,6 +491,273 @@ function normalizeHorizonRow(
     bestReturnPct: toBehaviorNumber(raw?.bestReturnPct),
     worstReturnPct: toBehaviorNumber(raw?.worstReturnPct),
   };
+}
+
+function isUsableReadoutHorizon(row: SymbolBehaviorHorizonRow) {
+  return (
+    row.sampleSize >= 10 &&
+    row.medianReturnPct !== null &&
+    row.winRatePct !== null
+  );
+}
+
+function selectBehaviorReadoutHorizon(
+  usableRows: SymbolBehaviorHorizonRow[],
+) {
+  return (
+    usableRows.find((row) => row.horizon === "5") ??
+    usableRows.find((row) => row.horizon === "3") ??
+    usableRows.find((row) => row.horizon === "1") ??
+    null
+  );
+}
+
+function getBehaviorReadoutContextType(
+  resultGroup: string | null | undefined,
+): BehaviorReadoutContextType {
+  const normalized = resultGroup?.trim().toLowerCase();
+
+  if (normalized === "risk") {
+    return "risk";
+  }
+
+  if (normalized === "neutral") {
+    return "neutral";
+  }
+
+  if (
+    normalized === "eligible" ||
+    normalized === "watch" ||
+    normalized === "overheated"
+  ) {
+    return "opportunity";
+  }
+
+  return "unknown";
+}
+
+function getBehaviorHorizonAgreement(
+  usableRows: SymbolBehaviorHorizonRow[],
+): BehaviorReadoutAgreement {
+  if (usableRows.length === 0) {
+    return "insufficient";
+  }
+
+  if (usableRows.length === 1 && usableRows[0].horizon === "1") {
+    return "short_only";
+  }
+
+  const positiveCount = usableRows.filter(
+    (row) =>
+      (row.medianReturnPct ?? 0) > 0 && (row.winRatePct ?? 0) >= 50,
+  ).length;
+  const negativeCount = usableRows.filter(
+    (row) =>
+      (row.medianReturnPct ?? 0) < 0 && (row.winRatePct ?? 0) < 50,
+  ).length;
+  const majority = Math.floor(usableRows.length / 2) + 1;
+
+  if (positiveCount >= majority) {
+    return "aligned_positive";
+  }
+
+  if (negativeCount >= majority) {
+    return "aligned_negative";
+  }
+
+  return "mixed";
+}
+
+function getBehaviorHorizonAgreementLabel(
+  agreement: BehaviorReadoutAgreement,
+) {
+  switch (agreement) {
+    case "aligned_positive":
+      return "Aligned positive";
+    case "aligned_negative":
+      return "Aligned negative";
+    case "mixed":
+      return "Mixed";
+    case "short_only":
+      return "Short horizon only";
+    case "insufficient":
+      return "Insufficient";
+  }
+}
+
+function getBehaviorReadoutSampleConfidence(sampleSize: number) {
+  if (sampleSize >= 50) {
+    return "Better";
+  }
+
+  if (sampleSize >= 20) {
+    return "Moderate";
+  }
+
+  if (sampleSize >= 10) {
+    return "Limited";
+  }
+
+  return "Very limited";
+}
+
+function getBehaviorReadoutLabel({
+  selected,
+  contextType,
+}: {
+  selected: SymbolBehaviorHorizonRow;
+  contextType: BehaviorReadoutContextType;
+}) {
+  const median = selected.medianReturnPct ?? 0;
+  const positiveRate = selected.winRatePct ?? 0;
+
+  if (contextType === "risk") {
+    if (median < 0 && positiveRate < 45) {
+      return "Downside continuation tendency";
+    }
+
+    if (median >= 0) {
+      return "Risk not confirmed in sample";
+    }
+
+    return "Mixed risk follow-through";
+  }
+
+  if (median > 1 && positiveRate >= 60 && selected.sampleSize >= 20) {
+    return "Strong constructive tendency";
+  }
+
+  if (median > 0 && positiveRate >= 50) {
+    return "Constructive tendency";
+  }
+
+  if (median < 0 && positiveRate < 45) {
+    return "Weak follow-through";
+  }
+
+  return "Mixed follow-through";
+}
+
+function getBehaviorReadoutTone({
+  label,
+  contextType,
+}: {
+  label: string;
+  contextType: BehaviorReadoutContextType;
+}): BehaviorReadoutTone {
+  if (label === "Insufficient sample") {
+    return "insufficient";
+  }
+
+  if (contextType === "risk") {
+    return label === "Downside continuation tendency" ? "risk" : "mixed";
+  }
+
+  if (
+    label === "Constructive tendency" ||
+    label === "Strong constructive tendency"
+  ) {
+    return "constructive";
+  }
+
+  if (label === "Weak follow-through") {
+    return "weak";
+  }
+
+  return "mixed";
+}
+
+function getBehaviorReadoutSummaryText({
+  label,
+  selectedHorizonLabel,
+  contextType,
+}: {
+  label: string;
+  selectedHorizonLabel: string;
+  contextType: BehaviorReadoutContextType;
+}) {
+  if (
+    label === "Constructive tendency" ||
+    label === "Strong constructive tendency"
+  ) {
+    return `Prior similar signals tended to show constructive follow-through over ${selectedHorizonLabel} in this sample.`;
+  }
+
+  if (label === "Weak follow-through") {
+    return `Prior similar signals did not consistently follow through over ${selectedHorizonLabel} in this sample.`;
+  }
+
+  if (label === "Downside continuation tendency") {
+    return `Prior similar risk signals tended to continue lower over ${selectedHorizonLabel} in this sample.`;
+  }
+
+  if (label === "Risk not confirmed in sample") {
+    return `Prior similar risk signals did not consistently continue lower over ${selectedHorizonLabel} in this sample.`;
+  }
+
+  if (contextType === "risk") {
+    return `Prior similar risk signals had mixed follow-through over ${selectedHorizonLabel} in this sample.`;
+  }
+
+  return `Prior similar signals had mixed follow-through over ${selectedHorizonLabel} in this sample.`;
+}
+
+function buildBehaviorReadoutCaveats({
+  selectedSampleSize,
+  overallSampleSize,
+  horizonAgreement,
+  warnings,
+}: {
+  selectedSampleSize: number;
+  overallSampleSize: number;
+  horizonAgreement: BehaviorReadoutAgreement;
+  warnings?: string[] | null;
+}) {
+  const caveats: string[] = [];
+
+  if (selectedSampleSize < 10) {
+    caveats.push("Very limited sample: more completed forward candles are needed.");
+  } else if (selectedSampleSize < 20) {
+    caveats.push("Limited sample: treat this as research context only.");
+  }
+
+  if (overallSampleSize > 0 && overallSampleSize < selectedSampleSize) {
+    caveats.push("Overall sample metadata is smaller than the selected horizon sample.");
+  }
+
+  if (horizonAgreement === "mixed") {
+    caveats.push("Usable horizons disagree; avoid over-weighting one horizon.");
+  }
+
+  if (horizonAgreement === "short_only") {
+    caveats.push("Only the 1-candle horizon has enough usable observations.");
+  }
+
+  for (const warning of warnings ?? []) {
+    if (warning) {
+      caveats.push(getBehaviorWarningLabel(warning));
+    }
+  }
+
+  return uniqueStrings(caveats);
+}
+
+function uniqueStrings(values: string[]) {
+  const seen = new Set<string>();
+  const unique: string[] = [];
+
+  for (const value of values) {
+    const key = value.trim().toLowerCase();
+
+    if (!key || seen.has(key)) {
+      continue;
+    }
+
+    seen.add(key);
+    unique.push(value);
+  }
+
+  return unique;
 }
 
 function getHorizonKey(value: unknown): SymbolBehaviorHorizonKey | null {

@@ -19,7 +19,16 @@ describe("SymbolBehaviorPanel", () => {
 
     expect(html).toContain("Historical Behavior");
     expect(html).toContain("How similar prior signals behaved");
-    expect(html).toContain("not a prediction");
+    expect(html).toContain("research context, not financial advice");
+    expect(html).toContain("Behavior Readout");
+    expect(html).toContain("Constructive tendency");
+    expect(html).toContain("Sample Confidence");
+    expect(html).toContain("Selected Horizon");
+    expect(html).toContain("Horizon Agreement");
+    expect(html).toContain("Historical Bias");
+    expect(html).toContain(
+      "Prior similar signals tended to show constructive follow-through",
+    );
     expect(html).toContain("Sample size");
     expect(html).toContain("Forward horizon observations");
     expect(html).toContain("1 candle");
@@ -45,6 +54,7 @@ describe("SymbolBehaviorPanel", () => {
       "No prior matching signals",
     );
     expect(html).toContain("No prior matching signals were found yet");
+    expect(html).not.toContain("Behavior Readout");
   });
 
   it("renders no_latest_signal coverage for insufficient history", () => {

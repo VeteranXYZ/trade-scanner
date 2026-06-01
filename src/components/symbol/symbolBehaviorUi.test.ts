@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  buildBehaviorReadout,
   buildBehaviorSummary,
   formatBehaviorPercent,
   formatBehaviorSampleSize,
@@ -104,6 +105,181 @@ describe("symbol behavior UI helpers", () => {
       "Historical behavior is currently unavailable for this symbol/timeframe.",
     );
   });
+
+  it("labels behavior readout sample confidence by selected horizon sample", () => {
+    expect(
+      buildBehaviorReadout(
+        makeReadoutInput({
+          horizons: { "5": makeHorizon(9, 1.2) },
+        }),
+      ).sampleConfidenceLabel,
+    ).toBe("Very limited");
+    expect(
+      buildBehaviorReadout(
+        makeReadoutInput({
+          horizons: { "5": makeHorizon(10, 1.2) },
+        }),
+      ).sampleConfidenceLabel,
+    ).toBe("Limited");
+    expect(
+      buildBehaviorReadout(
+        makeReadoutInput({
+          horizons: { "5": makeHorizon(20, 1.2) },
+        }),
+      ).sampleConfidenceLabel,
+    ).toBe("Moderate");
+    expect(
+      buildBehaviorReadout(
+        makeReadoutInput({
+          horizons: { "5": makeHorizon(50, 1.2) },
+        }),
+      ).sampleConfidenceLabel,
+    ).toBe("Better");
+  });
+
+  it("prefers 5, then 3, then 1 candle horizons when usable", () => {
+    expect(
+      buildBehaviorReadout(
+        makeReadoutInput({
+          horizons: {
+            "1": makeHorizon(20, 0.5),
+            "3": makeHorizon(20, 1.5),
+            "5": makeHorizon(20, 2.5),
+          },
+        }),
+      ).selectedHorizon,
+    ).toBe("5");
+    expect(
+      buildBehaviorReadout(
+        makeReadoutInput({
+          horizons: {
+            "1": makeHorizon(20, 0.5),
+            "3": makeHorizon(20, 1.5),
+            "5": makeHorizon(9, 2.5),
+          },
+        }),
+      ).selectedHorizon,
+    ).toBe("3");
+    expect(
+      buildBehaviorReadout(
+        makeReadoutInput({
+          horizons: {
+            "1": makeHorizon(20, 0.5),
+            "3": makeHorizon(9, 1.5),
+            "5": makeHorizon(9, 2.5),
+          },
+        }),
+      ).selectedHorizon,
+    ).toBe("1");
+  });
+
+  it("returns insufficient when no horizon has enough usable observations", () => {
+    const readout = buildBehaviorReadout(
+      makeReadoutInput({
+        horizons: {
+          "1": makeHorizon(9, 1.2),
+          "3": makeHorizon(8, 1.4),
+          "5": makeHorizon(7, 1.6),
+        },
+      }),
+    );
+
+    expect(readout.label).toBe("Insufficient sample");
+    expect(readout.selectedHorizon).toBeNull();
+    expect(readout.horizonAgreement).toBe("insufficient");
+  });
+
+  it("classifies horizon agreement as aligned positive, aligned negative, or mixed", () => {
+    expect(
+      buildBehaviorReadout(
+        makeReadoutInput({
+          horizons: {
+            "1": makeHorizon(20, 0.2, 51),
+            "3": makeHorizon(20, 0.3, 55),
+            "5": makeHorizon(20, 0.4, 60),
+          },
+        }),
+      ).horizonAgreement,
+    ).toBe("aligned_positive");
+    expect(
+      buildBehaviorReadout(
+        makeReadoutInput({
+          horizons: {
+            "1": makeHorizon(20, -0.2, 44),
+            "3": makeHorizon(20, -0.3, 40),
+            "5": makeHorizon(20, -0.4, 35),
+          },
+        }),
+      ).horizonAgreement,
+    ).toBe("aligned_negative");
+    expect(
+      buildBehaviorReadout(
+        makeReadoutInput({
+          horizons: {
+            "1": makeHorizon(20, 0.2, 51),
+            "3": makeHorizon(20, -0.3, 40),
+            "5": makeHorizon(20, 0, 48),
+          },
+        }),
+      ).horizonAgreement,
+    ).toBe("mixed");
+  });
+
+  it("interprets opportunity context as constructive or weak follow-through", () => {
+    expect(
+      buildBehaviorReadout(
+        makeReadoutInput({
+          resultGroup: "eligible",
+          horizons: { "5": makeHorizon(20, 1.2, 62) },
+        }),
+      ).label,
+    ).toBe("Strong constructive tendency");
+    expect(
+      buildBehaviorReadout(
+        makeReadoutInput({
+          resultGroup: "watch",
+          horizons: { "5": makeHorizon(12, -0.4, 42) },
+        }),
+      ).label,
+    ).toBe("Weak follow-through");
+  });
+
+  it("interprets risk context as downside continuation or not confirmed", () => {
+    expect(
+      buildBehaviorReadout(
+        makeReadoutInput({
+          resultGroup: "risk",
+          horizons: { "5": makeHorizon(12, -0.8, 35) },
+        }),
+      ).label,
+    ).toBe("Downside continuation tendency");
+    expect(
+      buildBehaviorReadout(
+        makeReadoutInput({
+          resultGroup: "risk",
+          horizons: { "5": makeHorizon(12, 0.1, 52) },
+        }),
+      ).label,
+    ).toBe("Risk not confirmed in sample");
+  });
+
+  it("handles malformed numeric values without inventing a readout", () => {
+    const readout = buildBehaviorReadout(
+      makeReadoutInput({
+        sampleSize: "bad",
+        horizons: {
+          "5": {
+            sampleSize: "12",
+            medianReturnPct: "bad",
+            winRatePct: "bad",
+          },
+        },
+      }),
+    );
+
+    expect(readout.label).toBe("Insufficient sample");
+    expect(readout.historicalBiasLabel).toBe("Not enough usable horizon data");
+  });
 });
 
 function makeBehavior(): SymbolBehavior {
@@ -127,14 +303,39 @@ function makeBehavior(): SymbolBehavior {
   };
 }
 
-function makeHorizon(sampleSize: number, avgReturnPct: number) {
+function makeHorizon(
+  sampleSize: number,
+  avgReturnPct: number,
+  winRatePct = 60,
+) {
   return {
     sampleSize,
     avgReturnPct,
     medianReturnPct: avgReturnPct,
-    winRatePct: 60,
+    winRatePct,
     bestReturnPct: 5,
     worstReturnPct: -2,
+  };
+}
+
+function makeReadoutInput(
+  overrides: Partial<SymbolBehavior> & {
+    resultGroup?: string | null;
+    currentGroup?: string | null;
+    signalLabel?: string | null;
+  } = {},
+) {
+  return {
+    resultGroup: "eligible",
+    signalLabel: "confirmed",
+    sampleSize: 30,
+    horizons: {
+      "1": makeHorizon(20, 0.5),
+      "3": makeHorizon(20, 1),
+      "5": makeHorizon(20, 1.5),
+    },
+    warnings: [],
+    ...overrides,
   };
 }
 

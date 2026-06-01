@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import {
+  buildBehaviorReadout,
   buildBehaviorSummary,
   formatBehaviorPercent,
   formatBehaviorSampleSize,
@@ -19,6 +20,7 @@ import {
   getHiddenRecentOutcomeCount,
   getRecentOutcomeReturn,
   selectCompactRecentOutcomes,
+  type BehaviorReadout,
   type SymbolBehavior,
   type SymbolBehaviorCoverage,
   type SymbolBehaviorDiagnostics,
@@ -54,8 +56,8 @@ export function SymbolBehaviorPanel({
           <h2 className="text-sm font-semibold">Historical Behavior</h2>
           <p className="mt-1 text-xs text-[var(--muted)]">
             How similar prior signals behaved after this setup appeared. Same
-            symbol/timeframe scanner history only; research context, not a
-            prediction.
+            symbol/timeframe scanner history only; research context, not financial
+            advice.
           </p>
         </div>
         {isAvailable && behavior ? (
@@ -67,6 +69,7 @@ export function SymbolBehaviorPanel({
         <EmptyBehaviorState diagnostics={diagnostics} coverage={coverage} />
       ) : (
         <>
+          <BehaviorReadoutCard behavior={behavior} />
           <BehaviorSummary behavior={behavior} />
           <SampleHint behavior={behavior} />
           <BehaviorWarnings
@@ -117,6 +120,54 @@ function EmptyBehaviorState({
   );
 }
 
+function BehaviorReadoutCard({ behavior }: { behavior: SymbolBehavior }) {
+  const readout = buildBehaviorReadout({
+    resultGroup: behavior.currentContext?.resultGroup,
+    signalLabel: behavior.currentContext?.signalLabel,
+    sampleSize: behavior.sampleSize,
+    horizons: behavior.horizons,
+    warnings: Array.isArray(behavior.warnings) ? behavior.warnings : [],
+  });
+  const toneClass = getBehaviorReadoutToneClass(readout);
+
+  return (
+    <div className={`mb-3 border px-3 py-3 ${toneClass}`}>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <div className="text-[10px] uppercase tracking-normal text-[var(--muted-2)]">
+            Behavior Readout
+          </div>
+          <h3 className="mt-1 text-sm font-semibold text-[var(--foreground)]">
+            {readout.label}
+          </h3>
+          <p className="mt-1 max-w-3xl text-xs leading-5 text-[var(--muted)]">
+            {readout.summaryText}
+          </p>
+        </div>
+      </div>
+      <div className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+        <BehaviorFact
+          label="Sample Confidence"
+          value={readout.sampleConfidenceLabel}
+        />
+        <BehaviorFact label="Selected Horizon" value={readout.selectedHorizonLabel} />
+        <BehaviorFact
+          label="Horizon Agreement"
+          value={readout.horizonAgreementLabel}
+        />
+        <BehaviorFact label="Historical Bias" value={readout.historicalBiasLabel} />
+      </div>
+      {readout.caveats.length > 0 ? (
+        <div className="mt-3 space-y-1 text-xs text-[var(--muted)]">
+          {readout.caveats.map((caveat) => (
+            <p key={caveat}>{caveat}</p>
+          ))}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 function BehaviorSummary({ behavior }: { behavior: SymbolBehavior }) {
   return (
     <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
@@ -125,6 +176,21 @@ function BehaviorSummary({ behavior }: { behavior: SymbolBehavior }) {
       ))}
     </div>
   );
+}
+
+function getBehaviorReadoutToneClass(readout: BehaviorReadout) {
+  switch (readout.tone) {
+    case "constructive":
+      return "border-emerald-500/30 bg-emerald-500/10";
+    case "weak":
+      return "border-amber-500/30 bg-amber-500/10";
+    case "risk":
+      return "border-rose-500/35 bg-rose-500/10";
+    case "mixed":
+      return "border-sky-500/25 bg-sky-500/10";
+    case "insufficient":
+      return "border-[var(--border)] bg-[#080d12]";
+  }
 }
 
 function SampleHint({ behavior }: { behavior: SymbolBehavior }) {
