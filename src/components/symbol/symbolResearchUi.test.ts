@@ -5,10 +5,14 @@ import {
   formatSymbolResearchGroup,
   formatSymbolResearchList,
   formatSymbolResearchPrice,
+  formatSymbolResearchRunContext,
   formatSymbolResearchScore,
   formatSymbolResearchSetup,
+  getTimeframeSnapshotNote,
+  getTimeframeSnapshotTitle,
   getSymbolResearchCandleSummary,
   getSymbolResearchScoreRows,
+  hasNewerSymbolResearchHistoryRows,
 } from "./symbolResearchUi";
 
 describe("symbol research UI helpers", () => {
@@ -92,5 +96,47 @@ describe("symbol research UI helpers", () => {
       "Strong Trend",
     ]);
     expect(formatSymbolResearchList([{ type: "risk" }])).toEqual([]);
+  });
+
+  it("labels run context without making newer rows look current", () => {
+    expect(formatSymbolResearchRunContext({ isSelectedCurrentRun: true })).toBe(
+      "Selected current run",
+    );
+    expect(
+      formatSymbolResearchRunContext({
+        isNewerThanSelectedCurrentRun: true,
+        sourceRunIsLikelyFullUniverse: false,
+      }),
+    ).toBe("Newer non-preferred run");
+    expect(formatSymbolResearchRunContext({ sourceRunIsLikelyFullUniverse: true })).toBe(
+      "Full-universe run",
+    );
+    expect(formatSymbolResearchRunContext({ sourceRunIsLikelyFullUniverse: false })).toBe(
+      "Non-preferred run",
+    );
+  });
+
+  it("detects newer history rows that need a current-selection notice", () => {
+    expect(
+      hasNewerSymbolResearchHistoryRows([
+        { isSelectedCurrentRun: true },
+        { isNewerThanSelectedCurrentRun: true },
+      ]),
+    ).toBe(true);
+    expect(hasNewerSymbolResearchHistoryRows([{ isSelectedCurrentRun: true }])).toBe(
+      false,
+    );
+  });
+
+  it("avoids multi-timeframe wording when only one snapshot exists", () => {
+    expect(getTimeframeSnapshotTitle(0)).toBe("Timeframe Snapshot");
+    expect(getTimeframeSnapshotTitle(1)).toBe("Timeframe Snapshot");
+    expect(getTimeframeSnapshotTitle(2)).toBe("Multi-Timeframe Snapshot");
+    expect(getTimeframeSnapshotNote([{ timeframe: "4h" }])).toBe(
+      "Only 4h snapshot is currently available for this symbol.",
+    );
+    expect(getTimeframeSnapshotNote([{ timeframe: "4h" }, { timeframe: "1d" }])).toBe(
+      null,
+    );
   });
 });

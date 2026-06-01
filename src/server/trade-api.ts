@@ -458,6 +458,10 @@ async function handleSymbolResearch(response: http.ServerResponse, url: URL) {
   const store = new PgSymbolResearchStore();
 
   try {
+    const preferFullUniverse = shouldPreferFullUniverseLatestRun({
+      assetClass: assetClass.value,
+      includeNonScanner,
+    });
     const latest = await store.getSymbolResearchLatestSignalPg({
       exchange,
       market,
@@ -466,6 +470,12 @@ async function handleSymbolResearch(response: http.ServerResponse, url: URL) {
       assetClass: assetClass.value,
       includeNonScanner,
       includeMarketContext,
+    });
+    const currentSelection = buildSymbolResearchCurrentSelectionMetadata({
+      run: latest.scanRun,
+      signal: latest.signal,
+      assetClass: assetClass.value,
+      preferredFullUniverse: preferFullUniverse,
     });
 
     if (!latest.symbol) {
@@ -494,6 +504,7 @@ async function handleSymbolResearch(response: http.ServerResponse, url: URL) {
           scanRun: latest.scanRun,
           signal: null,
         },
+        currentSelection,
       });
       return;
     }
@@ -528,7 +539,10 @@ async function handleSymbolResearch(response: http.ServerResponse, url: URL) {
           })
         : Promise.resolve([]),
     ]);
-    const latestSignal = enrichSymbolResearchSignal(latest.signal);
+    const latestSignal = enrichSymbolResearchSignal(latest.signal, {
+      currentSignal: latest.signal,
+      assetClass: assetClass.value,
+    });
     const quality = getSymbolQuality(latest.symbol.symbol, {
       assetClass: latest.symbol.assetClass,
       candleCount: latestSignal.candleCount,
@@ -552,10 +566,21 @@ async function handleSymbolResearch(response: http.ServerResponse, url: URL) {
         scanRun: latest.scanRun,
         signal: latestSignal,
       },
+      currentSelection,
       scoreBreakdown: buildSymbolResearchScoreBreakdown(latestSignal),
       interpretation: buildSymbolResearchInterpretation(latestSignal),
-      history: historySignals.map(enrichSymbolResearchSignal),
-      timeframes: timeframeSignals.map(enrichSymbolResearchSignal),
+      history: historySignals.map((signal) =>
+        enrichSymbolResearchSignal(signal, {
+          currentSignal: latest.signal,
+          assetClass: assetClass.value,
+        }),
+      ),
+      timeframes: timeframeSignals.map((signal) =>
+        enrichSymbolResearchSignal(signal, {
+          currentSignal: latest.signal,
+          assetClass: assetClass.value,
+        }),
+      ),
       candles: buildSymbolResearchCandlesPayload({ timeframe, candles }),
     });
   } catch {
@@ -846,19 +871,125 @@ function buildLatestRunSelectionMetadata({
 
 type EnrichedSymbolResearchSignal = SymbolResearchSignalRecord & {
   resultGroup: ScanResultGroup;
+  sourceRunIsLikelyFullUniverse: boolean | null;
+  isSelectedCurrentRun: boolean;
+  isNewerThanSelectedCurrentRun: boolean;
 } & ReturnType<typeof getScanResultReview>;
 
 function enrichSymbolResearchSignal(
   signal: SymbolResearchSignalRecord,
+  {
+    currentSignal,
+    assetClass,
+  }: {
+    currentSignal?: SymbolResearchSignalRecord | null;
+    assetClass?: SymbolAssetClassFilter;
+  } = {},
 ): EnrichedSymbolResearchSignal {
   const resultGroup = classifyScanResultGroup(signal);
   const review = getScanResultReview({ ...signal, resultGroup });
+  const isSamePrimaryTimeframe =
+    currentSignal?.timeframe !== undefined && signal.timeframe === currentSignal.timeframe;
+  const isSelectedCurrentRun =
+    Boolean(currentSignal?.scanRunId) &&
+    isSamePrimaryTimeframe &&
+    signal.scanRunId === currentSignal?.scanRunId;
 
   return {
     ...signal,
     resultGroup,
     ...review,
+    sourceRunIsLikelyFullUniverse: getSymbolResearchSourceRunLikelyFullUniverse({
+      signal,
+      assetClass: assetClass ?? signal.assetClass,
+    }),
+    isSelectedCurrentRun,
+    isNewerThanSelectedCurrentRun:
+      Boolean(currentSignal) &&
+      isSamePrimaryTimeframe &&
+      !isSelectedCurrentRun &&
+      isAfterDate(signal.scanTime, currentSignal?.scanTime),
   };
+}
+
+function buildSymbolResearchCurrentSelectionMetadata({
+  run,
+  signal,
+  assetClass,
+  preferredFullUniverse,
+}: {
+  run: Awaited<ReturnType<PgScannerResultsStore["getLatestScanRun"]>>;
+  signal: SymbolResearchSignalRecord | null;
+  assetClass: SymbolAssetClassFilter;
+  preferredFullUniverse: boolean;
+}) {
+  return {
+    ...buildLatestRunSelectionMetadata({
+      run,
+      assetClass,
+      preferredFullUniverse,
+    }),
+    selectedRunId: run?.id ?? null,
+    selectedSignalId: signal?.id ?? null,
+    selectedTimeframe: run?.timeframe ?? signal?.timeframe ?? null,
+    selectedRunStartedAt: run?.startedAt ?? null,
+    selectedRunFinishedAt: run?.finishedAt ?? null,
+    selectedSignalScanTime: signal?.scanTime ?? null,
+  };
+}
+
+function getSymbolResearchSourceRunLikelyFullUniverse({
+  signal,
+  assetClass,
+}: {
+  signal: SymbolResearchSignalRecord;
+  assetClass: SymbolAssetClassFilter;
+}) {
+  if (
+    signal.scanRunSymbolsTotal == null ||
+    signal.scanRunSymbolsScanned == null ||
+    signal.scanRunSignalsCreated == null
+  ) {
+    return null;
+  }
+
+  return isLikelyFullUniverseRun({
+    run: {
+      id: signal.scanRunId,
+      exchange: signal.exchange,
+      market: signal.market,
+      mode: "single",
+      timeframe: signal.timeframe,
+      universe: "unknown",
+      status: "success",
+      symbolsTotal: signal.scanRunSymbolsTotal,
+      symbolsScanned: signal.scanRunSymbolsScanned,
+      signalsCreated: signal.scanRunSignalsCreated,
+      symbolsSkipped: 0,
+      failedSymbols: 0,
+      params: signal.scanRunParams,
+      errorMessage: null,
+      startedAt: signal.scanRunStartedAt ?? signal.scanTime,
+      finishedAt: signal.scanRunFinishedAt,
+    },
+    assetClass,
+    minExpectedSymbols: LATEST_SCAN_FULL_UNIVERSE_MIN_SYMBOLS,
+  });
+}
+
+function isAfterDate(left: string | null | undefined, right: string | null | undefined) {
+  if (!left || !right) {
+    return false;
+  }
+
+  const leftTime = Date.parse(left);
+  const rightTime = Date.parse(right);
+
+  if (Number.isNaN(leftTime) || Number.isNaN(rightTime)) {
+    return false;
+  }
+
+  return leftTime > rightTime;
 }
 
 function buildSymbolResearchScoreBreakdown(signal: SymbolResearchSignalRecord) {

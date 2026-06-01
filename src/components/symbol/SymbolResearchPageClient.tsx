@@ -11,10 +11,14 @@ import {
   formatSymbolResearchGroup,
   formatSymbolResearchList,
   formatSymbolResearchPrice,
+  formatSymbolResearchRunContext,
   formatSymbolResearchScore,
   formatSymbolResearchSetup,
+  getTimeframeSnapshotNote,
+  getTimeframeSnapshotTitle,
   getSymbolResearchCandleSummary,
   getSymbolResearchScoreRows,
+  hasNewerSymbolResearchHistoryRows,
   toTitleCase,
 } from "./symbolResearchUi";
 
@@ -82,6 +86,24 @@ type SymbolResearchSignal = {
   scoringVersion?: string | null;
   scannerVersion?: string | null;
   createdAt?: string;
+  scanRunStartedAt?: string | null;
+  scanRunFinishedAt?: string | null;
+  sourceRunIsLikelyFullUniverse?: boolean | null;
+  isSelectedCurrentRun?: boolean;
+  isNewerThanSelectedCurrentRun?: boolean;
+};
+
+type SymbolResearchCurrentSelection = {
+  selectedRunId: string | null;
+  selectedSignalId: string | null;
+  selectedTimeframe: string | null;
+  selectedRunStartedAt: string | null;
+  selectedRunFinishedAt: string | null;
+  selectedSignalScanTime: string | null;
+  preferredFullUniverse: boolean;
+  isLikelyFullUniverse: boolean;
+  minExpectedSymbols: number;
+  fallbackUsed: boolean;
 };
 
 type SymbolResearchCandle = {
@@ -110,6 +132,7 @@ type SymbolResearchResponse = {
     scanRun: SymbolResearchRun | null;
     signal: SymbolResearchSignal;
   };
+  currentSelection?: SymbolResearchCurrentSelection;
   scoreBreakdown: {
     rankScore: number | null;
     finalSignalScore: number | null;
@@ -206,6 +229,9 @@ export function SymbolResearchPageClient({
   const secondaryStructures = formatSymbolResearchList(
     latestSignal.secondaryStructures,
   );
+  const timeframeSnapshotTitle = getTimeframeSnapshotTitle(data.timeframes.length);
+  const timeframeSnapshotNote = getTimeframeSnapshotNote(data.timeframes);
+  const showHistorySelectionNotice = hasNewerSymbolResearchHistoryRows(data.history);
 
   return (
     <main className="mx-auto w-full max-w-7xl px-4 py-6 text-[var(--foreground)]">
@@ -291,18 +317,25 @@ export function SymbolResearchPageClient({
         }}
       />
 
-      <SymbolSignalTimeline history={data.history} />
+      <SymbolSignalTimeline
+        history={data.history}
+        showSelectionNotice={showHistorySelectionNotice}
+      />
 
       <div className="mt-4 grid gap-4 xl:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
-        <Panel title="Multi-Timeframe Snapshot">
+        <Panel title={timeframeSnapshotTitle}>
+          {timeframeSnapshotNote ? (
+            <p className="mb-3 text-xs text-[var(--muted)]">{timeframeSnapshotNote}</p>
+          ) : null}
           <ResponsiveTable
-            headers={["Timeframe", "Group", "Action", "Rank", "Scan Time"]}
+            headers={["Timeframe", "Group", "Action", "Rank", "Scan Time", "Run Context"]}
             rows={data.timeframes.map((item) => [
               item.timeframe,
               formatSymbolResearchGroup(item.resultGroup),
-              formatSymbolResearchAction(item.statusNote),
+              formatSymbolResearchAction(item.actionBias ?? item.statusNote),
               formatSymbolResearchScore(item.rankScore),
               formatSymbolResearchDateTime(item.scanTime),
+              formatSymbolResearchRunContext(item),
             ])}
             emptyText="No timeframe snapshots available."
           />
@@ -487,7 +520,7 @@ function ResponsiveTable({
 
   return (
     <div className="overflow-x-auto">
-      <table className="w-full min-w-[620px] border-collapse text-left text-xs">
+      <table className="w-full min-w-[760px] border-collapse text-left text-xs">
         <thead className="bg-[#090f15] text-[10px] uppercase text-[var(--muted)]">
           <tr>
             {headers.map((header) => (

@@ -35,6 +35,16 @@ type CandleSummaryInput = {
   }>;
 };
 
+type RunContextInput = {
+  isSelectedCurrentRun?: boolean | null;
+  isNewerThanSelectedCurrentRun?: boolean | null;
+  sourceRunIsLikelyFullUniverse?: boolean | null;
+};
+
+type TimeframeSnapshotInput = {
+  timeframe?: string | null;
+};
+
 export function formatSymbolResearchScore(
   value: number | null | undefined,
   decimals = 1,
@@ -153,6 +163,49 @@ export function getSymbolResearchCandleSummary(candles: CandleSummaryInput) {
     recentHigh: Number.isFinite(high) ? high : null,
     recentLow: Number.isFinite(low) ? low : null,
   };
+}
+
+export function formatSymbolResearchRunContext(value: RunContextInput) {
+  if (value.isSelectedCurrentRun) {
+    return "Selected current run";
+  }
+
+  if (value.isNewerThanSelectedCurrentRun) {
+    return value.sourceRunIsLikelyFullUniverse === false
+      ? "Newer non-preferred run"
+      : "Newer run";
+  }
+
+  if (value.sourceRunIsLikelyFullUniverse === true) {
+    return "Full-universe run";
+  }
+
+  if (value.sourceRunIsLikelyFullUniverse === false) {
+    return "Non-preferred run";
+  }
+
+  return "Historical run";
+}
+
+export function hasNewerSymbolResearchHistoryRows(
+  history: RunContextInput[] | null | undefined,
+) {
+  return Boolean(
+    history?.some((item) => item.isNewerThanSelectedCurrentRun === true),
+  );
+}
+
+export function getTimeframeSnapshotTitle(itemCount: number) {
+  return itemCount <= 1 ? "Timeframe Snapshot" : "Multi-Timeframe Snapshot";
+}
+
+export function getTimeframeSnapshotNote(timeframes: TimeframeSnapshotInput[]) {
+  if (timeframes.length !== 1) {
+    return null;
+  }
+
+  const timeframe = timeframes[0]?.timeframe || "selected timeframe";
+  return `Only ${timeframe} snapshot is currently available for this symbol.`;
 }
 
 export function toTitleCase(value: string) {

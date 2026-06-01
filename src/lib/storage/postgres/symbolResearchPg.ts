@@ -31,7 +31,14 @@ export type SymbolResearchSymbolRecord = {
   updatedAt: string;
 };
 
-export type SymbolResearchSignalRecord = LatestScanSignalRecord;
+export type SymbolResearchSignalRecord = LatestScanSignalRecord & {
+  scanRunStartedAt: string | null;
+  scanRunFinishedAt: string | null;
+  scanRunSymbolsTotal: number | null;
+  scanRunSymbolsScanned: number | null;
+  scanRunSignalsCreated: number | null;
+  scanRunParams: Record<string, unknown>;
+};
 
 export type SymbolResearchCandleRecord = {
   id: number;
@@ -120,6 +127,12 @@ type ScanSignalRow = {
   scoring_version: string | null;
   scanner_version: string | null;
   created_at: Date | string;
+  scan_run_started_at?: Date | string | null;
+  scan_run_finished_at?: Date | string | null;
+  scan_run_symbols_total?: number | string | null;
+  scan_run_symbols_scanned?: number | string | null;
+  scan_run_signals_created?: number | string | null;
+  scan_run_params?: Record<string, unknown> | null;
   asset_class: string | null;
   is_scanner_eligible: boolean | null;
   is_backtest_eligible: boolean | null;
@@ -295,6 +308,12 @@ export class PgSymbolResearchStore {
         FROM (
           SELECT DISTINCT ON (ss.timeframe)
             ss.*,
+            sr.started_at AS scan_run_started_at,
+            sr.finished_at AS scan_run_finished_at,
+            sr.symbols_total AS scan_run_symbols_total,
+            sr.symbols_scanned AS scan_run_symbols_scanned,
+            sr.signals_created AS scan_run_signals_created,
+            sr.params AS scan_run_params,
             s.asset_class,
             s.is_scanner_eligible,
             s.is_backtest_eligible,
@@ -302,6 +321,8 @@ export class PgSymbolResearchStore {
             COALESCE(coverage.candle_count, 0) AS candle_count,
             coverage.first_open_time
           FROM scan_signals ss
+          JOIN scan_runs sr
+            ON sr.id = ss.scan_run_id
           JOIN symbols s
             ON s.id = ss.symbol_id
           LEFT JOIN LATERAL (
@@ -483,6 +504,12 @@ function selectSignalWithSymbolCoverageSql() {
   return `
     SELECT
       ss.*,
+      sr.started_at AS scan_run_started_at,
+      sr.finished_at AS scan_run_finished_at,
+      sr.symbols_total AS scan_run_symbols_total,
+      sr.symbols_scanned AS scan_run_symbols_scanned,
+      sr.signals_created AS scan_run_signals_created,
+      sr.params AS scan_run_params,
       s.asset_class,
       s.is_scanner_eligible,
       s.is_backtest_eligible,
@@ -490,6 +517,8 @@ function selectSignalWithSymbolCoverageSql() {
       COALESCE(coverage.candle_count, 0) AS candle_count,
       coverage.first_open_time
     FROM scan_signals ss
+    JOIN scan_runs sr
+      ON sr.id = ss.scan_run_id
     JOIN symbols s
       ON s.id = ss.symbol_id
     LEFT JOIN LATERAL (
@@ -562,6 +591,16 @@ function toSymbolResearchSignalRecord(
     scoringVersion: row.scoring_version,
     scannerVersion: row.scanner_version,
     createdAt: new Date(row.created_at).toISOString(),
+    scanRunStartedAt: row.scan_run_started_at
+      ? new Date(row.scan_run_started_at).toISOString()
+      : null,
+    scanRunFinishedAt: row.scan_run_finished_at
+      ? new Date(row.scan_run_finished_at).toISOString()
+      : null,
+    scanRunSymbolsTotal: toNullableNumber(row.scan_run_symbols_total ?? null),
+    scanRunSymbolsScanned: toNullableNumber(row.scan_run_symbols_scanned ?? null),
+    scanRunSignalsCreated: toNullableNumber(row.scan_run_signals_created ?? null),
+    scanRunParams: row.scan_run_params ?? {},
     assetClass: isSymbolAssetClass(row.asset_class) ? row.asset_class : "crypto",
     isScannerEligible: row.is_scanner_eligible ?? true,
     isBacktestEligible: row.is_backtest_eligible ?? true,

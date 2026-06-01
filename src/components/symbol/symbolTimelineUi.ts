@@ -1,3 +1,5 @@
+import { formatSymbolResearchRunContext } from "./symbolResearchUi";
+
 export type RawSymbolTimelineSignal = {
   id?: string | null;
   symbol?: string | null;
@@ -16,6 +18,9 @@ export type RawSymbolTimelineSignal = {
   confirmationScore?: number | null;
   riskScore?: number | null;
   detectedRiskTypes?: unknown;
+  sourceRunIsLikelyFullUniverse?: boolean | null;
+  isSelectedCurrentRun?: boolean | null;
+  isNewerThanSelectedCurrentRun?: boolean | null;
 };
 
 export type NormalizedSymbolTimelineSignal = {
@@ -36,6 +41,7 @@ export type NormalizedSymbolTimelineSignal = {
   riskScore: string;
   riskText: string;
   statusText: string;
+  runContextText: string;
 };
 
 const groupLabels: Record<string, string> = {
@@ -95,6 +101,7 @@ export function normalizeSignalHistory(
         riskScore: formatTimelineScore(item.riskScore),
         riskText: getTimelineRiskText(item.detectedRiskTypes),
         statusText: getTimelineStatusText(item),
+        runContextText: formatSymbolResearchRunContext(item),
       };
     })
     .sort((left, right) => {

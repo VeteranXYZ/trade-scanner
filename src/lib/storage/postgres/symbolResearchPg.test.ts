@@ -114,7 +114,16 @@ describe("PgSymbolResearchStore", () => {
     });
 
     expect(history).toHaveLength(1);
+    expect(history[0]).toMatchObject({
+      scanRunId: "run-2",
+      scanRunStartedAt: "2026-05-31T00:00:00.000Z",
+      scanRunFinishedAt: "2026-05-31T00:01:00.000Z",
+      scanRunSymbolsTotal: 413,
+      scanRunSymbolsScanned: 409,
+      scanRunSignalsCreated: 409,
+    });
     expect(paramsList[0]).toEqual(["binance", "spot", "SEIUSDT", "4h", "crypto", 30]);
+    expect(queries[0]).toContain("JOIN scan_runs sr");
     expect(queries[0]).toContain("ORDER BY ss.scan_time DESC");
     expect(queries[0]).toContain("LIMIT $6");
     expect(queries[0]).not.toMatch(/max\(scan_time\)/i);
@@ -152,7 +161,9 @@ describe("PgSymbolResearchStore", () => {
     });
 
     expect(rows.map((row) => row.timeframe)).toEqual(["4h", "1d"]);
+    expect(rows[0]?.scanRunStartedAt).toBe("2026-05-31T00:00:00.000Z");
     expect(queries[0]).toContain("SELECT DISTINCT ON (ss.timeframe)");
+    expect(queries[0]).toContain("JOIN scan_runs sr");
     expect(queries[0]).toContain("ss.scan_time DESC");
     expect(queries[0]).not.toMatch(/max\(scan_time\)/i);
   });
@@ -288,6 +299,12 @@ function makeSignalRow(
     scoring_version: "test",
     scanner_version: "test",
     created_at: "2026-05-31T00:00:02.000Z",
+    scan_run_started_at: "2026-05-31T00:00:00.000Z",
+    scan_run_finished_at: "2026-05-31T00:01:00.000Z",
+    scan_run_symbols_total: "413",
+    scan_run_symbols_scanned: "409",
+    scan_run_signals_created: "409",
+    scan_run_params: { assetClass: "crypto", allSymbols: true },
     asset_class: "crypto",
     is_scanner_eligible: true,
     is_backtest_eligible: true,

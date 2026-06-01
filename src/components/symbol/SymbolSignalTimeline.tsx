@@ -6,9 +6,13 @@ import {
 
 type SymbolSignalTimelineProps = {
   history: RawSymbolTimelineSignal[];
+  showSelectionNotice?: boolean;
 };
 
-export function SymbolSignalTimeline({ history }: SymbolSignalTimelineProps) {
+export function SymbolSignalTimeline({
+  history,
+  showSelectionNotice = false,
+}: SymbolSignalTimelineProps) {
   const items = normalizeSignalHistory(history);
 
   return (
@@ -29,7 +33,14 @@ export function SymbolSignalTimeline({ history }: SymbolSignalTimelineProps) {
           {items.length === 1 ? (
             <p className="mb-3 border border-[var(--border)] bg-[#080d12] px-3 py-2 text-xs text-[var(--muted)]">
               Only the latest signal is available. More history will appear after future
-              scans.
+          scans.
+            </p>
+          ) : null}
+
+          {showSelectionNotice ? (
+            <p className="mb-3 border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-100">
+              Some newer history rows may come from non-preferred or smaller runs.
+              Current classification uses the selected full-universe scan run.
             </p>
           ) : null}
 
@@ -67,6 +78,7 @@ export function SymbolSignalTimeline({ history }: SymbolSignalTimelineProps) {
                     <TimelineFact label="Opportunity" value={item.opportunityScore} />
                     <TimelineFact label="Confirmation" value={item.confirmationScore} />
                     <TimelineFact label="Risk" value={item.riskScore} />
+                    <TimelineFact label="Run Context" value={item.runContextText} />
                     <TimelineFact label="Risks Noted" value={item.riskText} wide />
                     <TimelineFact label="Status" value={item.statusText} wide />
                   </div>

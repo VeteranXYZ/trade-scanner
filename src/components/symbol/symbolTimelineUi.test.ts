@@ -57,4 +57,17 @@ describe("symbol timeline UI helpers", () => {
     expect(getTimelineGroupLabel("eligible")).toBe("Eligible");
     expect(getTimelineGroupLabel("unknown_group")).toBe("Neutral");
   });
+
+  it("carries current-run context into normalized rows", () => {
+    expect(
+      normalizeSignalHistory([
+        {
+          id: "newer-limited",
+          scanTime: "2026-05-31T20:05:00.000Z",
+          isNewerThanSelectedCurrentRun: true,
+          sourceRunIsLikelyFullUniverse: false,
+        },
+      ])[0]?.runContextText,
+    ).toBe("Newer non-preferred run");
+  });
 });

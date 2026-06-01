@@ -300,6 +300,15 @@ describe("trade-api symbol research", () => {
     expect(body.latest.scanRun.id).toBe("full-run");
     expect(body.latest.signal.resultGroup).toBe("eligible");
     expect(body.latest.signal.reviewTier).toBe("eligible");
+    expect(body.latest.signal.isSelectedCurrentRun).toBe(true);
+    expect(body.currentSelection).toMatchObject({
+      selectedRunId: "full-run",
+      selectedSignalId: "signal-latest",
+      selectedTimeframe: "4h",
+      preferredFullUniverse: true,
+      isLikelyFullUniverse: true,
+      fallbackUsed: false,
+    });
     expect(body.scoreBreakdown).toMatchObject({
       rankScore: 82,
       finalSignalScore: 76,
@@ -326,6 +335,85 @@ describe("trade-api symbol research", () => {
       assetClass: "crypto",
       includeNonScanner: false,
       includeMarketContext: false,
+    });
+  });
+
+  it("keeps selected current classification when history includes newer non-preferred rows", async () => {
+    getSymbolResearchLatestSignalPgMock.mockResolvedValue({
+      symbol: makeResearchSymbol("SEIUSDT"),
+      scanRun: makeRun("full-run", {
+        symbolsTotal: 413,
+        symbolsScanned: 409,
+        signalsCreated: 409,
+        params: { assetClass: "crypto", allSymbols: true },
+      }),
+      signal: makeResearchSignal({
+        id: "selected-risk",
+        scanRunId: "full-run",
+        symbol: "SEIUSDT",
+        scanTime: "2026-05-31T18:27:00.000Z",
+        signalLabel: "breakdown_risk",
+        actionBias: "avoid",
+        primaryStructure: "trend_breakdown",
+        rankScore: 20,
+      }),
+    });
+    getSymbolSignalHistoryPgMock.mockResolvedValue([
+      makeResearchSignal({
+        id: "newer-limited",
+        scanRunId: "limited-run",
+        symbol: "SEIUSDT",
+        scanTime: "2026-05-31T20:05:00.000Z",
+        scanRunSymbolsTotal: 25,
+        scanRunSymbolsScanned: 25,
+        scanRunSignalsCreated: 25,
+      }),
+      makeResearchSignal({
+        id: "selected-risk",
+        scanRunId: "full-run",
+        symbol: "SEIUSDT",
+        scanTime: "2026-05-31T18:27:00.000Z",
+        signalLabel: "breakdown_risk",
+        actionBias: "avoid",
+        primaryStructure: "trend_breakdown",
+        rankScore: 20,
+      }),
+    ]);
+    getSymbolLatestSignalsByTimeframesPgMock.mockResolvedValue([
+      makeResearchSignal({
+        id: "newer-limited",
+        scanRunId: "limited-run",
+        symbol: "SEIUSDT",
+        scanTime: "2026-05-31T20:05:00.000Z",
+        scanRunSymbolsTotal: 25,
+        scanRunSymbolsScanned: 25,
+        scanRunSignalsCreated: 25,
+      }),
+    ]);
+
+    const response = await requestTradeApi(
+      "/api/symbol/research?exchange=binance&market=spot&symbol=seiusdt&timeframe=4h",
+    );
+    const body = JSON.parse(response.body);
+
+    expect(response.status).toBe(200);
+    expect(body.latest.signal.id).toBe("selected-risk");
+    expect(body.latest.signal.resultGroup).toBe("risk");
+    expect(body.history[0]).toMatchObject({
+      id: "newer-limited",
+      isSelectedCurrentRun: false,
+      isNewerThanSelectedCurrentRun: true,
+      sourceRunIsLikelyFullUniverse: false,
+    });
+    expect(body.history[1]).toMatchObject({
+      id: "selected-risk",
+      isSelectedCurrentRun: true,
+      isNewerThanSelectedCurrentRun: false,
+    });
+    expect(body.timeframes[0]).toMatchObject({
+      id: "newer-limited",
+      isNewerThanSelectedCurrentRun: true,
+      sourceRunIsLikelyFullUniverse: false,
     });
   });
 
@@ -515,6 +603,12 @@ function makeResearchSignal(
     rankScore: number | null;
     primaryStructure: string | null;
     detectedRiskTypes: unknown[];
+    scanTime: string;
+    signalLabel: string | null;
+    actionBias: string | null;
+    scanRunSymbolsTotal: number | null;
+    scanRunSymbolsScanned: number | null;
+    scanRunSignalsCreated: number | null;
   }> = {},
 ) {
   return {
@@ -525,7 +619,7 @@ function makeResearchSignal(
     market: "spot",
     symbol: overrides.symbol ?? "SEIUSDT",
     timeframe: overrides.timeframe ?? "4h",
-    scanTime: "2026-05-31T00:00:01.000Z",
+    scanTime: overrides.scanTime ?? "2026-05-31T00:00:01.000Z",
     candleOpenTime: "2026-05-30T20:00:00.000Z",
     priceAtSignal: 1.23,
     rankScore: overrides.rankScore ?? 82,
@@ -537,8 +631,8 @@ function makeResearchSignal(
     momentumScore: 64,
     volumeScore: 54,
     structureScore: 80,
-    signalLabel: "confirmed",
-    actionBias: "eligible",
+    signalLabel: overrides.signalLabel ?? "confirmed",
+    actionBias: overrides.actionBias ?? "eligible",
     primaryStructure: overrides.primaryStructure ?? "strong_trend",
     secondaryStructures: [],
     detectedRiskTypes: overrides.detectedRiskTypes ?? [],
@@ -549,6 +643,12 @@ function makeResearchSignal(
     scoringVersion: "test",
     scannerVersion: "test",
     createdAt: "2026-05-31T00:00:02.000Z",
+    scanRunStartedAt: "2026-05-31T00:00:00.000Z",
+    scanRunFinishedAt: "2026-05-31T00:01:00.000Z",
+    scanRunSymbolsTotal: overrides.scanRunSymbolsTotal ?? 413,
+    scanRunSymbolsScanned: overrides.scanRunSymbolsScanned ?? 409,
+    scanRunSignalsCreated: overrides.scanRunSignalsCreated ?? 409,
+    scanRunParams: { assetClass: "crypto", allSymbols: true },
     assetClass: "crypto",
     isScannerEligible: true,
     isBacktestEligible: true,
