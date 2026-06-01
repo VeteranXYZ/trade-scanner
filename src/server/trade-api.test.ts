@@ -16,7 +16,21 @@ const pgScannerResultsStoreMock = vi.hoisted(() =>
 );
 
 vi.mock("@/lib/storage/postgres/scannerResultsPg", () => ({
+  LATEST_SCAN_FULL_UNIVERSE_MIN_SYMBOLS: 300,
   PgScannerResultsStore: pgScannerResultsStoreMock,
+  isLikelyFullUniverseRun: ({
+    run,
+    assetClass,
+    minExpectedSymbols = 300,
+  }: {
+    run: { symbolsTotal: number; symbolsScanned: number; signalsCreated: number };
+    assetClass: string;
+    minExpectedSymbols?: number;
+  }) =>
+    assetClass !== "crypto" ||
+    ((run.symbolsTotal >= minExpectedSymbols ||
+      run.symbolsScanned >= minExpectedSymbols) &&
+      run.signalsCreated >= minExpectedSymbols),
 }));
 
 describe("trade-api CORS", () => {
@@ -87,6 +101,111 @@ describe("trade-api CORS", () => {
       "Content-Type",
     );
     expect(pgScannerResultsStoreMock).not.toHaveBeenCalled();
+  });
+});
+
+describe("trade-api latest scan run selection", () => {
+  beforeEach(() => {
+    getLatestScanRunMock.mockReset();
+    listLatestScanSignalsForRunMock.mockReset();
+    listLatestScanSignalsForRunMock.mockResolvedValue([]);
+    closeMock.mockReset();
+    closeMock.mockResolvedValue(undefined);
+    pgScannerResultsStoreMock.mockClear();
+  });
+
+  it("requests full-universe selection for default crypto scanner latest scans", async () => {
+    getLatestScanRunMock.mockResolvedValue(
+      makeRun("full-run", {
+        symbolsTotal: 413,
+        symbolsScanned: 409,
+        signalsCreated: 409,
+        params: { assetClass: "crypto", allSymbols: true },
+      }),
+    );
+
+    const response = await requestTradeApi(
+      "/api/scan/latest?timeframe=4h&assetClass=crypto&limit=100",
+    );
+    const body = JSON.parse(response.body);
+
+    expect(response.status).toBe(200);
+    expect(body.run.id).toBe("full-run");
+    expect(getLatestScanRunMock).toHaveBeenCalledWith({
+      timeframe: "4h",
+      assetClass: "crypto",
+      preferFullUniverse: true,
+      minExpectedSymbols: 300,
+    });
+    expect(body.summary.latestRunSelection).toEqual({
+      preferredFullUniverse: true,
+      isLikelyFullUniverse: true,
+      minExpectedSymbols: 300,
+      fallbackUsed: false,
+    });
+  });
+
+  it("marks fallback metadata when only a limited crypto run is returned", async () => {
+    getLatestScanRunMock.mockResolvedValue(
+      makeRun("limited-run", {
+        symbolsTotal: 100,
+        symbolsScanned: 96,
+        signalsCreated: 96,
+      }),
+    );
+
+    const response = await requestTradeApi(
+      "/api/scan/latest?timeframe=4h&assetClass=crypto&limit=100",
+    );
+    const body = JSON.parse(response.body);
+
+    expect(response.status).toBe(200);
+    expect(body.run.id).toBe("limited-run");
+    expect(body.summary.latestRunSelection).toEqual({
+      preferredFullUniverse: true,
+      isLikelyFullUniverse: false,
+      minExpectedSymbols: 300,
+      fallbackUsed: true,
+    });
+  });
+
+  it("does not force crypto full-universe selection for non-crypto or includeNonScanner requests", async () => {
+    getLatestScanRunMock.mockResolvedValue(
+      makeRun("small-stable-run", {
+        symbolsTotal: 4,
+        symbolsScanned: 4,
+        signalsCreated: 4,
+      }),
+    );
+
+    const stableResponse = await requestTradeApi(
+      "/api/scan/latest?timeframe=4h&assetClass=stable&limit=100",
+    );
+    const stableBody = JSON.parse(stableResponse.body);
+
+    expect(stableResponse.status).toBe(200);
+    expect(getLatestScanRunMock).toHaveBeenLastCalledWith({
+      timeframe: "4h",
+      assetClass: "stable",
+      preferFullUniverse: false,
+      minExpectedSymbols: 300,
+    });
+    expect(stableBody.summary.latestRunSelection).toMatchObject({
+      preferredFullUniverse: false,
+      isLikelyFullUniverse: true,
+      fallbackUsed: false,
+    });
+
+    await requestTradeApi(
+      "/api/scan/latest?timeframe=4h&assetClass=crypto&includeNonScanner=true&limit=100",
+    );
+
+    expect(getLatestScanRunMock).toHaveBeenLastCalledWith({
+      timeframe: "4h",
+      assetClass: "crypto",
+      preferFullUniverse: false,
+      minExpectedSymbols: 300,
+    });
   });
 });
 
@@ -167,4 +286,33 @@ function createMockResponse() {
 
 function formatHeaderValue(value: number | string | string[]) {
   return Array.isArray(value) ? value.join(", ") : String(value);
+}
+
+function makeRun(
+  id: string,
+  overrides: Partial<{
+    symbolsTotal: number;
+    symbolsScanned: number;
+    signalsCreated: number;
+    params: Record<string, unknown>;
+  }> = {},
+) {
+  return {
+    id,
+    exchange: "binance",
+    market: "spot",
+    mode: "single",
+    timeframe: "4h",
+    universe: "all-symbols",
+    status: "success",
+    symbolsTotal: overrides.symbolsTotal ?? 2,
+    symbolsScanned: overrides.symbolsScanned ?? 2,
+    signalsCreated: overrides.signalsCreated ?? 2,
+    symbolsSkipped: 0,
+    failedSymbols: 0,
+    params: overrides.params ?? {},
+    errorMessage: null,
+    startedAt: "2026-05-31T00:00:00.000Z",
+    finishedAt: "2026-05-31T00:01:00.000Z",
+  };
 }

@@ -9,7 +9,11 @@ import {
 } from "@/lib/market-data/symbolClassification";
 import { buildLatestScanResponse } from "@/lib/scanner/latestScanResponse";
 import { PgMarketDataStore } from "@/lib/storage/postgres/marketDataPg";
-import { PgScannerResultsStore } from "@/lib/storage/postgres/scannerResultsPg";
+import {
+  LATEST_SCAN_FULL_UNIVERSE_MIN_SYMBOLS,
+  PgScannerResultsStore,
+  isLikelyFullUniverseRun,
+} from "@/lib/storage/postgres/scannerResultsPg";
 
 type ServiceCheck = {
   ok: boolean;
@@ -501,9 +505,18 @@ async function handleLatestScan(response: http.ServerResponse, url: URL) {
   }
 
   const store = new PgScannerResultsStore();
+  const preferFullUniverse = shouldPreferFullUniverseLatestRun({
+    assetClass: assetClass.value,
+    includeNonScanner,
+  });
 
   try {
-    const run = await store.getLatestScanRun({ timeframe });
+    const run = await store.getLatestScanRun({
+      timeframe,
+      assetClass: assetClass.value,
+      preferFullUniverse,
+      minExpectedSymbols: LATEST_SCAN_FULL_UNIVERSE_MIN_SYMBOLS,
+    });
 
     if (!run) {
       sendJson(response, 200, {
@@ -535,9 +548,18 @@ async function handleLatestScan(response: http.ServerResponse, url: URL) {
       limit: limit.value,
       includeLowQuality,
     });
+    const latestRunSelection = buildLatestRunSelectionMetadata({
+      run,
+      assetClass: assetClass.value,
+      preferredFullUniverse: preferFullUniverse,
+    });
 
     sendJson(response, 200, {
       ...latestScan,
+      summary: {
+        ...latestScan.summary,
+        latestRunSelection,
+      },
       service: serviceName,
       source: "postgres",
       timeframe,
@@ -555,6 +577,48 @@ async function handleLatestScan(response: http.ServerResponse, url: URL) {
   } finally {
     await store.close().catch(() => undefined);
   }
+}
+
+function shouldPreferFullUniverseLatestRun({
+  assetClass,
+  includeNonScanner,
+}: {
+  assetClass: SymbolAssetClassFilter;
+  includeNonScanner: boolean;
+}) {
+  return assetClass === "crypto" && !includeNonScanner;
+}
+
+function buildLatestRunSelectionMetadata({
+  run,
+  assetClass,
+  preferredFullUniverse,
+}: {
+  run: Awaited<ReturnType<PgScannerResultsStore["getLatestScanRun"]>>;
+  assetClass: SymbolAssetClassFilter;
+  preferredFullUniverse: boolean;
+}) {
+  if (!run) {
+    return {
+      preferredFullUniverse,
+      isLikelyFullUniverse: false,
+      minExpectedSymbols: LATEST_SCAN_FULL_UNIVERSE_MIN_SYMBOLS,
+      fallbackUsed: false,
+    };
+  }
+
+  const isLikelyFullUniverse = isLikelyFullUniverseRun({
+    run,
+    assetClass,
+    minExpectedSymbols: LATEST_SCAN_FULL_UNIVERSE_MIN_SYMBOLS,
+  });
+
+  return {
+    preferredFullUniverse,
+    isLikelyFullUniverse,
+    minExpectedSymbols: LATEST_SCAN_FULL_UNIVERSE_MIN_SYMBOLS,
+    fallbackUsed: preferredFullUniverse && !isLikelyFullUniverse,
+  };
 }
 
 async function handleScanRuns(response: http.ServerResponse, url: URL) {

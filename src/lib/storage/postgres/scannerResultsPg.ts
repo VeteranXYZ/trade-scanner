@@ -9,6 +9,7 @@ import { SCORING_VERSION } from "@/lib/scanner/scoring";
 import { createPostgresPool } from "./pool";
 
 export const PG_SCANNER_VERSION = "pg-scanner-v1";
+export const LATEST_SCAN_FULL_UNIVERSE_MIN_SYMBOLS = 300;
 
 export type ScanRunRecord = {
   id: string;
@@ -71,6 +72,45 @@ export type LatestScanSignalRecord = ScanSignalRecord & {
   candleCount: number;
   firstOpenTime: string | null;
 };
+
+export function isLikelyFullUniverseRun({
+  run,
+  assetClass,
+  minExpectedSymbols = LATEST_SCAN_FULL_UNIVERSE_MIN_SYMBOLS,
+}: {
+  run: ScanRunRecord;
+  assetClass: SymbolAssetClassFilter;
+  minExpectedSymbols?: number;
+}) {
+  if (assetClass !== "crypto") {
+    return true;
+  }
+
+  const paramsAssetClass =
+    typeof run.params.assetClass === "string"
+      ? run.params.assetClass.toLowerCase()
+      : null;
+  const paramsAllSymbols =
+    typeof run.params.allSymbols === "boolean"
+      ? run.params.allSymbols
+      : typeof run.params.allSymbols === "string"
+        ? run.params.allSymbols.toLowerCase() === "true"
+        : null;
+  const hasFullSymbolCount =
+    run.symbolsTotal >= minExpectedSymbols ||
+    run.symbolsScanned >= minExpectedSymbols;
+  const hasFullSignalCount =
+    typeof run.signalsCreated === "number"
+      ? run.signalsCreated >= minExpectedSymbols
+      : true;
+
+  return (
+    hasFullSymbolCount &&
+    hasFullSignalCount &&
+    (paramsAssetClass === null || paramsAssetClass === assetClass) &&
+    (paramsAllSymbols === null || paramsAllSymbols)
+  );
+}
 
 export type CreateScanRunInput = {
   id: string;
@@ -295,7 +335,45 @@ export class PgScannerResultsStore {
     }
   }
 
-  async getLatestScanRun({ timeframe }: { timeframe: string }) {
+  async getLatestScanRun({
+    timeframe,
+    preferFullUniverse = false,
+    assetClass = "all",
+    minExpectedSymbols = LATEST_SCAN_FULL_UNIVERSE_MIN_SYMBOLS,
+  }: {
+    timeframe: string;
+    preferFullUniverse?: boolean;
+    assetClass?: SymbolAssetClassFilter;
+    minExpectedSymbols?: number;
+  }) {
+    if (preferFullUniverse && assetClass === "crypto") {
+      const fullUniverseResult = await this.pool.query<ScanRunRow>(
+        `
+          SELECT *
+          FROM scan_runs
+          WHERE timeframe = $1
+            AND status = 'success'
+            AND (symbols_total >= $2 OR symbols_scanned >= $2)
+            AND (signals_created IS NULL OR signals_created >= $2)
+            AND (
+              NOT (params ? 'assetClass')
+              OR lower(params->>'assetClass') = $3
+            )
+            AND (
+              NOT (params ? 'allSymbols')
+              OR lower(params->>'allSymbols') = 'true'
+            )
+          ORDER BY finished_at DESC NULLS LAST, started_at DESC
+          LIMIT 1
+        `,
+        [timeframe, minExpectedSymbols, assetClass],
+      );
+
+      if (fullUniverseResult.rows[0]) {
+        return toScanRunRecord(fullUniverseResult.rows[0]);
+      }
+    }
+
     const result = await this.pool.query<ScanRunRow>(
       `
         SELECT *

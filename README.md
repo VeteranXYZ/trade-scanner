@@ -145,6 +145,18 @@ Expected: `HTTP 204` and
 open `https://s.bitcoinmind.com/scanner`; the latest scan table should render
 without a browser CORS error.
 
+Verify that the latest public crypto scan is selecting a full scanner universe
+run rather than a small manual/test run:
+
+```bash
+curl 'https://api.auere.com/api/scan/latest?timeframe=4h&assetClass=crypto&limit=100' \
+  | jq '{ok, symbolsTotal: .run.symbolsTotal, scanned: .run.symbolsScanned, signalsCreated: .run.signalsCreated, latestRunSelection: .summary.latestRunSelection}'
+```
+
+Expected `symbolsTotal`, `scanned`, and `signalsCreated` should generally be at
+least `300` for the crypto all-symbol scan. `latestRunSelection.fallbackUsed`
+should be `false` when a full universe run is available.
+
 D1 is not configured in `wrangler.jsonc` for Phase 1. The old migration workflow is intentionally removed.
 
 ### Cloudflare Free Batching

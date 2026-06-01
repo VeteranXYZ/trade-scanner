@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { Pool } from "pg";
-import { PgScannerResultsStore } from "./scannerResultsPg";
+import { PgScannerResultsStore, isLikelyFullUniverseRun } from "./scannerResultsPg";
 
 describe("PgScannerResultsStore latest scan queries", () => {
   it("selects the latest successful run by run metadata", async () => {
@@ -18,6 +18,140 @@ describe("PgScannerResultsStore latest scan queries", () => {
     expect(queries[0]).toContain("status = 'success'");
     expect(queries[0]).toContain("finished_at DESC NULLS LAST");
     expect(queries[0]).not.toMatch(/max\(scan_time\)/i);
+  });
+
+  it("prefers a full crypto universe run over a newer limited run", async () => {
+    const queries: string[] = [];
+    const store = new PgScannerResultsStore(
+      makePool((sql, params) => {
+        queries.push(sql);
+
+        if (queries.length === 1) {
+          expect(params).toEqual(["4h", 300, "crypto"]);
+          return {
+            rows: [
+              makeRunRow("full-run", {
+                symbols_total: 413,
+                symbols_scanned: 409,
+                signals_created: 409,
+                params: { assetClass: "crypto", allSymbols: true },
+              }),
+            ],
+          };
+        }
+
+        return {
+          rows: [
+            makeRunRow("limited-run", {
+              symbols_total: 100,
+              symbols_scanned: 96,
+              signals_created: 96,
+              started_at: "2026-05-31T01:00:00.000Z",
+              finished_at: "2026-05-31T01:01:00.000Z",
+            }),
+          ],
+        };
+      }),
+    );
+
+    const run = await store.getLatestScanRun({
+      timeframe: "4h",
+      assetClass: "crypto",
+      preferFullUniverse: true,
+    });
+
+    expect(run?.id).toBe("full-run");
+    expect(queries).toHaveLength(1);
+    expect(queries[0]).toContain("symbols_total >= $2 OR symbols_scanned >= $2");
+    expect(queries[0]).toContain("signals_created IS NULL OR signals_created >= $2");
+    expect(queries[0]).toContain("params ? 'assetClass'");
+    expect(queries[0]).toContain("params ? 'allSymbols'");
+  });
+
+  it("falls back to the latest successful run when no full crypto run exists", async () => {
+    const queries: string[] = [];
+    const store = new PgScannerResultsStore(
+      makePool(() => {
+        queries.push("");
+
+        if (queries.length === 1) {
+          return { rows: [] };
+        }
+
+        return {
+          rows: [
+            makeRunRow("limited-run", {
+              symbols_total: 100,
+              symbols_scanned: 96,
+              signals_created: 96,
+            }),
+          ],
+        };
+      }),
+    );
+
+    const run = await store.getLatestScanRun({
+      timeframe: "4h",
+      assetClass: "crypto",
+      preferFullUniverse: true,
+    });
+
+    expect(run?.id).toBe("limited-run");
+    expect(queries).toHaveLength(2);
+  });
+
+  it("does not apply crypto full-universe selection to other asset classes", async () => {
+    const queries: string[] = [];
+    const store = new PgScannerResultsStore(
+      makePool((sql) => {
+        queries.push(sql);
+        return { rows: [makeRunRow("stable-run")] };
+      }),
+    );
+
+    const run = await store.getLatestScanRun({
+      timeframe: "4h",
+      assetClass: "stable",
+      preferFullUniverse: true,
+    });
+
+    expect(run?.id).toBe("stable-run");
+    expect(queries).toHaveLength(1);
+    expect(queries[0]).not.toContain("symbols_total >= $2 OR symbols_scanned >= $2");
+  });
+
+  it("marks only sufficiently large crypto scanner runs as likely full universe", () => {
+    expect(
+      isLikelyFullUniverseRun({
+        run: makeRunRecord("full-run", {
+          symbolsTotal: 413,
+          symbolsScanned: 409,
+          signalsCreated: 409,
+          params: { assetClass: "crypto", allSymbols: true },
+        }),
+        assetClass: "crypto",
+      }),
+    ).toBe(true);
+    expect(
+      isLikelyFullUniverseRun({
+        run: makeRunRecord("limited-run", {
+          symbolsTotal: 100,
+          symbolsScanned: 96,
+          signalsCreated: 96,
+        }),
+        assetClass: "crypto",
+      }),
+    ).toBe(false);
+    expect(
+      isLikelyFullUniverseRun({
+        run: makeRunRecord("stable-run", {
+          symbolsTotal: 4,
+          symbolsScanned: 4,
+          signalsCreated: 4,
+        }),
+        assetClass: "stable",
+      }),
+    ).toBe(true);
   });
 
   it("loads all latest signals by scan_run_id instead of max scan_time", async () => {
@@ -70,7 +204,7 @@ function makePool(
   } as unknown as Pool;
 }
 
-function makeRunRow(id: string) {
+function makeRunRow(id: string, overrides: Partial<Record<string, unknown>> = {}) {
   return {
     id,
     exchange: "binance",
@@ -79,15 +213,44 @@ function makeRunRow(id: string) {
     timeframe: "4h",
     universe: "all-symbols",
     status: "success",
-    symbols_total: 2,
-    symbols_scanned: 2,
-    signals_created: 2,
+    symbols_total: overrides.symbols_total ?? 2,
+    symbols_scanned: overrides.symbols_scanned ?? 2,
+    signals_created: overrides.signals_created ?? 2,
     symbols_skipped: 0,
     failed_symbols: 0,
-    params: {},
+    params: overrides.params ?? {},
     error_message: null,
-    started_at: "2026-05-31T00:00:00.000Z",
-    finished_at: "2026-05-31T00:01:00.000Z",
+    started_at: overrides.started_at ?? "2026-05-31T00:00:00.000Z",
+    finished_at: overrides.finished_at ?? "2026-05-31T00:01:00.000Z",
+  };
+}
+
+function makeRunRecord(
+  id: string,
+  overrides: Partial<{
+    symbolsTotal: number;
+    symbolsScanned: number;
+    signalsCreated: number;
+    params: Record<string, unknown>;
+  }> = {},
+) {
+  return {
+    id,
+    exchange: "binance",
+    market: "spot",
+    mode: "single",
+    timeframe: "4h",
+    universe: "all-symbols",
+    status: "success",
+    symbolsTotal: overrides.symbolsTotal ?? 2,
+    symbolsScanned: overrides.symbolsScanned ?? 2,
+    signalsCreated: overrides.signalsCreated ?? 2,
+    symbolsSkipped: 0,
+    failedSymbols: 0,
+    params: overrides.params ?? {},
+    errorMessage: null,
+    startedAt: "2026-05-31T00:00:00.000Z",
+    finishedAt: "2026-05-31T00:01:00.000Z",
   };
 }
 
