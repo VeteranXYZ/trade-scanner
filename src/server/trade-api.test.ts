@@ -5,12 +5,28 @@ import { handleTradeApiRequest } from "./trade-api";
 const getLatestScanRunMock = vi.hoisted(() => vi.fn());
 const listLatestScanSignalsForRunMock = vi.hoisted(() => vi.fn());
 const closeMock = vi.hoisted(() => vi.fn());
+const getSymbolResearchLatestSignalPgMock = vi.hoisted(() => vi.fn());
+const getSymbolSignalHistoryPgMock = vi.hoisted(() => vi.fn());
+const getSymbolLatestSignalsByTimeframesPgMock = vi.hoisted(() => vi.fn());
+const getSymbolCandlesPgMock = vi.hoisted(() => vi.fn());
+const closeSymbolResearchMock = vi.hoisted(() => vi.fn());
 const pgScannerResultsStoreMock = vi.hoisted(() =>
   vi.fn(function PgScannerResultsStore() {
     return {
       getLatestScanRun: getLatestScanRunMock,
       listLatestScanSignalsForRun: listLatestScanSignalsForRunMock,
       close: closeMock,
+    };
+  }),
+);
+const pgSymbolResearchStoreMock = vi.hoisted(() =>
+  vi.fn(function PgSymbolResearchStore() {
+    return {
+      getSymbolResearchLatestSignalPg: getSymbolResearchLatestSignalPgMock,
+      getSymbolSignalHistoryPg: getSymbolSignalHistoryPgMock,
+      getSymbolLatestSignalsByTimeframesPg: getSymbolLatestSignalsByTimeframesPgMock,
+      getSymbolCandlesPg: getSymbolCandlesPgMock,
+      close: closeSymbolResearchMock,
     };
   }),
 );
@@ -33,15 +49,14 @@ vi.mock("@/lib/storage/postgres/scannerResultsPg", () => ({
       run.signalsCreated >= minExpectedSymbols),
 }));
 
+vi.mock("@/lib/storage/postgres/symbolResearchPg", () => ({
+  PgSymbolResearchStore: pgSymbolResearchStoreMock,
+}));
+
 describe("trade-api CORS", () => {
   beforeEach(() => {
-    getLatestScanRunMock.mockReset();
-    getLatestScanRunMock.mockResolvedValue(null);
-    listLatestScanSignalsForRunMock.mockReset();
-    listLatestScanSignalsForRunMock.mockResolvedValue([]);
-    closeMock.mockReset();
-    closeMock.mockResolvedValue(undefined);
-    pgScannerResultsStoreMock.mockClear();
+    resetScannerMocks();
+    resetSymbolResearchMocks();
   });
 
   it("allows the production scanner origin on latest-scan GET requests", async () => {
@@ -102,16 +117,31 @@ describe("trade-api CORS", () => {
     );
     expect(pgScannerResultsStoreMock).not.toHaveBeenCalled();
   });
+
+  it("returns symbol research preflight responses without hitting Postgres", async () => {
+    const response = await requestTradeApi(
+      "/api/symbol/research?exchange=binance&market=spot&symbol=SEIUSDT&timeframe=4h",
+      {
+        method: "OPTIONS",
+        headers: {
+          Origin: "https://s.bitcoinmind.com",
+          "Access-Control-Request-Method": "GET",
+        },
+      },
+    );
+
+    expect(response.status).toBe(204);
+    expect(response.headers.get("access-control-allow-origin")).toBe(
+      "https://s.bitcoinmind.com",
+    );
+    expect(pgSymbolResearchStoreMock).not.toHaveBeenCalled();
+  });
 });
 
 describe("trade-api latest scan run selection", () => {
   beforeEach(() => {
-    getLatestScanRunMock.mockReset();
-    listLatestScanSignalsForRunMock.mockReset();
-    listLatestScanSignalsForRunMock.mockResolvedValue([]);
-    closeMock.mockReset();
-    closeMock.mockResolvedValue(undefined);
-    pgScannerResultsStoreMock.mockClear();
+    resetScannerMocks();
+    resetSymbolResearchMocks();
   });
 
   it("requests full-universe selection for default crypto scanner latest scans", async () => {
@@ -209,6 +239,116 @@ describe("trade-api latest scan run selection", () => {
   });
 });
 
+describe("trade-api symbol research", () => {
+  beforeEach(() => {
+    resetScannerMocks();
+    resetSymbolResearchMocks();
+  });
+
+  it("requires a symbol", async () => {
+    const response = await requestTradeApi("/api/symbol/research?timeframe=4h");
+    const body = JSON.parse(response.body);
+
+    expect(response.status).toBe(400);
+    expect(body.error).toBe("SYMBOL_REQUIRED");
+    expect(pgSymbolResearchStoreMock).not.toHaveBeenCalled();
+  });
+
+  it("rejects invalid timeframes", async () => {
+    const response = await requestTradeApi(
+      "/api/symbol/research?symbol=SEIUSDT&timeframe=4h;drop",
+    );
+    const body = JSON.parse(response.body);
+
+    expect(response.status).toBe(400);
+    expect(body.error).toBe("INVALID_TIMEFRAME");
+    expect(pgSymbolResearchStoreMock).not.toHaveBeenCalled();
+  });
+
+  it("returns a stable research response shape", async () => {
+    getSymbolResearchLatestSignalPgMock.mockResolvedValue({
+      symbol: makeResearchSymbol("SEIUSDT"),
+      scanRun: makeRun("full-run", {
+        symbolsTotal: 413,
+        symbolsScanned: 409,
+        signalsCreated: 409,
+      }),
+      signal: makeResearchSignal({ id: "signal-latest", symbol: "SEIUSDT" }),
+    });
+    getSymbolSignalHistoryPgMock.mockResolvedValue([
+      makeResearchSignal({ id: "signal-history", symbol: "SEIUSDT" }),
+    ]);
+    getSymbolLatestSignalsByTimeframesPgMock.mockResolvedValue([
+      makeResearchSignal({ id: "signal-4h", symbol: "SEIUSDT", timeframe: "4h" }),
+      makeResearchSignal({ id: "signal-1d", symbol: "SEIUSDT", timeframe: "1d" }),
+    ]);
+    getSymbolCandlesPgMock.mockResolvedValue([
+      makeResearchCandle({ openTime: 1000, close: 1.1 }),
+      makeResearchCandle({ openTime: 2000, close: 1.2 }),
+    ]);
+
+    const response = await requestTradeApi(
+      "/api/symbol/research?exchange=binance&market=spot&symbol=seiusdt&timeframe=4h",
+    );
+    const body = JSON.parse(response.body);
+
+    expect(response.status).toBe(200);
+    expect(body.ok).toBe(true);
+    expect(body.service).toBe("trade-api");
+    expect(body.source).toBe("postgres");
+    expect(body.symbol.symbol).toBe("SEIUSDT");
+    expect(body.latest.scanRun.id).toBe("full-run");
+    expect(body.latest.signal.resultGroup).toBe("eligible");
+    expect(body.latest.signal.reviewTier).toBe("eligible");
+    expect(body.scoreBreakdown).toMatchObject({
+      rankScore: 82,
+      finalSignalScore: 76,
+      opportunityScore: 74,
+    });
+    expect(body.interpretation).toMatchObject({
+      group: "eligible",
+      action: "Manual review",
+      setupType: "Strong Trend",
+    });
+    expect(body.history).toHaveLength(1);
+    expect(body.timeframes).toHaveLength(2);
+    expect(body.candles).toMatchObject({
+      timeframe: "4h",
+      count: 2,
+      firstOpenTime: "1970-01-01T00:00:01.000Z",
+      lastOpenTime: "1970-01-01T00:00:02.000Z",
+    });
+    expect(getSymbolResearchLatestSignalPgMock).toHaveBeenCalledWith({
+      exchange: "binance",
+      market: "spot",
+      symbol: "SEIUSDT",
+      timeframe: "4h",
+      assetClass: "crypto",
+      includeNonScanner: false,
+      includeMarketContext: false,
+    });
+  });
+
+  it("returns NO_LATEST_SIGNAL when the selected run has no signal for the symbol", async () => {
+    getSymbolResearchLatestSignalPgMock.mockResolvedValue({
+      symbol: makeResearchSymbol("SEIUSDT"),
+      scanRun: makeRun("full-run"),
+      signal: null,
+    });
+
+    const response = await requestTradeApi(
+      "/api/symbol/research?symbol=SEIUSDT&timeframe=4h",
+    );
+    const body = JSON.parse(response.body);
+
+    expect(response.status).toBe(404);
+    expect(body.error).toBe("NO_LATEST_SIGNAL");
+    expect(body.latest.signal).toBeNull();
+    expect(getSymbolSignalHistoryPgMock).not.toHaveBeenCalled();
+    expect(getSymbolCandlesPgMock).not.toHaveBeenCalled();
+  });
+});
+
 async function requestTradeApi(
   path: string,
   init: { method?: string; headers?: Record<string, string> } = {},
@@ -288,6 +428,34 @@ function formatHeaderValue(value: number | string | string[]) {
   return Array.isArray(value) ? value.join(", ") : String(value);
 }
 
+function resetScannerMocks() {
+  getLatestScanRunMock.mockReset();
+  getLatestScanRunMock.mockResolvedValue(null);
+  listLatestScanSignalsForRunMock.mockReset();
+  listLatestScanSignalsForRunMock.mockResolvedValue([]);
+  closeMock.mockReset();
+  closeMock.mockResolvedValue(undefined);
+  pgScannerResultsStoreMock.mockClear();
+}
+
+function resetSymbolResearchMocks() {
+  getSymbolResearchLatestSignalPgMock.mockReset();
+  getSymbolResearchLatestSignalPgMock.mockResolvedValue({
+    symbol: null,
+    scanRun: null,
+    signal: null,
+  });
+  getSymbolSignalHistoryPgMock.mockReset();
+  getSymbolSignalHistoryPgMock.mockResolvedValue([]);
+  getSymbolLatestSignalsByTimeframesPgMock.mockReset();
+  getSymbolLatestSignalsByTimeframesPgMock.mockResolvedValue([]);
+  getSymbolCandlesPgMock.mockReset();
+  getSymbolCandlesPgMock.mockResolvedValue([]);
+  closeSymbolResearchMock.mockReset();
+  closeSymbolResearchMock.mockResolvedValue(undefined);
+  pgSymbolResearchStoreMock.mockClear();
+}
+
 function makeRun(
   id: string,
   overrides: Partial<{
@@ -314,5 +482,103 @@ function makeRun(
     errorMessage: null,
     startedAt: "2026-05-31T00:00:00.000Z",
     finishedAt: "2026-05-31T00:01:00.000Z",
+  };
+}
+
+function makeResearchSymbol(symbol: string) {
+  return {
+    id: 1,
+    exchange: "binance",
+    market: "spot",
+    symbol,
+    baseAsset: symbol.replace(/USDT$/, ""),
+    quoteAsset: "USDT",
+    status: "TRADING",
+    quoteVolume: 1000000,
+    priceChangePercent: 1.2,
+    isEnabled: true,
+    assetClass: "crypto",
+    isScannerEligible: true,
+    isBacktestEligible: true,
+    isMarketContext: false,
+    metadata: {},
+    updatedAt: "2026-05-31T00:00:00.000Z",
+  };
+}
+
+function makeResearchSignal(
+  overrides: Partial<{
+    id: string;
+    scanRunId: string;
+    symbol: string;
+    timeframe: string;
+    rankScore: number | null;
+    primaryStructure: string | null;
+    detectedRiskTypes: unknown[];
+  }> = {},
+) {
+  return {
+    id: overrides.id ?? "signal-1",
+    scanRunId: overrides.scanRunId ?? "full-run",
+    symbolId: 1,
+    exchange: "binance",
+    market: "spot",
+    symbol: overrides.symbol ?? "SEIUSDT",
+    timeframe: overrides.timeframe ?? "4h",
+    scanTime: "2026-05-31T00:00:01.000Z",
+    candleOpenTime: "2026-05-30T20:00:00.000Z",
+    priceAtSignal: 1.23,
+    rankScore: overrides.rankScore ?? 82,
+    finalSignalScore: 76,
+    opportunityScore: 74,
+    confirmationScore: 68,
+    riskScore: 14,
+    trendScore: 72,
+    momentumScore: 64,
+    volumeScore: 54,
+    structureScore: 80,
+    signalLabel: "confirmed",
+    actionBias: "eligible",
+    primaryStructure: overrides.primaryStructure ?? "strong_trend",
+    secondaryStructures: [],
+    detectedRiskTypes: overrides.detectedRiskTypes ?? [],
+    factors: {},
+    nextConfirmation: ["Hold above latest range"],
+    invalidation: ["Loses recent support"],
+    rawMetrics: {},
+    scoringVersion: "test",
+    scannerVersion: "test",
+    createdAt: "2026-05-31T00:00:02.000Z",
+    assetClass: "crypto",
+    isScannerEligible: true,
+    isBacktestEligible: true,
+    isMarketContext: false,
+    candleCount: 1000,
+    firstOpenTime: "2024-01-01T00:00:00.000Z",
+  };
+}
+
+function makeResearchCandle({
+  openTime,
+  close,
+}: {
+  openTime: number;
+  close: number;
+}) {
+  return {
+    id: openTime,
+    symbolId: 1,
+    exchange: "binance",
+    market: "spot",
+    symbol: "SEIUSDT",
+    timeframe: "4h",
+    openTime,
+    closeTime: openTime + 1000,
+    open: close - 0.1,
+    high: close + 0.2,
+    low: close - 0.2,
+    close,
+    volume: 100,
+    quoteVolume: 150,
   };
 }

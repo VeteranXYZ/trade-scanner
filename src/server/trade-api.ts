@@ -4,16 +4,27 @@ import path from "node:path";
 import { Pool } from "pg";
 import Redis from "ioredis";
 import {
+  getSymbolQuality,
   isSymbolAssetClassFilter,
   type SymbolAssetClassFilter,
 } from "@/lib/market-data/symbolClassification";
 import { buildLatestScanResponse } from "@/lib/scanner/latestScanResponse";
+import {
+  classifyScanResultGroup,
+  getScanResultReview,
+  type ScanResultGroup,
+} from "@/lib/scanner/scanResultGroups";
 import { PgMarketDataStore } from "@/lib/storage/postgres/marketDataPg";
 import {
   LATEST_SCAN_FULL_UNIVERSE_MIN_SYMBOLS,
   PgScannerResultsStore,
   isLikelyFullUniverseRun,
 } from "@/lib/storage/postgres/scannerResultsPg";
+import {
+  PgSymbolResearchStore,
+  type SymbolResearchCandleRecord,
+  type SymbolResearchSignalRecord,
+} from "@/lib/storage/postgres/symbolResearchPg";
 
 type ServiceCheck = {
   ok: boolean;
@@ -100,6 +111,11 @@ export async function handleTradeApiRequest(
 
     if (url.pathname === "/api/candles") {
       await handleCandles(response, url);
+      return;
+    }
+
+    if (url.pathname === "/api/symbol/research") {
+      await handleSymbolResearch(response, url);
       return;
     }
 
@@ -341,6 +357,213 @@ async function handleCandles(response: http.ServerResponse, url: URL) {
       service: serviceName,
       source: "postgres",
       error: sanitizeConnectionError(error, "POSTGRES_UNAVAILABLE"),
+    });
+  } finally {
+    await store.close().catch(() => undefined);
+  }
+}
+
+async function handleSymbolResearch(response: http.ServerResponse, url: URL) {
+  const exchange = normalizeIdentityParam(
+    url.searchParams.get("exchange"),
+    "binance",
+  );
+  const market = normalizeIdentityParam(url.searchParams.get("market"), "spot");
+  const symbolInput = url.searchParams.get("symbol")?.trim() ?? "";
+  const symbol = symbolInput.toUpperCase();
+  const timeframe = url.searchParams.get("timeframe")?.trim() ?? "4h";
+  const assetClass = parseAssetClassParam(url.searchParams.get("assetClass"));
+  const includeNonScanner = parseBooleanParam(url.searchParams.get("includeNonScanner"));
+  const includeMarketContext = parseBooleanParam(
+    url.searchParams.get("includeMarketContext"),
+  );
+  const includeCandles =
+    url.searchParams.get("includeCandles") === null
+      ? true
+      : parseBooleanParam(url.searchParams.get("includeCandles"));
+  const historyLimit = parseBoundedInteger({
+    value: url.searchParams.get("historyLimit"),
+    fallback: 30,
+    min: 1,
+    max: 100,
+    name: "limit",
+  });
+  const candleLimit = parseBoundedInteger({
+    value: url.searchParams.get("candleLimit"),
+    fallback: 120,
+    min: 1,
+    max: 500,
+    name: "limit",
+  });
+
+  if (!symbol || !/^[A-Z0-9]{2,30}$/.test(symbol)) {
+    sendJson(response, 400, {
+      ok: false,
+      service: serviceName,
+      error: "SYMBOL_REQUIRED",
+    });
+    return;
+  }
+
+  if (
+    !exchange ||
+    !market ||
+    !/^[a-z0-9_-]{1,30}$/.test(exchange) ||
+    !/^[a-z0-9_-]{1,30}$/.test(market)
+  ) {
+    sendJson(response, 404, {
+      ok: false,
+      service: serviceName,
+      error: "SYMBOL_NOT_FOUND",
+    });
+    return;
+  }
+
+  if (!/^[A-Za-z0-9]{1,8}$/.test(timeframe)) {
+    sendJson(response, 400, {
+      ok: false,
+      service: serviceName,
+      error: "INVALID_TIMEFRAME",
+    });
+    return;
+  }
+
+  if (!assetClass.valid) {
+    sendJson(response, 400, {
+      ok: false,
+      service: serviceName,
+      error: "INVALID_ASSET_CLASS",
+    });
+    return;
+  }
+
+  if (!historyLimit.valid) {
+    sendJson(response, 400, {
+      ok: false,
+      service: serviceName,
+      error: historyLimit.error,
+    });
+    return;
+  }
+
+  if (!candleLimit.valid) {
+    sendJson(response, 400, {
+      ok: false,
+      service: serviceName,
+      error: candleLimit.error,
+    });
+    return;
+  }
+
+  const store = new PgSymbolResearchStore();
+
+  try {
+    const latest = await store.getSymbolResearchLatestSignalPg({
+      exchange,
+      market,
+      symbol,
+      timeframe,
+      assetClass: assetClass.value,
+      includeNonScanner,
+      includeMarketContext,
+    });
+
+    if (!latest.symbol) {
+      sendJson(response, 404, {
+        ok: false,
+        service: serviceName,
+        source: "postgres",
+        error: "SYMBOL_NOT_FOUND",
+      });
+      return;
+    }
+
+    if (!latest.signal) {
+      sendJson(response, 404, {
+        ok: false,
+        service: serviceName,
+        source: "postgres",
+        error: "NO_LATEST_SIGNAL",
+        symbol: {
+          exchange: latest.symbol.exchange,
+          market: latest.symbol.market,
+          symbol: latest.symbol.symbol,
+          assetClass: latest.symbol.assetClass,
+        },
+        latest: {
+          scanRun: latest.scanRun,
+          signal: null,
+        },
+      });
+      return;
+    }
+
+    const [historySignals, timeframeSignals, candles] = await Promise.all([
+      store.getSymbolSignalHistoryPg({
+        exchange,
+        market,
+        symbol,
+        timeframe,
+        historyLimit: historyLimit.value,
+        assetClass: assetClass.value,
+        includeNonScanner,
+        includeMarketContext,
+      }),
+      store.getSymbolLatestSignalsByTimeframesPg({
+        exchange,
+        market,
+        symbol,
+        timeframes: ["4h", "1d", "1w", "1M"],
+        assetClass: assetClass.value,
+        includeNonScanner,
+        includeMarketContext,
+      }),
+      includeCandles
+        ? store.getSymbolCandlesPg({
+            exchange,
+            market,
+            symbol,
+            timeframe,
+            candleLimit: candleLimit.value,
+          })
+        : Promise.resolve([]),
+    ]);
+    const latestSignal = enrichSymbolResearchSignal(latest.signal);
+    const quality = getSymbolQuality(latest.symbol.symbol, {
+      assetClass: latest.symbol.assetClass,
+      candleCount: latestSignal.candleCount,
+      firstOpenTime: latestSignal.firstOpenTime,
+    });
+
+    sendJson(response, 200, {
+      ok: true,
+      service: serviceName,
+      source: "postgres",
+      symbol: {
+        exchange: latest.symbol.exchange,
+        market: latest.symbol.market,
+        symbol: latest.symbol.symbol,
+        assetClass: latest.symbol.assetClass,
+        qualityTier: quality.qualityTier,
+        isLowQuality: quality.isLowQuality,
+        qualityFlags: quality.qualityFlags,
+      },
+      latest: {
+        scanRun: latest.scanRun,
+        signal: latestSignal,
+      },
+      scoreBreakdown: buildSymbolResearchScoreBreakdown(latestSignal),
+      interpretation: buildSymbolResearchInterpretation(latestSignal),
+      history: historySignals.map(enrichSymbolResearchSignal),
+      timeframes: timeframeSignals.map(enrichSymbolResearchSignal),
+      candles: buildSymbolResearchCandlesPayload({ timeframe, candles }),
+    });
+  } catch {
+    sendJson(response, 503, {
+      ok: false,
+      service: serviceName,
+      source: "postgres",
+      error: "INTERNAL_ERROR",
     });
   } finally {
     await store.close().catch(() => undefined);
@@ -619,6 +842,123 @@ function buildLatestRunSelectionMetadata({
     minExpectedSymbols: LATEST_SCAN_FULL_UNIVERSE_MIN_SYMBOLS,
     fallbackUsed: preferredFullUniverse && !isLikelyFullUniverse,
   };
+}
+
+type EnrichedSymbolResearchSignal = SymbolResearchSignalRecord & {
+  resultGroup: ScanResultGroup;
+} & ReturnType<typeof getScanResultReview>;
+
+function enrichSymbolResearchSignal(
+  signal: SymbolResearchSignalRecord,
+): EnrichedSymbolResearchSignal {
+  const resultGroup = classifyScanResultGroup(signal);
+  const review = getScanResultReview({ ...signal, resultGroup });
+
+  return {
+    ...signal,
+    resultGroup,
+    ...review,
+  };
+}
+
+function buildSymbolResearchScoreBreakdown(signal: SymbolResearchSignalRecord) {
+  return {
+    rankScore: signal.rankScore,
+    finalSignalScore: signal.finalSignalScore,
+    opportunityScore: signal.opportunityScore,
+    confirmationScore: signal.confirmationScore,
+    riskScore: signal.riskScore,
+    trendScore: signal.trendScore,
+    momentumScore: signal.momentumScore,
+    volumeScore: signal.volumeScore,
+    structureScore: signal.structureScore,
+  };
+}
+
+function buildSymbolResearchInterpretation(signal: EnrichedSymbolResearchSignal) {
+  return {
+    group: signal.resultGroup,
+    label: toReadableLabel(signal.signalLabel),
+    action: getSymbolResearchActionLabel(signal),
+    setupType: toReadableLabel(signal.primaryStructure),
+    statusNote: signal.statusNote,
+    reasons: signal.statusReasons,
+    nextConfirmation: signal.nextConfirmation,
+    invalidation: signal.invalidation,
+  };
+}
+
+function getSymbolResearchActionLabel(signal: EnrichedSymbolResearchSignal) {
+  if (signal.resultGroup === "eligible") {
+    return "Manual review";
+  }
+
+  if (signal.resultGroup === "watch") {
+    if (signal.reviewTier === "watch_caution") {
+      return "Caution review";
+    }
+
+    if (signal.reviewTier === "watch_low") {
+      return "Low priority review";
+    }
+
+    return "Review only";
+  }
+
+  if (signal.resultGroup === "overheated") {
+    return "Do not chase";
+  }
+
+  if (signal.resultGroup === "risk") {
+    return "Avoid or wait for repair";
+  }
+
+  if (signal.resultGroup === "insufficient_history") {
+    return "Not enough candles";
+  }
+
+  return "No clear edge";
+}
+
+function buildSymbolResearchCandlesPayload({
+  timeframe,
+  candles,
+}: {
+  timeframe: string;
+  candles: SymbolResearchCandleRecord[];
+}) {
+  const first = candles[0] ?? null;
+  const last = candles[candles.length - 1] ?? null;
+
+  return {
+    timeframe,
+    count: candles.length,
+    firstOpenTime: first ? toIsoTime(first.openTime) : null,
+    lastOpenTime: last ? toIsoTime(last.openTime) : null,
+    rows: candles,
+  };
+}
+
+function toIsoTime(value: number) {
+  const date = new Date(value);
+
+  return Number.isNaN(date.getTime()) ? null : date.toISOString();
+}
+
+function normalizeIdentityParam(value: string | null, fallback: string) {
+  return (value?.trim() || fallback).toLowerCase();
+}
+
+function toReadableLabel(value: string | null | undefined) {
+  if (!value) {
+    return "Unknown";
+  }
+
+  return value
+    .split(/[_\s-]+/)
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1).toLowerCase())
+    .join(" ");
 }
 
 async function handleScanRuns(response: http.ServerResponse, url: URL) {

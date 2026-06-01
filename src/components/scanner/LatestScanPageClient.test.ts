@@ -3,6 +3,7 @@ import {
   buildLimitedViewWarning,
   buildLatestRunSummaryText,
   buildLatestScanUrl,
+  buildSymbolResearchPath,
   shouldShowIncompleteCryptoUniverseWarning,
 } from "./LatestScanPageClient";
 
@@ -53,6 +54,28 @@ describe("latest scan API URL builder", () => {
     });
 
     expect(url).toContain("limit=100");
+  });
+});
+
+describe("scanner symbol research links", () => {
+  it("builds a safe symbol detail path with timeframe", () => {
+    expect(
+      buildSymbolResearchPath({
+        exchange: "binance",
+        symbol: "seiusdt",
+        timeframe: "4h",
+      }),
+    ).toBe("/symbol/binance/SEIUSDT?timeframe=4h");
+  });
+
+  it("encodes exchange and symbol path segments", () => {
+    expect(
+      buildSymbolResearchPath({
+        exchange: "binance spot",
+        symbol: "sei/usdt",
+        timeframe: "1d",
+      }),
+    ).toBe("/symbol/binance%20spot/SEI%2FUSDT?timeframe=1d");
   });
 });
 

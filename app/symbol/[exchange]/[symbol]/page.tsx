@@ -1,4 +1,4 @@
-import { SymbolPageClient } from "@/components/symbol/SymbolPageClient";
+import { SymbolResearchPageClient } from "@/components/symbol/SymbolResearchPageClient";
 import type { Exchange } from "@/lib/shared/timeframes";
 
 type SymbolPageProps = {
@@ -11,5 +11,7 @@ type SymbolPageProps = {
 export default async function SymbolPage({ params }: SymbolPageProps) {
   const { exchange, symbol } = await params;
 
-  return <SymbolPageClient exchange={exchange} symbol={symbol.toUpperCase()} />;
+  return (
+    <SymbolResearchPageClient exchange={exchange} symbol={symbol.toUpperCase()} />
+  );
 }

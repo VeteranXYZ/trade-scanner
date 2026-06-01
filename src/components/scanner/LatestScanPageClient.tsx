@@ -1,6 +1,7 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
+import Link from "next/link";
 import { Fragment, useMemo, useState, type ReactNode } from "react";
 import {
   formatDateTime,
@@ -70,6 +71,8 @@ type LatestScanSummary = {
 type LatestScanItem = {
   id: string;
   scanRunId: string;
+  exchange?: string | null;
+  market?: string | null;
   symbol: string;
   timeframe: string;
   resultGroup?: string | null;
@@ -588,7 +591,16 @@ function LatestScanRow({
       }
     >
       <td className="px-2 py-1.5 font-semibold text-[var(--foreground)]">
-        {item.symbol}
+        <Link
+          className="text-[var(--info)] underline-offset-2 hover:underline"
+          href={buildSymbolResearchPath({
+            exchange: item.exchange ?? "binance",
+            symbol: item.symbol,
+            timeframe: item.timeframe,
+          })}
+        >
+          {item.symbol}
+        </Link>
       </td>
       <td className="px-2 py-1.5 font-mono tabular-nums">
         {formatScore(item.rankScore)}
@@ -897,6 +909,22 @@ export function buildLatestScanUrl({
   }
 
   return `${getTradeApiBaseUrl(tradeApiBaseUrl)}/api/scan/latest?${params.toString()}`;
+}
+
+export function buildSymbolResearchPath({
+  exchange,
+  symbol,
+  timeframe,
+}: {
+  exchange: string | null | undefined;
+  symbol: string;
+  timeframe: string;
+}) {
+  const params = new URLSearchParams({ timeframe });
+
+  return `/symbol/${encodeURIComponent(exchange || "binance")}/${encodeURIComponent(
+    symbol.toUpperCase(),
+  )}?${params.toString()}`;
 }
 
 export function buildLatestRunSummaryText({
