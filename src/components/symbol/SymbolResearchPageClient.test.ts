@@ -227,6 +227,8 @@ describe("SymbolResearchPageClient unavailable state", () => {
           timeframe: "1w",
           candleCount: 145,
           requiredCandles: 200,
+          firstOpenTime: "2023-08-14T00:00:00.000Z",
+          lastOpenTime: "2026-05-25T00:00:00.000Z",
         },
       },
     });
@@ -240,8 +242,8 @@ describe("SymbolResearchPageClient unavailable state", () => {
 
     expect(html).toContain("Timeframe unavailable for this symbol");
     expect(html).toContain("No 1w scanner signal for SEIUSDT");
-    expect(html).toContain("145 / 200");
-    expect(html).toContain("Success full-universe run, scanned 192 / 413, skipped 221");
+    expect(html).toContain("145 / 200 required");
+    expect(html).toContain("1w full-universe run, success, scanned 192 / 413, skipped 221");
     expect(html).toContain("Use 4h or 1d for SEIUSDT.");
     expect(html).toContain("Try older symbols such as BTCUSDT or ETHUSDT for 1w research.");
     expect(html).toContain("Back to Scanner");

@@ -11,6 +11,9 @@ import {
   formatSymbolResearchRunContext,
   formatSymbolResearchScore,
   formatSymbolResearchSetup,
+  formatSymbolResearchUnavailableCoverage,
+  formatSymbolResearchUnavailableReason,
+  formatSymbolResearchUnavailableSelectedRun,
   getSymbolResearchTimeframeSnapshots,
   getTimeframeSnapshotNote,
   getTimeframeSnapshotTitle,
@@ -226,10 +229,10 @@ describe("symbol research UI helpers", () => {
       expect.arrayContaining([
         { label: "Symbol", value: "SEIUSDT" },
         { label: "Timeframe", value: "1w" },
-        { label: "Candles", value: "145 / 200" },
+        { label: "Candles", value: "145 / 200 required" },
         {
           label: "Selected Run",
-          value: "Success full-universe run, scanned 192 / 413, skipped 221",
+          value: "1w full-universe run, success, scanned 192 / 413, skipped 221",
         },
         { label: "Signals Created", value: "192" },
       ]),
@@ -244,7 +247,7 @@ describe("symbol research UI helpers", () => {
     const content = buildSymbolResearchUnavailableContent({
       symbol: "ABCUSDT",
       timeframe: "1d",
-      unavailableReason: "no_signal",
+      unavailableReason: "not_in_selected_run",
       selectedRun: {
         status: "success",
         symbolsTotal: 413,
@@ -265,6 +268,33 @@ describe("symbol research UI helpers", () => {
     expect(content.message).toBe(
       "No scanner signal is available for this symbol/timeframe from the selected latest run.",
     );
+  });
+
+  it("formats unavailable reason, selected run, and candle coverage directly", () => {
+    expect(formatSymbolResearchUnavailableReason("insufficient_history")).toEqual({
+      code: "insufficient_history",
+      label: "Insufficient history",
+    });
+    expect(formatSymbolResearchUnavailableReason("not_in_selected_run")).toEqual({
+      code: "not_in_selected_run",
+      label: "Not in selected run",
+    });
+    expect(
+      formatSymbolResearchUnavailableSelectedRun({
+        timeframe: "1w",
+        status: "success",
+        symbolsTotal: 413,
+        symbolsScanned: 192,
+        symbolsSkipped: 221,
+        isLikelyFullUniverse: true,
+      }),
+    ).toBe("1w full-universe run, success, scanned 192 / 413, skipped 221");
+    expect(
+      formatSymbolResearchUnavailableCoverage({
+        candleCount: 145,
+        requiredCandles: 200,
+      }),
+    ).toBe("145 / 200 required");
   });
 
   it("avoids multi-timeframe wording when only one snapshot exists", () => {

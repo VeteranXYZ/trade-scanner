@@ -295,8 +295,7 @@ describe("PgSymbolResearchStore", () => {
             {
               candle_count: "145",
               first_open_time: "2023-08-14T00:00:00.000Z",
-              latest_open_time: "2026-05-25T00:00:00.000Z",
-              latest_close_time: "2026-05-31T23:59:59.999Z",
+              last_open_time: "2026-05-25T00:00:00.000Z",
             },
           ],
         };
@@ -311,11 +310,13 @@ describe("PgSymbolResearchStore", () => {
     });
 
     expect(coverage).toEqual({
+      exchange: "binance",
+      market: "spot",
+      symbol: "SEIUSDT",
       timeframe: "1w",
       candleCount: 145,
       firstOpenTime: "2023-08-14T00:00:00.000Z",
-      latestOpenTime: "2026-05-25T00:00:00.000Z",
-      latestCloseTime: "2026-05-31T23:59:59.999Z",
+      lastOpenTime: "2026-05-25T00:00:00.000Z",
     });
     expect(paramsList[0]).toEqual(["binance", "spot", "SEIUSDT", "1w"]);
     expect(queries[0]).toContain("COUNT(*) AS candle_count");

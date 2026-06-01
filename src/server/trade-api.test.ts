@@ -563,6 +563,12 @@ describe("trade-api symbol research", () => {
       scanRun: makeRun("full-run"),
       signal: null,
     });
+    getSymbolCandleCoveragePgMock.mockResolvedValue({
+      timeframe: "4h",
+      candleCount: 250,
+      firstOpenTime: "2026-01-01T00:00:00.000Z",
+      lastOpenTime: "2026-05-31T20:00:00.000Z",
+    });
 
     const response = await requestTradeApi(
       "/api/symbol/research?symbol=SEIUSDT&timeframe=4h",
@@ -571,7 +577,15 @@ describe("trade-api symbol research", () => {
 
     expect(response.status).toBe(404);
     expect(body.error).toBe("NO_LATEST_SIGNAL");
+    expect(body.errorCode).toBe("NO_LATEST_SIGNAL");
+    expect(body.unavailableReason).toBe("not_in_selected_run");
     expect(body.latest.signal).toBeNull();
+    expect(body.symbolCoverage).toMatchObject({
+      timeframe: "4h",
+      candleCount: 250,
+      requiredCandles: 200,
+      lastOpenTime: "2026-05-31T20:00:00.000Z",
+    });
     expect(getSymbolSignalHistoryPgMock).not.toHaveBeenCalled();
     expect(getSymbolCandlesPgMock).not.toHaveBeenCalled();
   });
@@ -593,8 +607,7 @@ describe("trade-api symbol research", () => {
       timeframe: "1w",
       candleCount: 145,
       firstOpenTime: "2023-08-14T00:00:00.000Z",
-      latestOpenTime: "2026-05-25T00:00:00.000Z",
-      latestCloseTime: "2026-05-31T23:59:59.999Z",
+      lastOpenTime: "2026-05-25T00:00:00.000Z",
     });
 
     const response = await requestTradeApi(
@@ -608,8 +621,9 @@ describe("trade-api symbol research", () => {
       error: "NO_LATEST_SIGNAL",
       errorCode: "NO_LATEST_SIGNAL",
       unavailableReason: "insufficient_history",
+      timeframe: "1w",
       message:
-        "No 1w scanner signal for SEIUSDT. The latest full-universe 1w scan ran successfully, but SEIUSDT was skipped because it has only 145 weekly candles. The scanner currently requires 200 candles.",
+        "No 1w scanner signal for SEIUSDT. The latest full-universe 1w scan ran successfully and skipped 221 symbols, and SEIUSDT was skipped because it has only 145 weekly candles. The scanner currently requires 200 candles.",
       selectedRun: {
         id: "full-1w",
         timeframe: "1w",
@@ -624,6 +638,8 @@ describe("trade-api symbol research", () => {
         timeframe: "1w",
         candleCount: 145,
         requiredCandles: 200,
+        firstOpenTime: "2023-08-14T00:00:00.000Z",
+        lastOpenTime: "2026-05-25T00:00:00.000Z",
       },
     });
     expect(getSymbolCandleCoveragePgMock).toHaveBeenCalledWith({
@@ -744,8 +760,7 @@ function resetSymbolResearchMocks() {
     timeframe: "4h",
     candleCount: 0,
     firstOpenTime: null,
-    latestOpenTime: null,
-    latestCloseTime: null,
+    lastOpenTime: null,
   });
   closeSymbolResearchMock.mockReset();
   closeSymbolResearchMock.mockResolvedValue(undefined);

@@ -510,6 +510,7 @@ async function handleSymbolResearch(response: http.ServerResponse, url: URL) {
         errorCode: "NO_LATEST_SIGNAL",
         unavailableReason: unavailable.unavailableReason,
         message: unavailable.message,
+        timeframe,
         symbol: {
           exchange: latest.symbol.exchange,
           market: latest.symbol.market,
@@ -959,8 +960,7 @@ function buildSymbolResearchCurrentSelectionMetadata({
 
 type SymbolResearchUnavailableReason =
   | "insufficient_history"
-  | "no_selected_run"
-  | "no_signal"
+  | "not_in_selected_run"
   | "unknown";
 
 async function buildSymbolResearchUnavailableMetadata({
@@ -1004,8 +1004,7 @@ async function buildSymbolResearchUnavailableMetadata({
     candleCount: coverage.candleCount,
     requiredCandles: SYMBOL_RESEARCH_REQUIRED_CANDLES,
     firstOpenTime: coverage.firstOpenTime,
-    latestOpenTime: coverage.latestOpenTime,
-    latestCloseTime: coverage.latestCloseTime,
+    lastOpenTime: coverage.lastOpenTime,
   };
 
   return {
@@ -1063,14 +1062,14 @@ function getSymbolResearchUnavailableReason({
   coverage: SymbolResearchCandleCoverageRecord;
 }): SymbolResearchUnavailableReason {
   if (!scanRun) {
-    return "no_selected_run";
+    return "unknown";
   }
 
   if (coverage.candleCount < SYMBOL_RESEARCH_REQUIRED_CANDLES) {
     return "insufficient_history";
   }
 
-  return "no_signal";
+  return "not_in_selected_run";
 }
 
 function getSymbolResearchUnavailableMessage({
@@ -1093,20 +1092,20 @@ function getSymbolResearchUnavailableMessage({
     const runDescription = selectedRun?.isLikelyFullUniverse
       ? `The latest full-universe ${timeframe} scan ran successfully`
       : `The selected ${timeframe} scan ran`;
+    const skippedDescription =
+      typeof selectedRun?.symbolsSkipped === "number" && selectedRun.symbolsSkipped > 0
+        ? ` and skipped ${selectedRun.symbolsSkipped} symbols`
+        : "";
     const candleLabel = getSymbolResearchCandleLabel(timeframe);
 
-    return `No ${timeframe} scanner signal for ${symbol}. ${runDescription}, but ${symbol} was skipped because it has only ${symbolCoverage.candleCount} ${candleLabel}. The scanner currently requires ${symbolCoverage.requiredCandles} candles.`;
+    return `No ${timeframe} scanner signal for ${symbol}. ${runDescription}${skippedDescription}, and ${symbol} was skipped because it has only ${symbolCoverage.candleCount} ${candleLabel}. The scanner currently requires ${symbolCoverage.requiredCandles} candles.`;
   }
 
-  if (unavailableReason === "no_selected_run") {
-    return `No selected latest ${timeframe} scanner run is available yet.`;
-  }
-
-  if (unavailableReason === "no_signal") {
+  if (unavailableReason === "not_in_selected_run") {
     return "No scanner signal is available for this symbol/timeframe from the selected latest run.";
   }
 
-  return "No scanner signal is available for this symbol/timeframe.";
+  return `No selected latest ${timeframe} scanner run is available yet.`;
 }
 
 function getSymbolResearchCandleLabel(timeframe: string) {

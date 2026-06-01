@@ -75,8 +75,7 @@ type ResearchDiagnosticsInput = {
 
 export type SymbolResearchUnavailableReason =
   | "insufficient_history"
-  | "no_selected_run"
-  | "no_signal"
+  | "not_in_selected_run"
   | "unknown";
 
 export type SymbolResearchUnavailableInput = {
@@ -396,7 +395,9 @@ export function buildSymbolResearchUnavailableContent(
   const timeframe = input.timeframe?.trim() || "selected timeframe";
   const candleCount = input.symbolCoverage?.candleCount ?? null;
   const requiredCandles = input.symbolCoverage?.requiredCandles ?? null;
-  const isInsufficientHistory = input.unavailableReason === "insufficient_history";
+  const isInsufficientHistory =
+    formatSymbolResearchUnavailableReason(input.unavailableReason).code ===
+    "insufficient_history";
   const title = isInsufficientHistory
     ? "Timeframe unavailable for this symbol"
     : "No scanner signal available";
@@ -415,11 +416,14 @@ export function buildSymbolResearchUnavailableContent(
           ? "Not available"
           : requiredCandles === null
             ? String(candleCount)
-            : `${candleCount} / ${requiredCandles}`,
+            : formatSymbolResearchUnavailableCoverage({
+                candleCount,
+                requiredCandles,
+              }),
     },
     {
       label: "Selected Run",
-      value: formatUnavailableSelectedRun(input.selectedRun),
+      value: formatSymbolResearchUnavailableSelectedRun(input.selectedRun),
     },
     {
       label: "Signals Created",
@@ -448,21 +452,37 @@ export function buildSymbolResearchUnavailableContent(
   };
 }
 
-export function toTitleCase(value: string) {
-  return value
-    .split(/[_\s-]+/)
-    .filter(Boolean)
-    .map((part) => part.charAt(0).toUpperCase() + part.slice(1).toLowerCase())
-    .join(" ");
+export function formatSymbolResearchUnavailableReason(
+  value: SymbolResearchUnavailableInput["unavailableReason"],
+) {
+  switch (value) {
+    case "insufficient_history":
+      return {
+        code: "insufficient_history" as const,
+        label: "Insufficient history",
+      };
+    case "not_in_selected_run":
+      return {
+        code: "not_in_selected_run" as const,
+        label: "Not in selected run",
+      };
+    case "unknown":
+    default:
+      return {
+        code: "unknown" as const,
+        label: "Unknown",
+      };
+  }
 }
 
-function formatUnavailableSelectedRun(
+export function formatSymbolResearchUnavailableSelectedRun(
   selectedRun: SymbolResearchUnavailableInput["selectedRun"],
 ) {
   if (!selectedRun) {
     return "No selected run";
   }
 
+  const timeframe = selectedRun.timeframe ? `${selectedRun.timeframe} ` : "";
   const runType = selectedRun.isLikelyFullUniverse
     ? "full-universe"
     : "selected";
@@ -471,7 +491,36 @@ function formatUnavailableSelectedRun(
   const total = formatNullableInteger(selectedRun.symbolsTotal);
   const skipped = formatNullableInteger(selectedRun.symbolsSkipped);
 
-  return `${status} ${runType} run, scanned ${scanned} / ${total}, skipped ${skipped}`;
+  return `${timeframe}${runType} run, ${status.toLowerCase()}, scanned ${scanned} / ${total}, skipped ${skipped}`;
+}
+
+export function formatSymbolResearchUnavailableCoverage({
+  candleCount,
+  requiredCandles,
+}: {
+  candleCount?: number | null;
+  requiredCandles?: number | null;
+}) {
+  if (typeof candleCount !== "number" || !Number.isFinite(candleCount)) {
+    return "Not available";
+  }
+
+  if (
+    typeof requiredCandles !== "number" ||
+    !Number.isFinite(requiredCandles)
+  ) {
+    return String(candleCount);
+  }
+
+  return `${candleCount} / ${requiredCandles} required`;
+}
+
+export function toTitleCase(value: string) {
+  return value
+    .split(/[_\s-]+/)
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1).toLowerCase())
+    .join(" ");
 }
 
 function formatNullableInteger(value: number | null | undefined) {

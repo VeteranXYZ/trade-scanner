@@ -134,8 +134,7 @@ type SymbolResearchSymbolCoverage = {
   candleCount: number;
   requiredCandles: number;
   firstOpenTime?: string | null;
-  latestOpenTime?: string | null;
-  latestCloseTime?: string | null;
+  lastOpenTime?: string | null;
 };
 
 type SymbolResearchSuccessResponse = {
@@ -1311,7 +1310,8 @@ function isSymbolResearchUnavailableResponse(
       "ok" in body &&
       body.ok === false &&
       (("unavailableReason" in body && body.unavailableReason) ||
-        getSymbolResearchErrorCode(body) === "NO_LATEST_SIGNAL"),
+        ("selectedRun" in body && body.selectedRun) ||
+        ("symbolCoverage" in body && body.symbolCoverage)),
   );
 }
 

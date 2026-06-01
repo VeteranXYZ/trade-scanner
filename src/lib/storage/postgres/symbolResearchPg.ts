@@ -58,11 +58,13 @@ export type SymbolResearchCandleRecord = {
 };
 
 export type SymbolResearchCandleCoverageRecord = {
+  exchange: string;
+  market: string;
+  symbol: string;
   timeframe: string;
   candleCount: number;
   firstOpenTime: string | null;
-  latestOpenTime: string | null;
-  latestCloseTime: string | null;
+  lastOpenTime: string | null;
 };
 
 export type SymbolResearchLatestSignalResult = {
@@ -169,8 +171,7 @@ type CandleRow = {
 type CandleCoverageRow = {
   candle_count: string;
   first_open_time: Date | string | null;
-  latest_open_time: Date | string | null;
-  latest_close_time: Date | string | null;
+  last_open_time: Date | string | null;
 };
 
 export class PgSymbolResearchStore {
@@ -432,8 +433,7 @@ export class PgSymbolResearchStore {
         SELECT
           COUNT(*) AS candle_count,
           MIN(open_time) AS first_open_time,
-          MAX(open_time) AS latest_open_time,
-          MAX(close_time) AS latest_close_time
+          MAX(open_time) AS last_open_time
         FROM market_candles
         WHERE exchange = $1
           AND market = $2
@@ -448,7 +448,13 @@ export class PgSymbolResearchStore {
       ],
     );
 
-    return toSymbolResearchCandleCoverageRecord(result.rows[0], timeframe);
+    return toSymbolResearchCandleCoverageRecord({
+      row: result.rows[0],
+      exchange: exchange.toLowerCase(),
+      market: market.toLowerCase(),
+      symbol: symbol.toUpperCase(),
+      timeframe,
+    });
   }
 
   private async getSymbol({
@@ -678,21 +684,30 @@ function toSymbolResearchCandleRecord(row: CandleRow): SymbolResearchCandleRecor
   };
 }
 
-function toSymbolResearchCandleCoverageRecord(
-  row: CandleCoverageRow | undefined,
-  timeframe: string,
-): SymbolResearchCandleCoverageRecord {
+function toSymbolResearchCandleCoverageRecord({
+  row,
+  exchange,
+  market,
+  symbol,
+  timeframe,
+}: {
+  row: CandleCoverageRow | undefined;
+  exchange: string;
+  market: string;
+  symbol: string;
+  timeframe: string;
+}): SymbolResearchCandleCoverageRecord {
   return {
+    exchange,
+    market,
+    symbol,
     timeframe,
     candleCount: Number(row?.candle_count ?? 0),
     firstOpenTime: row?.first_open_time
       ? new Date(row.first_open_time).toISOString()
       : null,
-    latestOpenTime: row?.latest_open_time
-      ? new Date(row.latest_open_time).toISOString()
-      : null,
-    latestCloseTime: row?.latest_close_time
-      ? new Date(row.latest_close_time).toISOString()
+    lastOpenTime: row?.last_open_time
+      ? new Date(row.last_open_time).toISOString()
       : null,
   };
 }
