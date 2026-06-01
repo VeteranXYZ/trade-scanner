@@ -3,6 +3,8 @@
 import { useQuery } from "@tanstack/react-query";
 import { useSearchParams } from "next/navigation";
 import { useMemo, type ReactNode } from "react";
+import { SymbolResearchChart } from "./SymbolResearchChart";
+import { SymbolSignalTimeline } from "./SymbolSignalTimeline";
 import {
   formatSymbolResearchAction,
   formatSymbolResearchDateTime,
@@ -45,6 +47,10 @@ type SymbolResearchRun = {
 
 type SymbolResearchSignal = {
   id: string;
+  scanRunId?: string;
+  symbolId?: number;
+  exchange?: string;
+  market?: string;
   symbol: string;
   timeframe: string;
   scanTime: string;
@@ -52,6 +58,13 @@ type SymbolResearchSignal = {
   priceAtSignal: number | null;
   rankScore: number | null;
   finalSignalScore: number | null;
+  opportunityScore?: number | null;
+  confirmationScore?: number | null;
+  riskScore?: number | null;
+  trendScore?: number | null;
+  momentumScore?: number | null;
+  volumeScore?: number | null;
+  structureScore?: number | null;
   signalLabel: string | null;
   actionBias: string | null;
   resultGroup?: string | null;
@@ -66,6 +79,9 @@ type SymbolResearchSignal = {
   invalidation?: unknown;
   factors?: Record<string, unknown>;
   rawMetrics?: Record<string, unknown>;
+  scoringVersion?: string | null;
+  scannerVersion?: string | null;
+  createdAt?: string;
 };
 
 type SymbolResearchCandle = {
@@ -263,6 +279,20 @@ export function SymbolResearchPageClient({
         </Panel>
       </div>
 
+      <SymbolResearchChart
+        symbol={data.symbol.symbol}
+        timeframe={timeframe}
+        candles={data.candles.rows}
+        candleCount={data.candles.count}
+        latestSignal={{
+          candleOpenTime: latestSignal.candleOpenTime,
+          resultGroup: latestSignal.resultGroup,
+          statusNote: latestSignal.statusNote,
+        }}
+      />
+
+      <SymbolSignalTimeline history={data.history} />
+
       <div className="mt-4 grid gap-4 xl:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
         <Panel title="Multi-Timeframe Snapshot">
           <ResponsiveTable
@@ -304,21 +334,6 @@ export function SymbolResearchPageClient({
           </div>
         </Panel>
       </div>
-
-      <Panel title="Recent Signal History" className="mt-4">
-        <ResponsiveTable
-          headers={["Scan Time", "Group", "Signal", "Action", "Setup", "Rank"]}
-          rows={data.history.map((item) => [
-            formatSymbolResearchDateTime(item.scanTime),
-            formatSymbolResearchGroup(item.resultGroup),
-            item.signalLabel ? toTitleCase(item.signalLabel) : "Unknown",
-            formatSymbolResearchAction(item.statusNote),
-            formatSymbolResearchSetup(item.primaryStructure),
-            formatSymbolResearchScore(item.rankScore),
-          ])}
-          emptyText="No recent signal history available."
-        />
-      </Panel>
 
       <Panel title="Raw Details" className="mt-4">
         <details>
