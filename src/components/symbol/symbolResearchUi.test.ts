@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  buildResearchDecisionSummary,
   buildSymbolResearchDiagnostics,
   buildSymbolResearchSummary,
   buildSymbolResearchTimeframeAvailability,
@@ -141,6 +142,163 @@ describe("symbol research UI helpers", () => {
     expect(summary.runBasis).toBe("Based on selected full-universe run");
     expect(JSON.stringify(summary)).not.toMatch(
       /\b(buy|sell|long|short|entry|exit|target|take[-\s]?profit|stop[-\s]?loss)\b/i,
+    );
+  });
+
+  it("builds a cautionary decision summary for risk with downside continuation behavior", () => {
+    const summary = buildResearchDecisionSummary({
+      selectedTimeframe: "4h",
+      selectedSignal: makeDecisionSignal("4h", "risk"),
+      timeframeSnapshots: [
+        makeDecisionSignal("4h", "risk"),
+        makeDecisionSignal("1d", "watch"),
+      ],
+      behaviorReadout: {
+        label: "Downside continuation tendency",
+        sampleConfidenceLabel: "Moderate",
+      },
+      behaviorDiagnostics: { available: true, reason: "ok" },
+      sampleQuality: {
+        sampleQualityLabel: "Clean enough for context",
+        hygieneSummary: "Clean enough for context; treat as research context.",
+      },
+    });
+
+    expect(summary.summaryLabel).toBe("Risk context reinforced");
+    expect(summary.suggestedResearchPosture).toBe("Avoid for now");
+    expect(summary.behaviorSupport).toContain(
+      "prior similar risk signals tended to continue lower",
+    );
+  });
+
+  it("keeps risk posture cautious when historical behavior sample is insufficient", () => {
+    const summary = buildResearchDecisionSummary({
+      selectedTimeframe: "4h",
+      selectedSignal: makeDecisionSignal("4h", "risk"),
+      timeframeSnapshots: [
+        makeDecisionSignal("4h", "risk"),
+        makeDecisionSignal("1d", "neutral"),
+      ],
+      behaviorReadout: {
+        label: "Insufficient sample",
+        sampleConfidenceLabel: "Very limited",
+      },
+      behaviorDiagnostics: { available: true, reason: "insufficient_sample" },
+      sampleQuality: {
+        sampleQualityLabel: "Very limited sample",
+        hygieneSummary: "Production history is still accumulating.",
+        hasVerySmallSample: true,
+      },
+    });
+
+    expect(summary.suggestedResearchPosture).toBe("Caution / wait for repair");
+    expect(summary.behaviorSupport).toBe(
+      "Historical behavior sample is insufficient.",
+    );
+    expect(summary.confidenceNote).toBe(
+      "Very limited sample: Production history is still accumulating.",
+    );
+  });
+
+  it("downgrades eligible context when higher timeframes include risk", () => {
+    const summary = buildResearchDecisionSummary({
+      selectedTimeframe: "4h",
+      selectedSignal: makeDecisionSignal("4h", "eligible"),
+      timeframeSnapshots: [
+        makeDecisionSignal("4h", "eligible"),
+        makeDecisionSignal("1d", "risk"),
+        makeDecisionSignal("1w", "watch"),
+      ],
+      behaviorReadout: {
+        label: "Constructive tendency",
+        sampleConfidenceLabel: "Moderate",
+      },
+      behaviorDiagnostics: { available: true, reason: "ok" },
+      sampleQuality: {
+        sampleQualityLabel: "Clean enough for context",
+        hygieneSummary: "Clean enough for context; treat as research context.",
+      },
+    });
+
+    expect(summary.summaryLabel).toBe("Candidate with higher-timeframe caution");
+    expect(summary.suggestedResearchPosture).toBe("Watch only");
+    expect(summary.multiTimeframeAlignment).toContain("Higher-timeframe caution");
+    expect(summary.keyCaution).toBe("Higher-timeframe risk is present.");
+  });
+
+  it("keeps eligible context as a deeper research candidate when behavior is supportive", () => {
+    const summary = buildResearchDecisionSummary({
+      selectedTimeframe: "4h",
+      selectedSignal: makeDecisionSignal("4h", "eligible"),
+      timeframeSnapshots: [
+        makeDecisionSignal("4h", "eligible"),
+        makeDecisionSignal("1d", "watch"),
+      ],
+      behaviorReadout: {
+        label: "Strong constructive tendency",
+        sampleConfidenceLabel: "Moderate",
+      },
+      behaviorDiagnostics: { available: true, reason: "ok" },
+      sampleQuality: {
+        sampleQualityLabel: "Clean enough for context",
+        hygieneSummary: "Clean enough for context; treat as research context.",
+      },
+    });
+
+    expect(summary.summaryLabel).toBe("Constructive research context");
+    expect(summary.suggestedResearchPosture).toBe(
+      "Candidate for deeper research",
+    );
+    expect(summary.behaviorSupport).toContain("Supportive");
+  });
+
+  it.each([
+    ["watch", "Watch only", "Watch context"],
+    ["overheated", "Caution / wait for repair", "Overheated caution"],
+    ["neutral", "Insufficient data", "No clear edge"],
+  ])(
+    "builds a conservative decision summary for %s",
+    (resultGroup, posture, label) => {
+      const summary = buildResearchDecisionSummary({
+        selectedTimeframe: "4h",
+        selectedSignal: makeDecisionSignal("4h", resultGroup),
+        timeframeSnapshots: [
+          makeDecisionSignal("4h", resultGroup),
+          makeDecisionSignal("1d", "neutral"),
+        ],
+        behaviorReadout: {
+          label: "Mixed follow-through",
+          sampleConfidenceLabel: "Limited",
+        },
+        behaviorDiagnostics: { available: true, reason: "ok" },
+      });
+
+      expect(summary.suggestedResearchPosture).toBe(posture);
+      expect(summary.summaryLabel).toBe(label);
+    },
+  );
+
+  it("handles missing behavior and MTF context without crashing", () => {
+    const summary = buildResearchDecisionSummary({
+      selectedTimeframe: "4h",
+      selectedSignal: makeDecisionSignal("4h", "eligible"),
+      timeframeSnapshots: null,
+      behaviorReadout: null,
+      behaviorDiagnostics: { available: false, reason: "no_prior_signals" },
+      sampleQuality: null,
+    });
+
+    expect(summary.multiTimeframeAlignment).toBe(
+      "Multi-timeframe context is unavailable.",
+    );
+    expect(summary.behaviorSupport).toBe(
+      "Historical behavior context is unavailable.",
+    );
+    expect(summary.suggestedResearchPosture).toBe(
+      "Candidate for deeper research",
+    );
+    expect(JSON.stringify(summary)).not.toMatch(
+      /\b(buy|sell|long|short|entry|exit|profit|prediction|accuracy)\b/i,
     );
   });
 
@@ -508,3 +666,10 @@ describe("symbol research UI helpers", () => {
     ]);
   });
 });
+
+function makeDecisionSignal(timeframe: string, resultGroup: string) {
+  return {
+    timeframe,
+    resultGroup,
+  };
+}

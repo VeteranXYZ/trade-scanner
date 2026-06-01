@@ -321,6 +321,10 @@ describe("SymbolResearchPageClient success state", () => {
       }),
     );
 
+    expect(html).toContain("Research Decision Summary");
+    expect(html).toContain("Constructive research context");
+    expect(html).toContain("Suggested Research Posture");
+    expect(html).toContain("Candidate for deeper research");
     expect(html).toContain("Historical Behavior");
     expect(html).toContain("How similar prior signals behaved");
     expect(html).toContain("Sample size");

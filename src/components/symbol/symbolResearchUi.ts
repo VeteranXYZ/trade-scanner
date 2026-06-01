@@ -170,6 +170,49 @@ export type SymbolResearchDiagnostics = {
   hasWarning: boolean;
 };
 
+type ResearchDecisionSignalInput = TimeframeSnapshotInput & {
+  resultGroup?: string | null;
+};
+
+type ResearchDecisionBehaviorReadoutInput = {
+  label?: string | null;
+  sampleConfidenceLabel?: string | null;
+  summaryText?: string | null;
+};
+
+type ResearchDecisionBehaviorDiagnosticsInput = {
+  available?: boolean | null;
+  reason?: string | null;
+};
+
+type ResearchDecisionSampleQualityInput = {
+  sampleQualityLabel?: string | null;
+  hygieneSummary?: string | null;
+  hasVerySmallSample?: boolean | null;
+  hasLimitedSample?: boolean | null;
+  hasLimitedForwardCandles?: boolean | null;
+  hasClusteredRuns?: boolean | null;
+  hasNonPreferredRuns?: boolean | null;
+};
+
+export type ResearchDecisionPosture =
+  | "Candidate for deeper research"
+  | "Watch only"
+  | "Caution / wait for repair"
+  | "Avoid for now"
+  | "Insufficient data"
+  | "Mixed context";
+
+export type ResearchDecisionSummary = {
+  summaryLabel: string;
+  currentStance: string;
+  multiTimeframeAlignment: string;
+  behaviorSupport: string;
+  confidenceNote: string;
+  keyCaution: string;
+  suggestedResearchPosture: ResearchDecisionPosture;
+};
+
 export function formatSymbolResearchScore(
   value: number | null | undefined,
   decimals = 1,
@@ -367,6 +410,65 @@ export function getSymbolResearchTimeframeSnapshots<T extends TimeframeSnapshotI
     selected,
     ...timeframes.filter((item) => item.timeframe?.toLowerCase() !== requested),
   ];
+}
+
+export function buildResearchDecisionSummary({
+  selectedSignal,
+  selectedTimeframe,
+  timeframeSnapshots,
+  behaviorReadout,
+  behaviorDiagnostics,
+  sampleQuality,
+}: {
+  selectedSignal?: ResearchDecisionSignalInput | null;
+  selectedTimeframe?: string | null;
+  timeframeSnapshots?: ResearchDecisionSignalInput[] | null;
+  behaviorReadout?: ResearchDecisionBehaviorReadoutInput | null;
+  behaviorDiagnostics?: ResearchDecisionBehaviorDiagnosticsInput | null;
+  sampleQuality?: ResearchDecisionSampleQualityInput | null;
+}): ResearchDecisionSummary {
+  const group = normalizeResearchGroup(selectedSignal?.resultGroup);
+  const timeframe =
+    selectedTimeframe?.trim() || selectedSignal?.timeframe?.trim() || "selected timeframe";
+  const mtfContext = getResearchDecisionMultiTimeframeContext({
+    group,
+    selectedTimeframe: timeframe,
+    timeframeSnapshots,
+  });
+  const behaviorContext = getResearchDecisionBehaviorContext({
+    behaviorReadout,
+    behaviorDiagnostics,
+    sampleQuality,
+  });
+  const suggestedResearchPosture = getResearchDecisionPosture({
+    group,
+    mtfContext,
+    behaviorContext,
+  });
+
+  return {
+    summaryLabel: getResearchDecisionSummaryLabel({
+      group,
+      mtfContext,
+      behaviorContext,
+    }),
+    currentStance: `Selected ${timeframe} group is ${formatSymbolResearchGroup(group)}.`,
+    multiTimeframeAlignment: mtfContext.text,
+    behaviorSupport: behaviorContext.text,
+    confidenceNote: getResearchDecisionConfidenceNote({
+      behaviorContext,
+      behaviorReadout,
+      behaviorDiagnostics,
+      sampleQuality,
+    }),
+    keyCaution: getResearchDecisionKeyCaution({
+      group,
+      mtfContext,
+      behaviorContext,
+      sampleQuality,
+    }),
+    suggestedResearchPosture,
+  };
 }
 
 export function buildSymbolResearchSummary(
@@ -839,6 +941,291 @@ function isSymbolResearchGroup(value: unknown): value is SymbolResearchGroup {
     value === "neutral" ||
     value === "insufficient_history"
   );
+}
+
+type ResearchDecisionMultiTimeframeContext = {
+  status: "aligned_positive" | "higher_timeframe_caution" | "broad_risk" | "mixed" | "unavailable";
+  text: string;
+  hasHigherTimeframeRisk: boolean;
+};
+
+type ResearchDecisionBehaviorContext = {
+  status: "supportive" | "cautionary" | "insufficient" | "mixed" | "unavailable";
+  text: string;
+};
+
+function normalizeResearchGroup(value: string | null | undefined): SymbolResearchGroup {
+  return isSymbolResearchGroup(value) ? value : "neutral";
+}
+
+function getResearchDecisionMultiTimeframeContext({
+  group,
+  selectedTimeframe,
+  timeframeSnapshots,
+}: {
+  group: SymbolResearchGroup;
+  selectedTimeframe: string;
+  timeframeSnapshots?: ResearchDecisionSignalInput[] | null;
+}): ResearchDecisionMultiTimeframeContext {
+  const rows = Array.isArray(timeframeSnapshots) ? timeframeSnapshots : [];
+
+  if (rows.length <= 1) {
+    return {
+      status: "unavailable",
+      text: "Multi-timeframe context is unavailable.",
+      hasHigherTimeframeRisk: false,
+    };
+  }
+
+  const selected = selectedTimeframe.trim().toLowerCase();
+  const higherRiskRows = rows.filter((row) => {
+    const timeframe = row.timeframe?.trim().toLowerCase();
+    return (
+      timeframe !== selected &&
+      isHigherDecisionTimeframe(timeframe) &&
+      normalizeResearchGroup(row.resultGroup) === "risk"
+    );
+  });
+  const hasHigherTimeframeRisk = higherRiskRows.length > 0;
+
+  if (group === "risk" && hasHigherTimeframeRisk) {
+    return {
+      status: "broad_risk",
+      text: "Broad risk: selected timeframe and higher timeframe include risk context.",
+      hasHigherTimeframeRisk,
+    };
+  }
+
+  if (hasHigherTimeframeRisk) {
+    return {
+      status: "higher_timeframe_caution",
+      text: "Higher-timeframe caution: 1d or 1w includes risk context.",
+      hasHigherTimeframeRisk,
+    };
+  }
+
+  if (group === "eligible" || group === "watch") {
+    return {
+      status: "aligned_positive",
+      text: "Aligned positive: higher timeframes are not in risk context.",
+      hasHigherTimeframeRisk,
+    };
+  }
+
+  return {
+    status: "mixed",
+    text: "Mixed multi-timeframe context.",
+    hasHigherTimeframeRisk,
+  };
+}
+
+function isHigherDecisionTimeframe(value: string | null | undefined) {
+  return value === "1d" || value === "1w";
+}
+
+function getResearchDecisionBehaviorContext({
+  behaviorReadout,
+  behaviorDiagnostics,
+  sampleQuality,
+}: {
+  behaviorReadout?: ResearchDecisionBehaviorReadoutInput | null;
+  behaviorDiagnostics?: ResearchDecisionBehaviorDiagnosticsInput | null;
+  sampleQuality?: ResearchDecisionSampleQualityInput | null;
+}): ResearchDecisionBehaviorContext {
+  if (!behaviorReadout || behaviorDiagnostics?.available === false) {
+    return {
+      status: "unavailable",
+      text: "Historical behavior context is unavailable.",
+    };
+  }
+
+  const label = behaviorReadout.label ?? "";
+
+  if (label === "Insufficient sample" || sampleQuality?.hasVerySmallSample) {
+    return {
+      status: "insufficient",
+      text: "Historical behavior sample is insufficient.",
+    };
+  }
+
+  if (label === "Downside continuation tendency") {
+    return {
+      status: "cautionary",
+      text: "Cautionary: prior similar risk signals tended to continue lower in this sample.",
+    };
+  }
+
+  if (label === "Weak follow-through") {
+    return {
+      status: "cautionary",
+      text: "Cautionary: prior similar signals did not consistently follow through in this sample.",
+    };
+  }
+
+  if (
+    label === "Constructive tendency" ||
+    label === "Strong constructive tendency"
+  ) {
+    return {
+      status: "supportive",
+      text: "Supportive: prior similar signals showed constructive follow-through in this sample.",
+    };
+  }
+
+  return {
+    status: "mixed",
+    text: "Mixed: historical follow-through is not clearly aligned.",
+  };
+}
+
+function getResearchDecisionPosture({
+  group,
+  mtfContext,
+  behaviorContext,
+}: {
+  group: SymbolResearchGroup;
+  mtfContext: ResearchDecisionMultiTimeframeContext;
+  behaviorContext: ResearchDecisionBehaviorContext;
+}): ResearchDecisionPosture {
+  switch (group) {
+    case "risk":
+      return mtfContext.status === "broad_risk" ||
+        behaviorContext.status === "cautionary"
+        ? "Avoid for now"
+        : "Caution / wait for repair";
+    case "eligible":
+      return mtfContext.hasHigherTimeframeRisk ||
+        behaviorContext.status === "cautionary"
+        ? "Watch only"
+        : "Candidate for deeper research";
+    case "watch":
+      return "Watch only";
+    case "overheated":
+      return "Caution / wait for repair";
+    case "insufficient_history":
+    case "neutral":
+      return "Insufficient data";
+    default:
+      return "Mixed context";
+  }
+}
+
+function getResearchDecisionSummaryLabel({
+  group,
+  mtfContext,
+  behaviorContext,
+}: {
+  group: SymbolResearchGroup;
+  mtfContext: ResearchDecisionMultiTimeframeContext;
+  behaviorContext: ResearchDecisionBehaviorContext;
+}) {
+  if (group === "risk" && behaviorContext.status === "cautionary") {
+    return "Risk context reinforced";
+  }
+
+  if (group === "risk") {
+    return "Risk context";
+  }
+
+  if (group === "eligible" && mtfContext.hasHigherTimeframeRisk) {
+    return "Candidate with higher-timeframe caution";
+  }
+
+  if (group === "eligible" && behaviorContext.status === "supportive") {
+    return "Constructive research context";
+  }
+
+  if (group === "eligible") {
+    return "Candidate research context";
+  }
+
+  if (group === "watch") {
+    return "Watch context";
+  }
+
+  if (group === "overheated") {
+    return "Overheated caution";
+  }
+
+  return "No clear edge";
+}
+
+function getResearchDecisionConfidenceNote({
+  behaviorContext,
+  behaviorReadout,
+  behaviorDiagnostics,
+  sampleQuality,
+}: {
+  behaviorContext: ResearchDecisionBehaviorContext;
+  behaviorReadout?: ResearchDecisionBehaviorReadoutInput | null;
+  behaviorDiagnostics?: ResearchDecisionBehaviorDiagnosticsInput | null;
+  sampleQuality?: ResearchDecisionSampleQualityInput | null;
+}) {
+  if (sampleQuality?.sampleQualityLabel && sampleQuality.hygieneSummary) {
+    return `${sampleQuality.sampleQualityLabel}: ${sampleQuality.hygieneSummary}`;
+  }
+
+  if (behaviorDiagnostics?.available === false) {
+    return "Historical behavior context is unavailable.";
+  }
+
+  if (behaviorContext.status === "insufficient") {
+    return "Historical behavior sample is insufficient.";
+  }
+
+  return behaviorReadout?.sampleConfidenceLabel
+    ? `Behavior sample confidence: ${behaviorReadout.sampleConfidenceLabel}.`
+    : "Behavior sample quality is not available.";
+}
+
+function getResearchDecisionKeyCaution({
+  group,
+  mtfContext,
+  behaviorContext,
+  sampleQuality,
+}: {
+  group: SymbolResearchGroup;
+  mtfContext: ResearchDecisionMultiTimeframeContext;
+  behaviorContext: ResearchDecisionBehaviorContext;
+  sampleQuality?: ResearchDecisionSampleQualityInput | null;
+}) {
+  if (mtfContext.status === "broad_risk") {
+    return "Risk context appears on multiple timeframes.";
+  }
+
+  if (mtfContext.hasHigherTimeframeRisk) {
+    return "Higher-timeframe risk is present.";
+  }
+
+  if (group === "risk") {
+    return "Risk context is elevated; wait for repair before deeper research.";
+  }
+
+  if (group === "watch") {
+    return "Confirmation is still needed.";
+  }
+
+  if (group === "overheated") {
+    return "Overextension risk is elevated.";
+  }
+
+  if (
+    sampleQuality?.hasVerySmallSample ||
+    behaviorContext.status === "insufficient" ||
+    behaviorContext.status === "unavailable"
+  ) {
+    return "Historical behavior context is limited.";
+  }
+
+  if (sampleQuality?.hasNonPreferredRuns) {
+    return "Some observations may include non-selected or secondary runs.";
+  }
+
+  if (sampleQuality?.hasClusteredRuns) {
+    return "Clustered recent observations are present.";
+  }
+
+  return "Treat this as research context, not a conclusion.";
 }
 
 function getResearchSummaryStance(signal: ResearchSummarySignalInput) {

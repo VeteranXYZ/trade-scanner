@@ -93,12 +93,6 @@ export type SymbolBehaviorHorizonRow = {
   worstReturnPct: number | null;
 };
 
-export type SymbolBehaviorSampleHint = {
-  label: string;
-  detail: string;
-  tone: "stronger" | "limited" | "small" | "none";
-};
-
 export type SymbolBehaviorRunContext = {
   scanTime?: string | null;
   sourceRunIsLikelyFullUniverse?: boolean | null;
@@ -271,42 +265,6 @@ export function getBehaviorSampleSize(behavior: SymbolBehavior | null | undefine
   );
 }
 
-export function getBehaviorSampleHint(
-  behavior: SymbolBehavior | null | undefined,
-): SymbolBehaviorSampleHint {
-  const sampleSize = getBehaviorSampleSize(behavior);
-
-  if (sampleSize >= 30) {
-    return {
-      label: "Stronger sample",
-      detail: "More prior observations are available, but this remains research context.",
-      tone: "stronger",
-    };
-  }
-
-  if (sampleSize >= 10) {
-    return {
-      label: "Limited but usable sample",
-      detail: "Useful as context, not a conclusion.",
-      tone: "limited",
-    };
-  }
-
-  if (sampleSize >= 1) {
-    return {
-      label: "Very small sample",
-      detail: "Treat these observations carefully.",
-      tone: "small",
-    };
-  }
-
-  return {
-    label: "No completed observations",
-    detail: "More completed scanner history is needed.",
-    tone: "none",
-  };
-}
-
 export function buildBehaviorSampleQuality({
   behavior,
   signalHistory,
@@ -341,34 +299,6 @@ export function buildBehaviorSampleQuality({
     behavior.currentContext?.timeframe?.trim().toLowerCase() === "1h" &&
     sampleSize < 20;
 
-  const caveats: string[] = [];
-
-  if (hasVerySmallSample || isNewOneHourHistory) {
-    caveats.push("Production history is still accumulating.");
-  }
-
-  if (hasVerySmallSample) {
-    caveats.push("Very limited sample; treat as research context.");
-  } else if (hasLimitedSample) {
-    caveats.push("Limited sample; treat as research context.");
-  }
-
-  if (hasClusteredRuns) {
-    caveats.push(
-      "Some recent observations appear clustered and may reflect development or non-scheduled runs.",
-    );
-  }
-
-  if (hasNonPreferredRuns) {
-    caveats.push(
-      "Some observations may include non-selected or secondary runs.",
-    );
-  }
-
-  if (hasLimitedForwardCandles) {
-    caveats.push("Longer-horizon outcomes are still incomplete.");
-  }
-
   const sampleQualityLabel = getBehaviorSampleQualityLabel({
     hasVerySmallSample,
     hasLimitedSample,
@@ -376,6 +306,27 @@ export function buildBehaviorSampleQuality({
     hasClusteredRuns,
     hasLimitedForwardCandles,
   });
+  const caveats: string[] = [];
+
+  if (
+    hasClusteredRuns &&
+    sampleQualityLabel !== "Clustered recent observations"
+  ) {
+    caveats.push("Clustered recent observations are close together in time.");
+  }
+
+  if (hasNonPreferredRuns && sampleQualityLabel !== "Mixed run context") {
+    caveats.push(
+      "Some observations may include non-selected or secondary runs.",
+    );
+  }
+
+  if (
+    hasLimitedForwardCandles &&
+    sampleQualityLabel !== "Waiting for more completed forward candles"
+  ) {
+    caveats.push("Longer-horizon outcomes are still incomplete.");
+  }
 
   return {
     sampleQualityLabel,
@@ -393,6 +344,7 @@ export function buildBehaviorSampleQuality({
       hasNonPreferredRuns,
       hasClusteredRuns,
       hasLimitedForwardCandles,
+      isNewOneHourHistory,
     }),
     caveats: uniqueStrings(caveats),
     hasClusteredRuns,
@@ -1004,6 +956,7 @@ function getBehaviorSampleQualitySummary({
   hasNonPreferredRuns,
   hasClusteredRuns,
   hasLimitedForwardCandles,
+  isNewOneHourHistory,
 }: Pick<
   BehaviorSampleQualityReadout,
   | "sampleQualityLabel"
@@ -1012,13 +965,15 @@ function getBehaviorSampleQualitySummary({
   | "hasNonPreferredRuns"
   | "hasClusteredRuns"
   | "hasLimitedForwardCandles"
->) {
-  if (hasVerySmallSample) {
-    return "Very limited completed observations are available; production history is still accumulating.";
+> & {
+  isNewOneHourHistory?: boolean;
+}) {
+  if (hasVerySmallSample || isNewOneHourHistory) {
+    return "Production history is still accumulating.";
   }
 
   if (hasLimitedSample) {
-    return "A limited sample is available; treat as research context.";
+    return "Treat as research context while the sample grows.";
   }
 
   if (hasNonPreferredRuns) {
@@ -1030,7 +985,7 @@ function getBehaviorSampleQualitySummary({
   }
 
   if (hasLimitedForwardCandles) {
-    return "Longer-horizon outcomes are still accumulating.";
+    return "Longer-horizon outcomes are still incomplete.";
   }
 
   return `${sampleQualityLabel}; treat as research context.`;

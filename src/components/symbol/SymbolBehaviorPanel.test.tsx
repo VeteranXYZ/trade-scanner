@@ -31,6 +31,8 @@ describe("SymbolBehaviorPanel", () => {
     );
     expect(html).toContain("Sample Quality");
     expect(html).toContain("Limited sample");
+    expect(html).toContain("Treat as research context while the sample grows.");
+    expect(html).not.toContain("Limited but usable sample");
     expect(html).toContain("Sample size");
     expect(html).toContain("Forward horizon observations");
     expect(html).toContain("1 candle");
@@ -89,6 +91,7 @@ describe("SymbolBehaviorPanel", () => {
     );
 
     expect(html).toContain("Limited sample");
+    expect(html).not.toContain("Limited sample — useful as context");
     expect(html).toContain("Next 1");
     expect(html).toContain("+1.20%");
   });
@@ -161,8 +164,58 @@ describe("SymbolBehaviorPanel", () => {
       "Several recent observations are close together in time",
     );
     expect(html).toContain(
+      "Recent observations appear clustered close together in time.",
+    );
+    expect(html).not.toContain(
       "Some recent observations appear clustered and may reflect development or non-scheduled runs.",
     );
+  });
+
+  it("renders very limited 1h sample quality without repeated sample caveats", () => {
+    const html = renderToStaticMarkup(
+      createElement(SymbolBehaviorPanel, {
+        behavior: makeBehavior({
+          sampleSize: 4,
+          horizons: {
+            "1": makeHorizon(4, 1.2),
+            "3": makeHorizon(0, 0),
+            "5": makeHorizon(0, 0),
+          },
+          recentOutcomes: [
+            makeOutcome({ scanTime: "2026-06-01T11:38:00.000Z" }),
+            makeOutcome({ scanTime: "2026-06-01T12:05:00.000Z" }),
+            makeOutcome({ scanTime: "2026-06-01T12:12:00.000Z" }),
+          ],
+          currentContext: {
+            signalLabel: "confirmed",
+            resultGroup: "eligible",
+            primaryStructure: "strong_trend",
+            timeframe: "1h",
+          },
+          warnings: [
+            "Very limited historical sample size.",
+            "Limited historical sample size.",
+          ],
+        }),
+        diagnostics: makeDiagnostics(true),
+      }),
+    );
+
+    expect(html).toContain("Insufficient sample");
+    expect(html).toContain("Very limited sample");
+    expect(html).toContain("Production history is still accumulating.");
+    expect(html).toContain(
+      "Longer-horizon outcomes are still incomplete.",
+    );
+    expect(html).toContain(
+      "Clustered recent observations are close together in time.",
+    );
+    expect(html).not.toContain(
+      "Very limited sample: more completed forward candles are needed.",
+    );
+    expect(html).not.toContain("Very limited sample; treat as research context.");
+    expect(html).not.toContain("Limited sample — useful as context");
+    expect(countOccurrences(html, "research context")).toBeLessThanOrEqual(1);
   });
 
   it("renders mixed run context caveat from existing signal history metadata", () => {
@@ -189,10 +242,14 @@ describe("SymbolBehaviorPanel", () => {
 
     expect(html).toContain("Mixed run context");
     expect(html).toContain(
-      "Some observations may include non-selected or secondary runs.",
+      "This sample may include non-selected or secondary runs.",
     );
   });
 });
+
+function countOccurrences(value: string, needle: string) {
+  return value.split(needle).length - 1;
+}
 
 function makeDiagnostics(
   available: boolean,

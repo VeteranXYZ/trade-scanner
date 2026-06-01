@@ -7,15 +7,18 @@ import { useMemo, useState, type FormEvent, type ReactNode } from "react";
 import { SymbolBehaviorPanel } from "./SymbolBehaviorPanel";
 import { SymbolResearchChart } from "./SymbolResearchChart";
 import { SymbolSignalTimeline } from "./SymbolSignalTimeline";
-import type {
-  SymbolBehavior,
-  SymbolBehaviorDiagnostics,
+import {
+  buildBehaviorReadout,
+  buildBehaviorSampleQuality,
+  type SymbolBehavior,
+  type SymbolBehaviorDiagnostics,
 } from "./symbolBehaviorUi";
 import {
   normalizeSymbolResearchCandles,
   type SymbolResearchCandles,
 } from "./symbolChartUi";
 import {
+  buildResearchDecisionSummary,
   buildSymbolResearchDiagnostics,
   buildSymbolResearchSummary,
   buildSymbolResearchTimeframeAvailability,
@@ -39,6 +42,7 @@ import {
   type SymbolResearchTimeframeAvailabilityRow,
   type SymbolResearchTimeframeNavigationOption,
   type SymbolResearchUnavailableReason,
+  type ResearchDecisionSummary,
 } from "./symbolResearchUi";
 
 type BuildSymbolResearchUrlParams = {
@@ -491,6 +495,28 @@ export function SymbolResearchPageClient({
     latestSignal,
     history,
   });
+  const behaviorReadout = data.behavior
+    ? buildBehaviorReadout({
+        resultGroup: data.behavior.currentContext?.resultGroup,
+        signalLabel: data.behavior.currentContext?.signalLabel,
+        sampleSize: data.behavior.sampleSize,
+        horizons: data.behavior.horizons,
+        warnings: Array.isArray(data.behavior.warnings)
+          ? data.behavior.warnings
+          : [],
+      })
+    : null;
+  const behaviorSampleQuality = data.behavior
+    ? buildBehaviorSampleQuality({ behavior: data.behavior, signalHistory: history })
+    : null;
+  const decisionSummary = buildResearchDecisionSummary({
+    selectedSignal: latestSignal,
+    selectedTimeframe,
+    timeframeSnapshots,
+    behaviorReadout,
+    behaviorDiagnostics: data.behaviorDiagnostics,
+    sampleQuality: behaviorSampleQuality,
+  });
   const candleRowsNotice = getCandleRowsNotice(candles);
 
   return (
@@ -583,6 +609,8 @@ export function SymbolResearchPageClient({
           </div>
         </Panel>
       </div>
+
+      <ResearchDecisionSummaryPanel summary={decisionSummary} />
 
       <div className="mt-4 grid gap-4 xl:grid-cols-[minmax(0,1.35fr)_minmax(320px,0.65fr)]">
         <Panel title="Research Summary">
@@ -1160,6 +1188,44 @@ function SymbolResearchUnavailableState({
         </ul>
       </div>
     </section>
+  );
+}
+
+function ResearchDecisionSummaryPanel({
+  summary,
+}: {
+  summary: ResearchDecisionSummary;
+}) {
+  return (
+    <Panel title="Research Decision Summary" className="mt-4">
+      <div className="grid gap-4 lg:grid-cols-[minmax(0,0.7fr)_minmax(0,1.3fr)]">
+        <div>
+          <div className="text-[11px] uppercase text-[var(--muted)]">
+            Summary
+          </div>
+          <div className="mt-1 text-lg font-semibold text-[var(--foreground)]">
+            {summary.summaryLabel}
+          </div>
+          <p className="mt-2 text-sm text-[var(--muted)]">
+            Research-only framing; not a score or trading instruction.
+          </p>
+        </div>
+        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+          <Fact label="Current Stance" value={summary.currentStance} />
+          <Fact
+            label="Multi-Timeframe Alignment"
+            value={summary.multiTimeframeAlignment}
+          />
+          <Fact label="Behavior Support" value={summary.behaviorSupport} />
+          <Fact label="Confidence Note" value={summary.confidenceNote} />
+          <Fact label="Key Caution" value={summary.keyCaution} />
+          <Fact
+            label="Suggested Research Posture"
+            value={summary.suggestedResearchPosture}
+          />
+        </div>
+      </div>
+    </Panel>
   );
 }
 

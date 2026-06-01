@@ -12,7 +12,6 @@ import {
   getBehaviorDiagnosticsTitle,
   getBehaviorGroupLabel,
   getBehaviorHorizonRows,
-  getBehaviorSampleHint,
   getBehaviorSampleSize,
   getBehaviorSetupLabel,
   getBehaviorSignalLabel,
@@ -84,9 +83,8 @@ export function SymbolBehaviorPanel({
           />
           <SampleQualityNotice quality={sampleQuality} />
           <BehaviorSummary behavior={behavior} />
-          <SampleHint behavior={behavior} />
           <BehaviorWarnings
-            warnings={Array.isArray(behavior.warnings) ? behavior.warnings : []}
+            warnings={getDisplayBehaviorWarnings(behavior.warnings)}
           />
           <CurrentBehaviorContext behavior={behavior} />
           <BehaviorHorizons horizons={getBehaviorHorizonRows(behavior)} />
@@ -149,10 +147,7 @@ function BehaviorReadoutCard({
     warnings: Array.isArray(behavior.warnings) ? behavior.warnings : [],
   });
   const toneClass = getBehaviorReadoutToneClass(readout);
-  const caveats = uniquePanelCaveats([
-    ...readout.caveats,
-    ...(sampleQuality?.caveats ?? []),
-  ]);
+  const caveats = getReadoutDisplayCaveats(readout, sampleQuality);
 
   return (
     <div className={`mb-3 border px-3 py-3 ${toneClass}`}>
@@ -219,6 +214,13 @@ function SampleQualityNotice({
         </span>{" "}
         - {quality.hygieneSummary}
       </p>
+      {quality.caveats.length > 0 ? (
+        <ul className="mt-2 list-disc space-y-1 pl-4 text-[var(--muted)]">
+          {quality.caveats.map((caveat) => (
+            <li key={caveat}>{caveat}</li>
+          ))}
+        </ul>
+      ) : null}
     </div>
   );
 }
@@ -246,22 +248,6 @@ function getBehaviorReadoutToneClass(readout: BehaviorReadout) {
     case "insufficient":
       return "border-[var(--border)] bg-[#080d12]";
   }
-}
-
-function SampleHint({ behavior }: { behavior: SymbolBehavior }) {
-  const hint = getBehaviorSampleHint(behavior);
-  const className =
-    hint.tone === "stronger"
-      ? "border-emerald-500/25 bg-emerald-500/10 text-emerald-100"
-      : hint.tone === "limited"
-        ? "border-sky-500/25 bg-sky-500/10 text-sky-100"
-        : "border-amber-500/30 bg-amber-500/10 text-amber-100";
-
-  return (
-    <p className={`mt-3 border px-3 py-2 text-xs ${className}`}>
-      <span className="font-semibold">{hint.label}</span> — {hint.detail}
-    </p>
-  );
 }
 
 function BehaviorWarnings({ warnings }: { warnings: string[] }) {
@@ -495,6 +481,56 @@ function toScoreValue(value: unknown) {
   const number = typeof value === "string" ? Number(value.trim()) : Number(value);
 
   return Number.isFinite(number) ? number : null;
+}
+
+function getReadoutDisplayCaveats(
+  readout: BehaviorReadout,
+  sampleQuality?: BehaviorSampleQualityReadout | null,
+) {
+  return uniquePanelCaveats(readout.caveats)
+    .filter((caveat) => !isSampleQualityDuplicateCaveat(caveat, sampleQuality))
+    .slice(0, 1);
+}
+
+function isSampleQualityDuplicateCaveat(
+  caveat: string,
+  sampleQuality?: BehaviorSampleQualityReadout | null,
+) {
+  const normalized = caveat.toLowerCase();
+
+  if (
+    normalized.includes("limited sample") ||
+    normalized.includes("very small sample") ||
+    normalized.includes("historical sample size") ||
+    normalized.includes("research context") ||
+    normalized.includes("completed forward candles are needed")
+  ) {
+    return true;
+  }
+
+  if (
+    sampleQuality?.hasLimitedForwardCandles &&
+    normalized.includes("1-candle horizon")
+  ) {
+    return true;
+  }
+
+  return false;
+}
+
+function getDisplayBehaviorWarnings(warnings: SymbolBehavior["warnings"]) {
+  if (!Array.isArray(warnings)) {
+    return [];
+  }
+
+  return warnings.filter((warning) => !isSampleSizeWarning(warning));
+}
+
+function isSampleSizeWarning(warning: string) {
+  return (
+    warning === "Very limited historical sample size." ||
+    warning === "Limited historical sample size."
+  );
 }
 
 function uniquePanelCaveats(values: string[]) {

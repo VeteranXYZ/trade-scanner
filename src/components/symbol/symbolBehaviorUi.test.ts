@@ -297,7 +297,10 @@ describe("symbol behavior UI helpers", () => {
     expect(quality?.sampleQualityLabel).toBe("Very limited sample");
     expect(quality?.sampleQualityTone).toBe("warning");
     expect(quality?.hasVerySmallSample).toBe(true);
-    expect(quality?.caveats).toContain("Production history is still accumulating.");
+    expect(quality?.hygieneSummary).toBe(
+      "Production history is still accumulating.",
+    );
+    expect(quality?.caveats).toEqual([]);
   });
 
   it("labels limited behavior samples without changing the readout classification", () => {
@@ -320,7 +323,10 @@ describe("symbol behavior UI helpers", () => {
 
     expect(quality?.sampleQualityLabel).toBe("Limited sample");
     expect(quality?.hasLimitedSample).toBe(true);
-    expect(quality?.caveats).toContain("Limited sample; treat as research context.");
+    expect(quality?.hygieneSummary).toBe(
+      "Treat as research context while the sample grows.",
+    );
+    expect(quality?.caveats).toEqual([]);
     expect(readout.label).toBe("Constructive tendency");
   });
 
@@ -339,10 +345,11 @@ describe("symbol behavior UI helpers", () => {
     expect(quality?.sampleQualityLabel).toBe(
       "Waiting for more completed forward candles",
     );
-    expect(quality?.hasLimitedForwardCandles).toBe(true);
-    expect(quality?.caveats).toContain(
+    expect(quality?.hygieneSummary).toBe(
       "Longer-horizon outcomes are still incomplete.",
     );
+    expect(quality?.hasLimitedForwardCandles).toBe(true);
+    expect(quality?.caveats).toEqual([]);
   });
 
   it("detects clustered recent observations from valid scan times", () => {
@@ -364,10 +371,44 @@ describe("symbol behavior UI helpers", () => {
     });
 
     expect(quality?.sampleQualityLabel).toBe("Clustered recent observations");
-    expect(quality?.hasClusteredRuns).toBe(true);
-    expect(quality?.caveats).toContain(
-      "Some recent observations appear clustered and may reflect development or non-scheduled runs.",
+    expect(quality?.hygieneSummary).toBe(
+      "Recent observations appear clustered close together in time.",
     );
+    expect(quality?.hasClusteredRuns).toBe(true);
+    expect(quality?.caveats).toEqual([]);
+  });
+
+  it("keeps very limited 1h sample quality copy compact with distinct caveats", () => {
+    const quality = buildBehaviorSampleQuality({
+      behavior: makeBehavior({
+        sampleSize: 4,
+        currentContext: {
+          signalLabel: "confirmed",
+          resultGroup: "eligible",
+          primaryStructure: "strong_trend",
+          timeframe: "1h",
+        },
+        horizons: {
+          "1": makeHorizon(4, 0.5),
+          "3": makeHorizon(0, 0),
+          "5": makeHorizon(0, 0),
+        },
+        recentOutcomes: [
+          makeOutcome("2026-06-01T11:38:00.000Z"),
+          makeOutcome("2026-06-01T12:05:00.000Z"),
+          makeOutcome("2026-06-01T12:12:00.000Z"),
+        ],
+      }),
+    });
+
+    expect(quality?.sampleQualityLabel).toBe("Very limited sample");
+    expect(quality?.hygieneSummary).toBe(
+      "Production history is still accumulating.",
+    );
+    expect(quality?.caveats).toEqual([
+      "Clustered recent observations are close together in time.",
+      "Longer-horizon outcomes are still incomplete.",
+    ]);
   });
 
   it("does not crash or flag clustering for malformed or missing scan times only", () => {
@@ -411,10 +452,11 @@ describe("symbol behavior UI helpers", () => {
     });
 
     expect(quality?.sampleQualityLabel).toBe("Mixed run context");
-    expect(quality?.hasNonPreferredRuns).toBe(true);
-    expect(quality?.caveats).toContain(
-      "Some observations may include non-selected or secondary runs.",
+    expect(quality?.hygieneSummary).toBe(
+      "This sample may include non-selected or secondary runs.",
     );
+    expect(quality?.hasNonPreferredRuns).toBe(true);
+    expect(quality?.caveats).toEqual([]);
   });
 
   it("does not emit sample quality for unavailable behavior", () => {
