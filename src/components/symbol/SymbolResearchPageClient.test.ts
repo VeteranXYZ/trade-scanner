@@ -326,6 +326,7 @@ describe("SymbolResearchPageClient success state", () => {
     expect(html).toContain("Suggested Research Posture");
     expect(html).toContain("Candidate for deeper research");
     expect(html).toContain("Historical Behavior");
+    expect(html).toContain("Historical Follow-through Evaluation");
     expect(html).toContain("How similar prior signals behaved");
     expect(html).toContain("Sample size");
     expect(html).toContain("Forward horizon observations");

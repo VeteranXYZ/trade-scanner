@@ -157,6 +157,22 @@ export type BehaviorReadout = {
   caveats: string[];
 };
 
+export type HistoricalFollowThroughEvaluation = {
+  available: boolean;
+  title: string;
+  posture: string;
+  evaluationScope: string;
+  selectedHorizonLabel: string;
+  sampleLabel: string;
+  sampleConfidenceLabel: string;
+  directionMatchLabel: string;
+  directionMatchPct?: number;
+  medianReturnLabel: string;
+  positiveRateLabel: string;
+  interpretation: string;
+  caveats: string[];
+};
+
 export const symbolBehaviorHorizonKeys = ["1", "3", "5"] as const;
 
 export function toBehaviorNumber(value: unknown) {
@@ -417,6 +433,100 @@ export function buildBehaviorReadout(
       contextType,
     }),
     caveats,
+  };
+}
+
+export function buildHistoricalFollowThroughEvaluation({
+  behavior,
+  diagnostics,
+  sampleQuality,
+}: {
+  behavior: SymbolBehavior | null | undefined;
+  diagnostics?: SymbolBehaviorDiagnostics | null;
+  sampleQuality?: BehaviorSampleQualityReadout | null;
+}): HistoricalFollowThroughEvaluation {
+  const title = "Historical Follow-through Evaluation";
+  const evaluationScope = "Same symbol / same timeframe / similar scanner context";
+
+  if (!behavior || diagnostics?.available === false) {
+    return {
+      available: false,
+      title,
+      posture: "Insufficient completed forward candles",
+      evaluationScope,
+      selectedHorizonLabel: "No usable horizon",
+      sampleLabel: "0 completed forward observations",
+      sampleConfidenceLabel: "Unavailable",
+      directionMatchLabel: "Not available",
+      medianReturnLabel: "Not available",
+      positiveRateLabel: "Not available",
+      interpretation:
+        "Not enough completed forward candles for follow-through evaluation.",
+      caveats: buildHistoricalFollowThroughUnavailableCaveats(sampleQuality),
+    };
+  }
+
+  const selected = selectFollowThroughHorizon(getBehaviorHorizonRows(behavior));
+
+  if (!selected) {
+    return {
+      available: false,
+      title,
+      posture: "Insufficient completed forward candles",
+      evaluationScope,
+      selectedHorizonLabel: "No usable horizon",
+      sampleLabel: "0 completed forward observations",
+      sampleConfidenceLabel: "Unavailable",
+      directionMatchLabel: "Not available",
+      medianReturnLabel: "Not available",
+      positiveRateLabel: "Not available",
+      interpretation:
+        "Not enough completed forward candles for follow-through evaluation.",
+      caveats: buildHistoricalFollowThroughUnavailableCaveats(sampleQuality),
+    };
+  }
+
+  const context = getFollowThroughContext(behavior.currentContext);
+  const median = selected.medianReturnPct;
+  const positiveRate = selected.winRatePct;
+  const directionMatchPct = getFollowThroughDirectionMatchPct({
+    context,
+    positiveRate,
+  });
+  const posture = getFollowThroughPosture({
+    context,
+    median,
+    positiveRate,
+  });
+
+  return {
+    available: true,
+    title,
+    posture,
+    evaluationScope,
+    selectedHorizonLabel: selected.label,
+    sampleLabel: `${formatBehaviorSampleSize(
+      selected.sampleSize,
+    )} completed forward observations`,
+    sampleConfidenceLabel: getFollowThroughSampleConfidenceLabel(
+      selected.sampleSize,
+    ),
+    directionMatchLabel: getFollowThroughDirectionMatchLabel({
+      context,
+      directionMatchPct,
+    }),
+    directionMatchPct,
+    medianReturnLabel: `${formatBehaviorPercent(median)} median return`,
+    positiveRateLabel: `${formatBehaviorWinRate(positiveRate)} positive rate`,
+    interpretation: getFollowThroughInterpretation({
+      context,
+      posture,
+      selectedHorizonLabel: selected.label,
+    }),
+    caveats: buildHistoricalFollowThroughCaveats({
+      selected,
+      sampleQuality,
+    }),
   };
 }
 
@@ -812,6 +922,277 @@ function buildBehaviorReadoutCaveats({
   }
 
   return uniqueStrings(caveats);
+}
+
+type FollowThroughContext =
+  | "risk"
+  | "eligible"
+  | "watch"
+  | "overheated"
+  | "neutral";
+
+function selectFollowThroughHorizon(rows: SymbolBehaviorHorizonRow[]) {
+  const usableRows = rows.filter(
+    (row) =>
+      row.sampleSize >= 5 &&
+      row.medianReturnPct !== null &&
+      row.winRatePct !== null,
+  );
+
+  return (
+    usableRows.find((row) => row.horizon === "5") ??
+    usableRows.find((row) => row.horizon === "3") ??
+    usableRows.find((row) => row.horizon === "1") ??
+    null
+  );
+}
+
+function getFollowThroughContext(
+  context: SymbolBehavior["currentContext"],
+): FollowThroughContext {
+  const group = context?.resultGroup?.trim().toLowerCase();
+  const signal = context?.signalLabel?.trim().toLowerCase() ?? "";
+
+  if (
+    group === "risk" ||
+    signal.includes("breakdown") ||
+    signal.includes("distribution") ||
+    signal.includes("failed")
+  ) {
+    return "risk";
+  }
+
+  if (group === "eligible") {
+    return "eligible";
+  }
+
+  if (group === "watch") {
+    return "watch";
+  }
+
+  if (group === "overheated") {
+    return "overheated";
+  }
+
+  return "neutral";
+}
+
+function getFollowThroughDirectionMatchPct({
+  context,
+  positiveRate,
+}: {
+  context: FollowThroughContext;
+  positiveRate: number | null;
+}) {
+  if (positiveRate === null) {
+    return undefined;
+  }
+
+  if (context === "risk" || context === "overheated") {
+    return clampFollowThroughPct(100 - positiveRate);
+  }
+
+  if (context === "eligible" || context === "watch") {
+    return clampFollowThroughPct(positiveRate);
+  }
+
+  return undefined;
+}
+
+function clampFollowThroughPct(value: number) {
+  return Math.max(0, Math.min(100, value));
+}
+
+function getFollowThroughPosture({
+  context,
+  median,
+  positiveRate,
+}: {
+  context: FollowThroughContext;
+  median: number | null;
+  positiveRate: number | null;
+}) {
+  if (median === null || positiveRate === null) {
+    return "Mixed follow-through";
+  }
+
+  switch (context) {
+    case "risk":
+      if (median < 0 && positiveRate < 45) {
+        return "Downside follow-through observed";
+      }
+
+      if (median > 0) {
+        return "Risk signal did not show downside follow-through in this sample";
+      }
+
+      return "Mixed follow-through";
+    case "eligible":
+      if (median > 0 && positiveRate > 50) {
+        return "Upside follow-through observed";
+      }
+
+      if (median < 0) {
+        return "Upside follow-through not supported in this sample";
+      }
+
+      return "Mixed follow-through";
+    case "watch":
+      if (median > 0 && positiveRate > 50) {
+        return "Watchlist follow-through is constructive";
+      }
+
+      return "Watchlist follow-through is mixed";
+    case "overheated":
+      if (median < 0 || positiveRate < 50) {
+        return "Pullback / cooling behavior observed";
+      }
+
+      if (median > 0 && positiveRate >= 50) {
+        return "Overheated signals continued higher in this sample";
+      }
+
+      return "Mixed overextension follow-through";
+    case "neutral":
+      return "No clear historical follow-through edge";
+  }
+}
+
+function getFollowThroughSampleConfidenceLabel(sampleSize: number) {
+  if (sampleSize >= 50) {
+    return "Stronger sample";
+  }
+
+  if (sampleSize >= 20) {
+    return "Moderate sample";
+  }
+
+  if (sampleSize >= 10) {
+    return "Limited sample";
+  }
+
+  return "Very limited sample";
+}
+
+function getFollowThroughDirectionMatchLabel({
+  context,
+  directionMatchPct,
+}: {
+  context: FollowThroughContext;
+  directionMatchPct?: number;
+}) {
+  if (context === "neutral") {
+    return "No clear direction match";
+  }
+
+  if (directionMatchPct === undefined) {
+    return "Not available";
+  }
+
+  const pct = `${directionMatchPct.toFixed(1)}%`;
+
+  switch (context) {
+    case "risk":
+      return `${pct} downside follow-through`;
+    case "eligible":
+      return `${pct} upside follow-through`;
+    case "watch":
+      return `${pct} confirmation follow-through`;
+    case "overheated":
+      return `${pct} pullback / cooling behavior`;
+  }
+}
+
+function getFollowThroughInterpretation({
+  context,
+  posture,
+  selectedHorizonLabel,
+}: {
+  context: FollowThroughContext;
+  posture: string;
+  selectedHorizonLabel: string;
+}) {
+  switch (posture) {
+    case "Downside follow-through observed":
+      return `Prior similar risk signals showed downside follow-through over ${selectedHorizonLabel} in this sample.`;
+    case "Risk signal did not show downside follow-through in this sample":
+      return `Prior similar risk signals did not show downside follow-through over ${selectedHorizonLabel} in this sample.`;
+    case "Upside follow-through observed":
+      return `Prior similar positive setups showed upside follow-through over ${selectedHorizonLabel} in this sample.`;
+    case "Upside follow-through not supported in this sample":
+      return `Prior similar positive setups did not show upside follow-through over ${selectedHorizonLabel} in this sample.`;
+    case "Watchlist follow-through is constructive":
+      return `Watchlist follow-through was constructive over ${selectedHorizonLabel}, but confirmation is still needed.`;
+    case "Pullback / cooling behavior observed":
+      return `Prior overheated signals showed pullback or cooling behavior over ${selectedHorizonLabel} in this sample.`;
+    case "Overheated signals continued higher in this sample":
+      return `Overheated signals continued higher over ${selectedHorizonLabel} in this sample, but this does not remove overextension risk.`;
+    case "No clear historical follow-through edge":
+      return "Historical follow-through does not show a clear edge in this sample.";
+    default:
+      if (context === "watch") {
+        return `Watchlist follow-through was mixed over ${selectedHorizonLabel}; confirmation is still needed.`;
+      }
+
+      return `Historical follow-through was mixed over ${selectedHorizonLabel} in this sample.`;
+  }
+}
+
+function buildHistoricalFollowThroughCaveats({
+  selected,
+  sampleQuality,
+}: {
+  selected: SymbolBehaviorHorizonRow;
+  sampleQuality?: BehaviorSampleQualityReadout | null;
+}) {
+  const caveats: string[] = [];
+
+  if (selected.sampleSize < 10) {
+    caveats.push("Very limited completed observations.");
+  } else if (selected.sampleSize < 20) {
+    caveats.push("Sample is limited.");
+  }
+
+  if (sampleQuality?.hasVerySmallSample) {
+    caveats.push("Production history is still accumulating.");
+  }
+
+  if (selected.horizon === "1") {
+    caveats.push("Only the 1-candle horizon is usable; avoid over-weighting it.");
+  }
+
+  for (const caveat of sampleQuality?.caveats ?? []) {
+    if (!isDuplicateFollowThroughCaveat(caveat)) {
+      caveats.push(caveat);
+    }
+  }
+
+  return uniqueStrings(caveats);
+}
+
+function buildHistoricalFollowThroughUnavailableCaveats(
+  sampleQuality?: BehaviorSampleQualityReadout | null,
+) {
+  const caveats: string[] = [];
+
+  if (sampleQuality?.hasVerySmallSample) {
+    caveats.push("Production history is still accumulating.");
+  }
+
+  if (sampleQuality?.hasLimitedForwardCandles) {
+    caveats.push("Longer-horizon outcomes are still incomplete.");
+  }
+
+  return uniqueStrings(caveats);
+}
+
+function isDuplicateFollowThroughCaveat(caveat: string) {
+  const normalized = caveat.trim().toLowerCase();
+
+  return (
+    normalized.includes("research context") ||
+    normalized.includes("limited sample")
+  );
 }
 
 function hasClusteredScanTimes(

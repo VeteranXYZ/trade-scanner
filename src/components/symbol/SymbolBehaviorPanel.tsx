@@ -5,6 +5,7 @@ import {
   buildBehaviorSampleQuality,
   buildBehaviorReadout,
   buildBehaviorSummary,
+  buildHistoricalFollowThroughEvaluation,
   formatBehaviorPercent,
   formatBehaviorSampleSize,
   formatBehaviorWinRate,
@@ -22,6 +23,7 @@ import {
   selectCompactRecentOutcomes,
   type BehaviorSampleQualityReadout,
   type BehaviorReadout,
+  type HistoricalFollowThroughEvaluation,
   type SymbolBehavior,
   type SymbolBehaviorCoverage,
   type SymbolBehaviorDiagnostics,
@@ -54,6 +56,11 @@ export function SymbolBehaviorPanel({
     isAvailable && behavior
       ? buildBehaviorSampleQuality({ behavior, signalHistory })
       : null;
+  const followThroughEvaluation = buildHistoricalFollowThroughEvaluation({
+    behavior,
+    diagnostics,
+    sampleQuality,
+  });
 
   return (
     <section
@@ -74,7 +81,12 @@ export function SymbolBehaviorPanel({
       </div>
 
       {!isAvailable || !behavior ? (
-        <EmptyBehaviorState diagnostics={diagnostics} coverage={coverage} />
+        <>
+          <EmptyBehaviorState diagnostics={diagnostics} coverage={coverage} />
+          <HistoricalFollowThroughEvaluationCard
+            evaluation={followThroughEvaluation}
+          />
+        </>
       ) : (
         <>
           <BehaviorReadoutCard
@@ -82,6 +94,9 @@ export function SymbolBehaviorPanel({
             sampleQuality={sampleQuality}
           />
           <SampleQualityNotice quality={sampleQuality} />
+          <HistoricalFollowThroughEvaluationCard
+            evaluation={followThroughEvaluation}
+          />
           <BehaviorSummary behavior={behavior} />
           <BehaviorWarnings
             warnings={getDisplayBehaviorWarnings(behavior.warnings)}
@@ -217,6 +232,63 @@ function SampleQualityNotice({
       {quality.caveats.length > 0 ? (
         <ul className="mt-2 list-disc space-y-1 pl-4 text-[var(--muted)]">
           {quality.caveats.map((caveat) => (
+            <li key={caveat}>{caveat}</li>
+          ))}
+        </ul>
+      ) : null}
+    </div>
+  );
+}
+
+function HistoricalFollowThroughEvaluationCard({
+  evaluation,
+}: {
+  evaluation: HistoricalFollowThroughEvaluation;
+}) {
+  const toneClass = evaluation.available
+    ? "border-[var(--border)] bg-[#080d12]"
+    : "border-amber-500/30 bg-amber-500/10";
+
+  return (
+    <div className={`mb-3 border px-3 py-3 ${toneClass}`}>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <div className="text-[10px] uppercase tracking-normal text-[var(--muted-2)]">
+            {evaluation.title}
+          </div>
+          <h3 className="mt-1 text-sm font-semibold text-[var(--foreground)]">
+            {evaluation.posture}
+          </h3>
+          <p className="mt-1 max-w-3xl text-xs leading-5 text-[var(--muted)]">
+            {evaluation.interpretation}
+          </p>
+        </div>
+      </div>
+
+      <div className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+        <BehaviorFact label="Evaluation Scope" value={evaluation.evaluationScope} />
+        <BehaviorFact
+          label="Selected Horizon"
+          value={evaluation.selectedHorizonLabel}
+        />
+        <BehaviorFact
+          label="Completed Observations"
+          value={evaluation.sampleLabel}
+        />
+        <BehaviorFact
+          label="Direction Match"
+          value={evaluation.directionMatchLabel}
+        />
+        <BehaviorFact
+          label="Median Follow-through"
+          value={evaluation.medianReturnLabel}
+        />
+        <BehaviorFact label="Positive Rate" value={evaluation.positiveRateLabel} />
+      </div>
+
+      {evaluation.caveats.length > 0 ? (
+        <ul className="mt-3 list-disc space-y-1 pl-4 text-xs text-[var(--muted)]">
+          {evaluation.caveats.map((caveat) => (
             <li key={caveat}>{caveat}</li>
           ))}
         </ul>
@@ -384,7 +456,7 @@ function RecentBehaviorOutcomes({
 
       {hasClusteredRuns ? (
         <p className="mb-3 border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-100">
-          Several recent observations are close together in time; treat short-term
+          Several recent observations are close together in time; treat near-term
           behavior samples cautiously.
         </p>
       ) : null}

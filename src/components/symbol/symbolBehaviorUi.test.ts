@@ -3,6 +3,7 @@ import {
   buildBehaviorReadout,
   buildBehaviorSampleQuality,
   buildBehaviorSummary,
+  buildHistoricalFollowThroughEvaluation,
   formatBehaviorPercent,
   formatBehaviorSampleSize,
   formatBehaviorWinRate,
@@ -461,6 +462,204 @@ describe("symbol behavior UI helpers", () => {
 
   it("does not emit sample quality for unavailable behavior", () => {
     expect(buildBehaviorSampleQuality({ behavior: null })).toBeNull();
+  });
+
+  it("evaluates risk signals with negative 5-candle median as downside follow-through", () => {
+    const evaluation = buildHistoricalFollowThroughEvaluation({
+      behavior: makeBehavior({
+        currentContext: { resultGroup: "risk", signalLabel: "breakdown_risk" },
+        horizons: {
+          "1": makeHorizon(16, -0.4, 40),
+          "3": makeHorizon(16, -0.9, 30),
+          "5": makeHorizon(16, -1.39, 25),
+        },
+      }),
+      diagnostics: { available: true, reason: "ok" },
+    });
+
+    expect(evaluation.available).toBe(true);
+    expect(evaluation.posture).toBe("Downside follow-through observed");
+    expect(evaluation.selectedHorizonLabel).toBe("5 candles");
+    expect(evaluation.sampleLabel).toBe("16 completed forward observations");
+    expect(evaluation.directionMatchLabel).toBe("75.0% downside follow-through");
+    expect(evaluation.medianReturnLabel).toBe("-1.39% median return");
+    expect(evaluation.positiveRateLabel).toBe("25.0% positive rate");
+  });
+
+  it("does not support downside follow-through when risk median is positive", () => {
+    const evaluation = buildHistoricalFollowThroughEvaluation({
+      behavior: makeBehavior({
+        currentContext: { resultGroup: "risk", signalLabel: "failed_breakdown" },
+        horizons: { "5": makeHorizon(12, 0.8, 58) },
+      }),
+      diagnostics: { available: true, reason: "ok" },
+    });
+
+    expect(evaluation.posture).toBe(
+      "Risk signal did not show downside follow-through in this sample",
+    );
+    expect(evaluation.interpretation).toContain(
+      "did not show downside follow-through",
+    );
+  });
+
+  it("evaluates eligible signals with positive median as upside follow-through", () => {
+    const evaluation = buildHistoricalFollowThroughEvaluation({
+      behavior: makeBehavior({
+        currentContext: { resultGroup: "eligible", signalLabel: "confirmed" },
+        horizons: { "5": makeHorizon(22, 1.4, 63) },
+      }),
+      diagnostics: { available: true, reason: "ok" },
+    });
+
+    expect(evaluation.posture).toBe("Upside follow-through observed");
+    expect(evaluation.directionMatchLabel).toBe("63.0% upside follow-through");
+    expect(evaluation.sampleConfidenceLabel).toBe("Moderate sample");
+  });
+
+  it("uses conservative watchlist follow-through wording", () => {
+    const evaluation = buildHistoricalFollowThroughEvaluation({
+      behavior: makeBehavior({
+        currentContext: { resultGroup: "watch", signalLabel: "developing" },
+        horizons: { "5": makeHorizon(14, 0.2, 51) },
+      }),
+      diagnostics: { available: true, reason: "ok" },
+    });
+
+    expect(evaluation.posture).toBe("Watchlist follow-through is constructive");
+    expect(evaluation.interpretation).toContain("confirmation is still needed");
+  });
+
+  it("uses overheated pullback and cooling wording", () => {
+    const cooling = buildHistoricalFollowThroughEvaluation({
+      behavior: makeBehavior({
+        currentContext: { resultGroup: "overheated", signalLabel: "extended" },
+        horizons: { "5": makeHorizon(18, -0.6, 38) },
+      }),
+      diagnostics: { available: true, reason: "ok" },
+    });
+    const continued = buildHistoricalFollowThroughEvaluation({
+      behavior: makeBehavior({
+        currentContext: { resultGroup: "overheated", signalLabel: "extended" },
+        horizons: { "5": makeHorizon(18, 1.1, 70) },
+      }),
+      diagnostics: { available: true, reason: "ok" },
+    });
+
+    expect(cooling.posture).toBe("Pullback / cooling behavior observed");
+    expect(cooling.directionMatchLabel).toBe("62.0% pullback / cooling behavior");
+    expect(continued.posture).toBe(
+      "Overheated signals continued higher in this sample",
+    );
+    expect(continued.interpretation).toContain(
+      "does not remove overextension risk",
+    );
+    expect(continued.interpretation).not.toMatch(/\bgood\b/i);
+  });
+
+  it("shows no clear historical follow-through edge for neutral context", () => {
+    const evaluation = buildHistoricalFollowThroughEvaluation({
+      behavior: makeBehavior({
+        currentContext: { resultGroup: "neutral", signalLabel: "neutral" },
+        horizons: { "5": makeHorizon(20, 0.9, 62) },
+      }),
+      diagnostics: { available: true, reason: "ok" },
+    });
+
+    expect(evaluation.posture).toBe("No clear historical follow-through edge");
+    expect(evaluation.directionMatchLabel).toBe("No clear direction match");
+  });
+
+  it("renders unavailable evaluation when horizons lack completed samples", () => {
+    const sampleQuality = buildBehaviorSampleQuality({
+      behavior: makeBehavior({
+        sampleSize: 4,
+        horizons: {
+          "1": makeHorizon(4, 0.2, 50),
+          "3": makeHorizon(0, 0),
+          "5": makeHorizon(0, 0),
+        },
+      }),
+    });
+    const evaluation = buildHistoricalFollowThroughEvaluation({
+      behavior: makeBehavior({
+        sampleSize: 4,
+        horizons: {
+          "1": makeHorizon(4, 0.2, 50),
+          "3": makeHorizon(0, 0),
+          "5": makeHorizon(0, 0),
+        },
+      }),
+      diagnostics: { available: true, reason: "insufficient_sample" },
+      sampleQuality,
+    });
+
+    expect(evaluation.available).toBe(false);
+    expect(evaluation.interpretation).toBe(
+      "Not enough completed forward candles for follow-through evaluation.",
+    );
+    expect(evaluation.caveats).toContain(
+      "Production history is still accumulating.",
+    );
+  });
+
+  it("adds conservative caveats for very limited 1h production history", () => {
+    const behavior = makeBehavior({
+      sampleSize: 5,
+      currentContext: {
+        resultGroup: "eligible",
+        signalLabel: "confirmed",
+        timeframe: "1h",
+      },
+      horizons: {
+        "1": makeHorizon(5, 0.4, 60),
+        "3": makeHorizon(0, 0),
+        "5": makeHorizon(0, 0),
+      },
+    });
+    const evaluation = buildHistoricalFollowThroughEvaluation({
+      behavior,
+      diagnostics: { available: true, reason: "ok" },
+      sampleQuality: buildBehaviorSampleQuality({ behavior }),
+    });
+
+    expect(evaluation.available).toBe(true);
+    expect(evaluation.selectedHorizonLabel).toBe("1 candle");
+    expect(evaluation.caveats).toEqual(
+      expect.arrayContaining([
+        "Very limited completed observations.",
+        "Production history is still accumulating.",
+        "Only the 1-candle horizon is usable; avoid over-weighting it.",
+      ]),
+    );
+  });
+
+  it("handles malformed follow-through numeric fields without crashing", () => {
+    const evaluation = buildHistoricalFollowThroughEvaluation({
+      behavior: makeBehavior({
+        horizons: {
+          "5": {
+            sampleSize: "7",
+            medianReturnPct: "bad",
+            winRatePct: "bad",
+          },
+        },
+      }),
+      diagnostics: { available: true, reason: "ok" },
+    });
+
+    expect(evaluation.available).toBe(false);
+    expect(evaluation.directionMatchLabel).toBe("Not available");
+  });
+
+  it("handles missing behavior in follow-through evaluation", () => {
+    const evaluation = buildHistoricalFollowThroughEvaluation({
+      behavior: null,
+      diagnostics: { available: false, reason: "no_prior_signals" },
+    });
+
+    expect(evaluation.available).toBe(false);
+    expect(evaluation.posture).toBe("Insufficient completed forward candles");
   });
 });
 

@@ -33,6 +33,11 @@ describe("SymbolBehaviorPanel", () => {
     expect(html).toContain("Limited sample");
     expect(html).toContain("Treat as research context while the sample grows.");
     expect(html).not.toContain("Limited but usable sample");
+    expect(html).toContain("Historical Follow-through Evaluation");
+    expect(html).toContain("Upside follow-through observed");
+    expect(html).toContain("Same symbol / same timeframe / similar scanner context");
+    expect(html).toContain("11 completed forward observations");
+    expect(html).toContain("63.6% upside follow-through");
     expect(html).toContain("Sample size");
     expect(html).toContain("Forward horizon observations");
     expect(html).toContain("1 candle");
@@ -63,6 +68,10 @@ describe("SymbolBehaviorPanel", () => {
     expect(html).toContain("No prior matching signals were found yet");
     expect(html).not.toContain("Behavior Readout");
     expect(html).not.toContain("Sample Quality");
+    expect(html).toContain("Historical Follow-through Evaluation");
+    expect(html).toContain(
+      "Not enough completed forward candles for follow-through evaluation.",
+    );
   });
 
   it("renders no_latest_signal coverage for insufficient history", () => {
@@ -119,6 +128,9 @@ describe("SymbolBehaviorPanel", () => {
     expect(html).toContain("Sample size");
     expect(html).toContain("—");
     expect(html).toContain("Unknown");
+    expect(html).toContain(
+      "Not enough completed forward candles for follow-through evaluation.",
+    );
   });
 
   it("limits visible recent outcomes and shows a count note", () => {
@@ -166,6 +178,7 @@ describe("SymbolBehaviorPanel", () => {
     expect(html).toContain(
       "Recent observations appear clustered close together in time.",
     );
+    expect(html).toContain("Historical Follow-through Evaluation");
     expect(html).not.toContain(
       "Some recent observations appear clustered and may reflect development or non-scheduled runs.",
     );
@@ -210,6 +223,7 @@ describe("SymbolBehaviorPanel", () => {
     expect(html).toContain(
       "Clustered recent observations are close together in time.",
     );
+    expect(html).toContain("Historical Follow-through Evaluation");
     expect(html).not.toContain(
       "Very limited sample: more completed forward candles are needed.",
     );
