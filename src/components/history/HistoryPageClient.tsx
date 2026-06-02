@@ -19,6 +19,10 @@ const maxObservationProbeRuns = 12;
 const historyDisclaimer =
   "Research-only. Not financial advice. Historical observations are not predictions.";
 const emptyHistoricalSnapshotRuns: HistoricalSnapshotRun[] = [];
+export const recentRunsPanelClassName =
+  "rounded-md border border-[var(--border)] bg-[var(--panel)] p-4 xl:sticky xl:top-4 xl:flex xl:max-h-[calc(100vh-2rem)] xl:flex-col xl:overflow-hidden";
+export const recentRunsScrollContainerClassName =
+  "space-y-2 pr-1 xl:min-h-0 xl:flex-1 xl:overflow-y-auto xl:overscroll-contain xl:rounded-md xl:border xl:border-[var(--border)] xl:bg-[#0d131a]/40 xl:p-2";
 const unsafePrimarySignalLabelMap: Record<string, string> = {
   "do not chase": "Overheated caution",
   avoid: "Risk review",
@@ -471,61 +475,18 @@ export function HistoryPageClient() {
         </div>
       </section>
 
-      <div className="grid gap-4 xl:grid-cols-[360px_minmax(0,1fr)]">
-        <section className="rounded-md border border-[var(--border)] bg-[var(--panel)] p-4">
-          <div className="mb-3">
-            <h2 className="text-base font-semibold">Recent Successful Runs</h2>
-            <p className="mt-1 text-xs text-[var(--muted)]">
-              Showing recent successful {timeframe} runs from Postgres.
-            </p>
-          </div>
-          {snapshotsQuery.isError ? (
-            <StatePanel
-              title="History unavailable"
-              message={formatQueryError(snapshotsQuery.error)}
-            />
-          ) : snapshotsQuery.isLoading ? (
-            <StatePanel title="Loading runs" message="Loading stored scan runs." />
-          ) : snapshots.length === 0 ? (
-            <StatePanel
-              title="No stored runs"
-              message={`No successful ${timeframe} historical snapshots are available.`}
-            />
-          ) : (
-            <div className="max-h-[680px] space-y-2 overflow-y-auto pr-1">
-              {snapshots.map((run) => (
-                <button
-                  key={run.runId}
-                  type="button"
-                  onClick={() => setManualSelectedRunId(run.runId)}
-                  className={`w-full rounded-md border p-3 text-left transition ${
-                    run.runId === selectedRunId
-                      ? "border-[var(--foreground)] bg-[#111820]"
-                      : "border-[var(--border)] hover:border-[var(--muted)]"
-                  }`}
-                >
-                  <div className="flex items-start justify-between gap-3">
-                    <div>
-                      <p className="text-sm font-semibold">{run.runId}</p>
-                      <p className="mt-1 text-xs text-[var(--muted)]">
-                        Finished {formatHistoryDateTime(run.finishedAt)}
-                      </p>
-                    </div>
-                    <span className="rounded border border-[var(--border)] px-2 py-1 text-xs font-semibold">
-                      {run.timeframe}
-                    </span>
-                  </div>
-                  <div className="mt-3 grid grid-cols-2 gap-2 text-xs text-[var(--muted)]">
-                    <span>Scanned {formatCount(run.symbolsScanned)}</span>
-                    <span>Signals {formatCount(run.signalsCreated)}</span>
-                    <span>Skipped {formatCount(run.skipped)}</span>
-                    <span>{formatFullUniverse(run)}</span>
-                  </div>
-                </button>
-              ))}
-            </div>
-          )}
-        </section>
+      <div className="grid gap-4 xl:grid-cols-[380px_minmax(0,1fr)] xl:items-start">
+        <RecentSuccessfulRunsPanel
+          timeframe={timeframe}
+          snapshots={snapshots}
+          selectedRunId={selectedRunId}
+          isError={snapshotsQuery.isError}
+          errorMessage={
+            snapshotsQuery.isError ? formatQueryError(snapshotsQuery.error) : null
+          }
+          isLoading={snapshotsQuery.isLoading}
+          onSelectRun={setManualSelectedRunId}
+        />
 
         <div className="space-y-4">
           <section className="rounded-md border border-[var(--border)] bg-[var(--panel)] p-4">
@@ -577,6 +538,94 @@ export function HistoryPageClient() {
           <SnapshotTable rows={rows} isLoading={snapshotQuery.isFetching} />
         </div>
       </div>
+    </section>
+  );
+}
+
+export function RecentSuccessfulRunsPanel({
+  timeframe,
+  snapshots,
+  selectedRunId,
+  isError,
+  errorMessage,
+  isLoading,
+  onSelectRun,
+}: {
+  timeframe: HistoryTimeframe;
+  snapshots: HistoricalSnapshotRun[];
+  selectedRunId: string | null;
+  isError: boolean;
+  errorMessage: string | null;
+  isLoading: boolean;
+  onSelectRun: (runId: string) => void;
+}) {
+  return (
+    <section
+      className={recentRunsPanelClassName}
+      data-testid="recent-runs-panel"
+      aria-label="Recent successful runs"
+    >
+      <div className="mb-3 shrink-0">
+        <h2 className="text-base font-semibold">Recent Successful Runs</h2>
+        <p className="mt-1 text-xs text-[var(--muted)]">
+          Showing recent successful {timeframe} runs from Postgres.
+        </p>
+      </div>
+      {isError ? (
+        <StatePanel
+          title="History unavailable"
+          message={errorMessage ?? "Stored scan runs could not be loaded."}
+        />
+      ) : isLoading ? (
+        <StatePanel title="Loading runs" message="Loading stored scan runs." />
+      ) : snapshots.length === 0 ? (
+        <StatePanel
+          title="No stored runs"
+          message={`No successful ${timeframe} historical snapshots are available.`}
+        />
+      ) : (
+        <div
+          className={recentRunsScrollContainerClassName}
+          data-testid="recent-runs-scroll-container"
+          aria-label="Recent successful run selector"
+        >
+          {snapshots.map((run) => {
+            const isSelected = run.runId === selectedRunId;
+
+            return (
+              <button
+                key={run.runId}
+                type="button"
+                onClick={() => onSelectRun(run.runId)}
+                aria-pressed={isSelected}
+                className={`w-full rounded-md border p-3 text-left transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)] ${
+                  isSelected
+                    ? "border-[var(--foreground)] bg-[#111820]"
+                    : "border-[var(--border)] hover:border-[var(--muted)]"
+                }`}
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <p className="break-all text-sm font-semibold">{run.runId}</p>
+                    <p className="mt-1 text-xs text-[var(--muted)]">
+                      Finished {formatHistoryDateTime(run.finishedAt)}
+                    </p>
+                  </div>
+                  <span className="shrink-0 rounded border border-[var(--border)] px-2 py-1 text-xs font-semibold">
+                    {run.timeframe}
+                  </span>
+                </div>
+                <div className="mt-3 grid grid-cols-2 gap-2 text-xs text-[var(--muted)]">
+                  <span>Scanned {formatCount(run.symbolsScanned)}</span>
+                  <span>Signals {formatCount(run.signalsCreated)}</span>
+                  <span>Skipped {formatCount(run.skipped)}</span>
+                  <span>{formatFullUniverse(run)}</span>
+                </div>
+              </button>
+            );
+          })}
+        </div>
+      )}
     </section>
   );
 }
@@ -764,6 +813,8 @@ function ForwardObservationStatePanel({
   const summary = uiState.summary;
   const coverage = readiness?.coverage ?? null;
   const selectedReadiness = readiness?.selectedRun ?? null;
+  const observationReadiness = getReadyObservationReadinessRun(readiness);
+  const dominantReadiness = observationReadiness ?? selectedReadiness;
   const title = getForwardObservationPanelTitle(uiState);
   const message = getForwardObservationPanelMessage({
     uiState,
@@ -799,6 +850,12 @@ function ForwardObservationStatePanel({
               value={shortRunId(readiness.recommendedRun.run.runId)}
             />
           ) : null}
+          {observationReadiness ? (
+            <Metric
+              label="Observation Run"
+              value={shortRunId(observationReadiness.run.runId)}
+            />
+          ) : null}
           {summary ? <Metric label="Rows" value={formatObservationRows(summary)} /> : null}
           {summary ? (
             <Metric label="Complete" value={formatCount(summary.completeCount)} />
@@ -827,7 +884,7 @@ function ForwardObservationStatePanel({
           <Metric
             label="Dominant Reason"
             value={formatObservationBlocker(
-              selectedReadiness?.blocker ?? readiness?.metadata.blocker,
+              dominantReadiness?.blocker ?? readiness?.metadata.blocker,
               uiState.maturity.dominantMissingReason,
             )}
           />
@@ -886,7 +943,7 @@ function getForwardObservationPanelTitle(uiState: ForwardObservationUiState) {
     case "using_selected_run":
       return "Using selected run";
     case "using_recommended_observable_run":
-      return "Using most recent observable run";
+      return "Using mature observation run";
     case "loading_observation_rows":
       return "Loading observation rows";
     case "observation_rows_error":
@@ -931,7 +988,7 @@ function getForwardObservationPanelMessage({
     case "using_selected_run":
       return "The selected stored run is the observation run for this forward window.";
     case "using_recommended_observable_run":
-      return "The selected stored run remains unchanged, and Forward Observation is using the most recent observable run for this window.";
+      return "The latest selected run remains unchanged, and Forward Observation is using a mature observation run for this forward observation window.";
     case "loading_observation_rows":
       return "Loading forward observation rows for the selected observation run.";
     case "observation_rows_error":
@@ -2078,11 +2135,11 @@ function getForwardObservationReadyContextNote({
     : "mature full-universe run";
 
   if (diagnosticBlocker === "waiting_for_future_candles") {
-    return `Latest run is still waiting for future candles. Showing the most recent ${runDescription} instead.`;
+    return `Latest selected run is still waiting for future candles. Showing the most recent ${runDescription} instead.`;
   }
 
   if (diagnosticBlocker === "stale_market_data") {
-    return `Latest run has stale market data coverage. Showing the most recent ${runDescription} instead.`;
+    return `Latest selected run has stale market data coverage. Showing the most recent ${runDescription} instead.`;
   }
 
   return `Showing the most recent ${runDescription} for this historical observation.`;
@@ -2111,7 +2168,7 @@ function formatForwardObservationSelectionMode(
     case "selected":
       return "Using selected run";
     case "observable":
-      return "Using most recent observable run";
+      return "Using mature observation run";
     case "not_ready":
       return "Not ready for selected run";
     case "unavailable":
@@ -2141,7 +2198,7 @@ function formatForwardObservationUiStatusLabel(
     case "observation_rows_error":
       return formatForwardObservationSelectionMode(uiState.selectionMode);
     case "using_recommended_observable_run":
-      return "Using most recent observable run";
+      return "Using mature observation run";
   }
 }
 

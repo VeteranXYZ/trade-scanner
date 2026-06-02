@@ -15,6 +15,9 @@ import {
   getForwardObservationRowsRunId,
   getObservationProbeRuns,
   HistoryPageClient,
+  RecentSuccessfulRunsPanel,
+  recentRunsPanelClassName,
+  recentRunsScrollContainerClassName,
   selectForwardObservationResult,
   SnapshotTable,
 } from "./HistoryPageClient";
@@ -128,6 +131,40 @@ describe("HistoryPageClient display formatting", () => {
     expect(html).not.toContain("Avoid");
     expect(html).not.toContain("Show More");
     expect(html).not.toContain("Pagination");
+  });
+
+  it("renders Recent Successful Runs as a wide-screen contained scroll panel", () => {
+    const selectedRun = makeObservationRun({
+      runId: "11111111-1111-4111-8111-111111111111",
+      finishedAt: "2026-06-02T08:05:00.000Z",
+    });
+    const olderRun = makeObservationRun({
+      runId: "22222222-2222-4222-8222-222222222222",
+      finishedAt: "2026-06-02T04:05:00.000Z",
+    });
+    const html = renderToStaticMarkup(
+      createElement(RecentSuccessfulRunsPanel, {
+        timeframe: "4h",
+        snapshots: [selectedRun, olderRun],
+        selectedRunId: selectedRun.runId,
+        isError: false,
+        errorMessage: null,
+        isLoading: false,
+        onSelectRun: () => undefined,
+      }),
+    );
+
+    expect(html).toContain('data-testid="recent-runs-panel"');
+    expect(html).toContain('data-testid="recent-runs-scroll-container"');
+    expect(html).toContain("xl:sticky");
+    expect(html).toContain("xl:max-h-[calc(100vh-2rem)]");
+    expect(html).toContain("xl:overflow-y-auto");
+    expect(html).toContain("xl:overscroll-contain");
+    expect(html).toContain("aria-pressed=\"true\"");
+    expect(html).toContain("Scanned 409");
+    expect(recentRunsPanelClassName).toContain("xl:sticky");
+    expect(recentRunsScrollContainerClassName).toContain("xl:overflow-y-auto");
+    expect(recentRunsScrollContainerClassName).toContain("xl:overscroll-contain");
   });
 
   it("renders Forward Observation with neutral copy and full row visibility", () => {
@@ -386,11 +423,11 @@ describe("HistoryPageClient display formatting", () => {
       readiness,
       readinessError: null,
     })).toBe(recommendedRun.runId);
-    expect(html).toContain("Using most recent observable run");
+    expect(html).toContain("Using mature observation run");
     expect(html).toContain("Latest run: 11111111, status: Market data appears stale");
     expect(html).toContain("Observation run: 22222222, status: Ready");
     expect(html).toContain("Observation finished 2026-06-02 02:52");
-    expect(html).toContain("Latest run has stale market data coverage");
+    expect(html).toContain("Latest selected run has stale market data coverage");
     expect(html).toContain("Observed Change");
     expect(html).not.toContain("Forward observation unavailable");
   });
@@ -443,11 +480,14 @@ describe("HistoryPageClient display formatting", () => {
       readinessError: null,
     })).toBe(observationRun.runId);
     expect(html).toContain(
-      "Latest run is still waiting for future candles. Showing the most recent mature full-universe run instead.",
+      "Latest selected run is still waiting for future candles. Showing the most recent mature full-universe run instead.",
     );
     expect(html).toContain("Latest run: 11111111, status: Waiting for future candles");
     expect(html).toContain("Observation run: 22222222, status: Ready");
     expect(html).toContain("Observed Change");
+    expect(html).toContain("Using mature observation run");
+    expect(html).not.toContain("Loading observation readiness");
+    expect(html).not.toContain("Dominant Reason");
     expect(html).not.toContain("Forward observation unavailable");
   });
 
