@@ -170,6 +170,14 @@ describe("HistoryPageClient display formatting", () => {
     expect(html).toContain("xl:overflow-y-auto");
     expect(html).toContain("xl:overscroll-contain");
     expect(html).toContain("aria-pressed=\"true\"");
+    expect(html).toContain("11111111...1111");
+    expect(html).toContain("22222222...2222");
+    expect(html).toContain("33333333...3333");
+    expect(html).toContain('title="11111111-1111-4111-8111-111111111111"');
+    expect(html).toContain(
+      'aria-label="Select historical run 11111111-1111-4111-8111-111111111111"',
+    );
+    expect(html).not.toContain(">11111111-1111-4111-8111-111111111111<");
     expect(html).toContain("Scanned 409");
     expect(html).toContain("Selected");
     expect(html).toContain("Latest");
@@ -204,7 +212,7 @@ describe("HistoryPageClient display formatting", () => {
 
     expect(html).toContain("Forward Observation");
     expect(html).toContain("Research-only. Historical observations are not predictions.");
-    expect(html).toContain("Using selected run");
+    expect(html).toContain("Mode: Using selected run");
     expect(html).toContain("1 candle");
     expect(html).toContain("3 candles");
     expect(html).toContain("5 candles");
@@ -444,11 +452,11 @@ describe("HistoryPageClient display formatting", () => {
       readiness,
       readinessError: null,
     })).toBe(recommendedRun.runId);
-    expect(html).toContain("Using mature observation run");
-    expect(html).toContain("Latest run: 11111111, status: Market data appears stale");
+    expect(html).toContain("Mode: Using mature observation run");
+    expect(html).toContain("Selected stored run: 11111111, status: Market data appears stale");
     expect(html).toContain("Observation run: 22222222, status: Ready");
     expect(html).toContain("Observation finished 2026-06-02 02:52");
-    expect(html).toContain("Latest selected run has stale market data coverage");
+    expect(html).toContain("Selected stored run has stale market data coverage");
     expect(html).toContain("Observed Change");
     expect(html).not.toContain("Forward observation unavailable");
   });
@@ -501,12 +509,12 @@ describe("HistoryPageClient display formatting", () => {
       readinessError: null,
     })).toBe(observationRun.runId);
     expect(html).toContain(
-      "Latest selected run is still waiting for future candles. Showing the most recent mature full-universe run instead.",
+      "Selected stored run is still waiting for future candles. Showing the most recent mature full-universe run instead.",
     );
-    expect(html).toContain("Latest run: 11111111, status: Waiting for future candles");
+    expect(html).toContain("Selected stored run: 11111111, status: Waiting for future candles");
     expect(html).toContain("Observation run: 22222222, status: Ready");
     expect(html).toContain("Observed Change");
-    expect(html).toContain("Using mature observation run");
+    expect(html).toContain("Mode: Using mature observation run");
     expect(html).not.toContain("Loading observation readiness");
     expect(html).not.toContain("Dominant Reason");
     expect(html).not.toContain("Forward observation unavailable");
@@ -625,7 +633,7 @@ describe("HistoryPageClient display formatting", () => {
       readiness,
       readinessError: null,
     })).toBe(selectedRun.runId);
-    expect(html).toContain("Using selected run");
+    expect(html).toContain("Mode: Using selected run");
     expect(html).toContain("Observation run: 11111111, status: Ready");
     expect(html).toContain("Observed Change");
   });

@@ -502,7 +502,7 @@ export function HistoryPageClient() {
                   Stored scanner metadata for the selected historical run.
                   Snapshot Rows below are scanner output from this selected run.
                   Forward Observation may use a different mature observation run
-                  when the latest selected run is still waiting for future candles.
+                  when the selected stored run is still waiting for future candles.
                 </p>
               </div>
               {snapshotQuery.data ? (
@@ -619,11 +619,17 @@ export function RecentSuccessfulRunsPanel({
                 type="button"
                 onClick={() => onSelectRun(run.runId)}
                 aria-pressed={isSelected}
+                aria-label={`Select historical run ${run.runId}`}
                 className={formatRecentRunCardClassName(run, isSelected)}
               >
                 <div className="flex items-start justify-between gap-3">
-                  <div>
-                    <p className="break-all text-sm font-semibold">{run.runId}</p>
+                  <div className="min-w-0">
+                    <p
+                      className="truncate text-sm font-semibold"
+                      title={run.runId}
+                    >
+                      {formatCompactRunId(run.runId)}
+                    </p>
                     <p className="mt-1 text-xs text-[var(--muted)]">
                       Finished {formatHistoryDateTime(run.finishedAt)}
                     </p>
@@ -743,7 +749,7 @@ export function ForwardObservationSection({
           <p className="mt-1 max-w-3xl text-xs leading-5 text-[var(--muted)]">
             Forward Observation is measured from the observation run after the
             selected number of complete future candles. It may use a mature
-            historical observation run when the latest selected run is not mature.
+            historical observation run when the selected stored run is not mature.
           </p>
           <p className="mt-1 text-xs font-semibold text-[var(--muted)]">
             {formatForwardObservationUiStatusLabel(uiState)}
@@ -771,13 +777,13 @@ export function ForwardObservationSection({
         <div className="mb-3 flex flex-wrap gap-2 text-xs text-[var(--muted)]">
           {selectedReadinessRun ? (
             <span className="rounded border border-[var(--border)] px-2 py-1">
-              Latest run: {shortRunId(selectedReadinessRun.runId)}, status:{" "}
+              Selected stored run: {shortRunId(selectedReadinessRun.runId)}, status:{" "}
               {formatReadinessRunStatus(selectedReadiness)}
             </span>
           ) : null}
           {selectedReadinessRun ? (
             <span className="rounded border border-[var(--border)] px-2 py-1">
-              Latest finished {formatHistoryDateTime(selectedReadinessRun.finishedAt)}
+              Selected finished {formatHistoryDateTime(selectedReadinessRun.finishedAt)}
             </span>
           ) : null}
           {observationRun ? (
@@ -1098,7 +1104,7 @@ function getForwardObservationPanelMessage({
     case "using_selected_run":
       return "The selected stored run is the observation run for this forward window.";
     case "using_recommended_observable_run":
-      return "The latest selected run remains unchanged, and Forward Observation is using a mature observation run for this forward observation window.";
+      return "The selected stored run remains unchanged, and Forward Observation is using a mature observation run for this forward observation window.";
     case "loading_observation_rows":
       return "Loading forward observation rows for the selected observation run.";
     case "observation_rows_error":
@@ -2239,11 +2245,11 @@ function getForwardObservationReadyContextNote({
     : "mature full-universe run";
 
   if (diagnosticBlocker === "waiting_for_future_candles") {
-    return `Latest selected run is still waiting for future candles. Showing the most recent ${runDescription} instead.`;
+    return `Selected stored run is still waiting for future candles. Showing the most recent ${runDescription} instead.`;
   }
 
   if (diagnosticBlocker === "stale_market_data") {
-    return `Latest selected run has stale market data coverage. Showing the most recent ${runDescription} instead.`;
+    return `Selected stored run has stale market data coverage. Showing the most recent ${runDescription} instead.`;
   }
 
   return `Showing the most recent ${runDescription} for this historical observation.`;
@@ -2300,9 +2306,9 @@ function formatForwardObservationUiStatusLabel(
     case "observation_ready_summary_missing":
     case "observation_empty":
     case "observation_rows_error":
-      return formatForwardObservationSelectionMode(uiState.selectionMode);
+      return `Mode: ${formatForwardObservationSelectionMode(uiState.selectionMode)}`;
     case "using_recommended_observable_run":
-      return "Using mature observation run";
+      return "Mode: Using mature observation run";
   }
 }
 
@@ -2397,6 +2403,18 @@ function formatDuration(value: number, unit: "hour" | "day" | "week") {
 
 function shortRunId(value: string | null | undefined) {
   return value ? value.slice(0, 8) : "-";
+}
+
+function formatCompactRunId(value: string | null | undefined) {
+  if (!value) {
+    return "-";
+  }
+
+  if (value.length <= 16) {
+    return value;
+  }
+
+  return `${value.slice(0, 8)}...${value.slice(-4)}`;
 }
 
 function formatFullUniverse(run: HistoricalSnapshotRun) {
