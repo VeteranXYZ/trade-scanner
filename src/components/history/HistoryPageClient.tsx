@@ -1,6 +1,6 @@
 "use client";
 
-import { useQuery } from "@tanstack/react-query";
+import { useQueries, useQuery } from "@tanstack/react-query";
 import Link from "next/link";
 import { useMemo, useState } from "react";
 import {
@@ -15,8 +15,10 @@ const HISTORY_TIMEFRAMES = ["1h", "4h", "1d", "1w"] as const;
 const OBSERVATION_WINDOWS = [1, 3, 5, 10] as const;
 const assetClass = "crypto";
 const snapshotsLimit = 25;
+const maxObservationProbeRuns = 12;
 const historyDisclaimer =
   "Research-only. Not financial advice. Historical observations are not predictions.";
+const emptyHistoricalSnapshotRuns: HistoricalSnapshotRun[] = [];
 const unsafePrimarySignalLabelMap: Record<string, string> = {
   "do not chase": "Overheated caution",
   avoid: "Risk review",
@@ -25,6 +27,15 @@ const unsafePrimarySignalLabelMap: Record<string, string> = {
 type HistoryTimeframe = (typeof HISTORY_TIMEFRAMES)[number];
 type ObservationWindow = (typeof OBSERVATION_WINDOWS)[number];
 type ObservationDataStatus = "complete" | "partial" | "missing";
+type ForwardObservationMaturityState =
+  | "ready"
+  | "not_ready"
+  | "empty_or_unavailable";
+type ForwardObservationSelectionMode =
+  | "selected"
+  | "observable"
+  | "not_ready"
+  | "unavailable";
 
 type HistoricalSnapshotRun = {
   runId: string;
@@ -146,6 +157,35 @@ type HistoricalSnapshotObservationsResponse = {
   };
 };
 
+type ForwardObservationMaturity = {
+  state: ForwardObservationMaturityState;
+  readyCount: number;
+  rowCount: number;
+  completeCount: number;
+  partialCount: number;
+  missingCount: number;
+  dominantMissingReason: string | null;
+  dominantMissingReasonCount: number;
+};
+
+type ForwardObservationCandidate = {
+  run: HistoricalSnapshotRun;
+  response: HistoricalSnapshotObservationsResponse | null;
+  isLoading: boolean;
+  isFetching: boolean;
+  error: string | null;
+};
+
+type ForwardObservationSelection = {
+  response: HistoricalSnapshotObservationsResponse | null;
+  maturity: ForwardObservationMaturity | null;
+  run: HistoricalSnapshotRun | null;
+  mode: ForwardObservationSelectionMode;
+  isLoading: boolean;
+  isFetching: boolean;
+  error: string | null;
+};
+
 export function HistoryPageClient() {
   const [timeframe, setTimeframe] = useState<HistoryTimeframe>("4h");
   const [observationWindow, setObservationWindow] =
@@ -159,7 +199,7 @@ export function HistoryPageClient() {
       fetchHistoricalSnapshots({ timeframe, assetClass, signal }),
     staleTime: 60_000,
   });
-  const snapshots = snapshotsQuery.data?.snapshots ?? [];
+  const snapshots = snapshotsQuery.data?.snapshots ?? emptyHistoricalSnapshotRuns;
   const selectedRunId =
     manualSelectedRunId && snapshots.some((run) => run.runId === manualSelectedRunId)
       ? manualSelectedRunId
@@ -176,22 +216,47 @@ export function HistoryPageClient() {
     enabled: selectedRunId !== null,
     staleTime: 60_000,
   });
-  const observationsQuery = useQuery({
-    queryKey: [
-      "history-snapshot-observations",
-      selectedRunId,
-      assetClass,
-      observationWindow,
-    ],
-    queryFn: ({ signal }) =>
-      fetchHistoricalSnapshotObservations({
-        runId: selectedRunId ?? "",
-        assetClass,
+  const observationProbeRuns = useMemo(
+    () =>
+      getObservationProbeRuns({
+        snapshots,
+        selectedRunId,
         window: observationWindow,
-        signal,
       }),
-    enabled: selectedRunId !== null,
-    staleTime: 60_000,
+    [snapshots, selectedRunId, observationWindow],
+  );
+  const observationQueries = useQueries({
+    queries: observationProbeRuns.map((run) => ({
+      queryKey: [
+        "history-snapshot-observations",
+        run.runId,
+        assetClass,
+        observationWindow,
+      ],
+      queryFn: ({ signal }: { signal?: AbortSignal }) =>
+        fetchHistoricalSnapshotObservations({
+          runId: run.runId,
+          assetClass,
+          window: observationWindow,
+          signal,
+        }),
+      enabled: selectedRunId !== null,
+      staleTime: 60_000,
+    })),
+  });
+  const observationSelection = selectForwardObservationResult({
+    selectedRunId,
+    candidates: observationProbeRuns.map((run, index) => {
+      const query = observationQueries[index];
+
+      return {
+        run,
+        response: query?.data ?? null,
+        isLoading: query?.isLoading ?? false,
+        isFetching: query?.isFetching ?? false,
+        error: query?.isError ? formatQueryError(query.error) : null,
+      };
+    }),
   });
   const rows = snapshotQuery.data?.rows ?? [];
   const selectedRun = snapshotQuery.data?.run ?? null;
@@ -204,13 +269,15 @@ export function HistoryPageClient() {
     void snapshotsQuery.refetch();
     if (selectedRunId !== null) {
       void snapshotQuery.refetch();
-      void observationsQuery.refetch();
+      for (const query of observationQueries) {
+        void query.refetch();
+      }
     }
   };
   const isRefreshing =
     snapshotsQuery.isFetching ||
     snapshotQuery.isFetching ||
-    observationsQuery.isFetching;
+    observationSelection.isFetching;
 
   return (
     <section className="mx-auto max-w-[1800px] px-3 py-5 sm:px-4">
@@ -359,14 +426,13 @@ export function HistoryPageClient() {
           <ForwardObservationSection
             window={observationWindow}
             onWindowChange={setObservationWindow}
-            response={observationsQuery.data ?? null}
-            isLoading={selectedRunId !== null && observationsQuery.isLoading}
-            isFetching={observationsQuery.isFetching}
-            error={
-              observationsQuery.isError
-                ? formatQueryError(observationsQuery.error)
-                : null
-            }
+            response={observationSelection.response}
+            maturity={observationSelection.maturity}
+            observationRun={observationSelection.run}
+            selectionMode={observationSelection.mode}
+            isLoading={selectedRunId !== null && observationSelection.isLoading}
+            isFetching={observationSelection.isFetching}
+            error={observationSelection.error}
           />
 
           <SnapshotTable rows={rows} isLoading={snapshotQuery.isFetching} />
@@ -380,6 +446,9 @@ export function ForwardObservationSection({
   window,
   onWindowChange,
   response,
+  maturity,
+  observationRun,
+  selectionMode,
   isLoading,
   isFetching,
   error,
@@ -387,12 +456,17 @@ export function ForwardObservationSection({
   window: ObservationWindow;
   onWindowChange: (window: ObservationWindow) => void;
   response: HistoricalSnapshotObservationsResponse | null;
+  maturity: ForwardObservationMaturity | null;
+  observationRun: HistoricalSnapshotRun | null;
+  selectionMode: ForwardObservationSelectionMode;
   isLoading: boolean;
   isFetching: boolean;
   error: string | null;
 }) {
   const rows = response?.rows ?? [];
   const metadata = response?.metadata ?? null;
+  const effectiveMaturity =
+    maturity ?? classifyForwardObservationMaturity(response);
 
   return (
     <section className="rounded-md border border-[var(--border)] bg-[var(--panel)] p-4">
@@ -401,6 +475,9 @@ export function ForwardObservationSection({
           <h2 className="text-base font-semibold">Forward Observation</h2>
           <p className="mt-1 text-xs text-[var(--muted)]">
             Research-only. Historical observations are not predictions.
+          </p>
+          <p className="mt-1 text-xs font-semibold text-[var(--muted)]">
+            {formatForwardObservationSelectionMode(selectionMode)}
           </p>
         </div>
         <div className="flex rounded-md border border-[var(--border)] p-1">
@@ -421,6 +498,20 @@ export function ForwardObservationSection({
         </div>
       </div>
 
+      {metadata || observationRun ? (
+        <div className="mb-3 flex flex-wrap gap-2 text-xs text-[var(--muted)]">
+          <span className="rounded border border-[var(--border)] px-2 py-1">
+            Observation run {shortRunId(observationRun?.runId)}
+          </span>
+          <span className="rounded border border-[var(--border)] px-2 py-1">
+            Finished {formatHistoryDateTime(observationRun?.finishedAt)}
+          </span>
+          <span className="rounded border border-[var(--border)] px-2 py-1">
+            Maturity {formatMaturityState(effectiveMaturity.state)}
+          </span>
+        </div>
+      ) : null}
+
       {metadata ? (
         <div className="mb-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-6">
           <Metric label="Selected Window" value={`${metadata.window} candles`} />
@@ -438,6 +529,16 @@ export function ForwardObservationSection({
         <StatePanel
           title="Loading observation"
           message="Loading forward observation rows."
+        />
+      ) : metadata && effectiveMaturity.state === "not_ready" ? (
+        <ForwardObservationNotReadyPanel
+          metadata={metadata}
+          maturity={effectiveMaturity}
+        />
+      ) : metadata && effectiveMaturity.state === "empty_or_unavailable" ? (
+        <StatePanel
+          title="Observation unavailable"
+          message="Forward observation data is unavailable for the selected window."
         />
       ) : rows.length === 0 ? (
         <StatePanel
@@ -503,6 +604,46 @@ export function ForwardObservationSection({
         </div>
       )}
     </section>
+  );
+}
+
+function ForwardObservationNotReadyPanel({
+  metadata,
+  maturity,
+}: {
+  metadata: HistoricalSnapshotObservationsResponse["metadata"];
+  maturity: ForwardObservationMaturity;
+}) {
+  return (
+    <div className="rounded-md border border-[var(--border)] p-4">
+      <h3 className="text-sm font-semibold">
+        Forward observation is not ready yet
+      </h3>
+      <p className="mt-2 max-w-3xl text-sm leading-6 text-[var(--muted)]">
+        This snapshot is too recent for the selected forward window. Forward
+        Observation uses completed future candles in the selected timeframe.
+        Choose an older run or a shorter window.
+      </p>
+      <div className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+        <Metric label="Selected Window" value={`${metadata.window} candles`} />
+        <Metric label="Timeframe" value={metadata.timeframe} />
+        <Metric label="Rows" value={formatCount(metadata.rowCount)} />
+        <Metric
+          label="Missing Reason"
+          value={formatMissingReason(
+            maturity.dominantMissingReason ?? "missing_data",
+          )}
+        />
+      </div>
+      <p className="mt-3 text-xs leading-5 text-[var(--muted)]">
+        For {metadata.timeframe} + {metadata.window}{" "}
+        {metadata.window === 1 ? "candle" : "candles"}, expect roughly{" "}
+        {formatApproximateObservationWait(metadata.timeframe, metadata.window)}{" "}
+        after the anchor before a complete {metadata.window}-candle observation
+        can exist. Candle sync timing and missing market data can affect
+        availability.
+      </p>
+    </div>
   );
 }
 
@@ -618,6 +759,184 @@ function StatePanel({ title, message }: { title: string; message: string }) {
       <p className="mt-1 text-sm leading-6 text-[var(--muted)]">{message}</p>
     </div>
   );
+}
+
+export function getObservationProbeRuns({
+  snapshots,
+  selectedRunId,
+  window,
+}: {
+  snapshots: HistoricalSnapshotRun[];
+  selectedRunId: string | null;
+  window: ObservationWindow;
+}) {
+  if (!selectedRunId) {
+    return [];
+  }
+
+  const selectedIndex = snapshots.findIndex((run) => run.runId === selectedRunId);
+
+  if (selectedIndex < 0) {
+    return [];
+  }
+
+  return snapshots.slice(
+    selectedIndex,
+    selectedIndex + getObservationProbeLimit(window),
+  );
+}
+
+export function classifyForwardObservationMaturity(
+  response: HistoricalSnapshotObservationsResponse | null,
+): ForwardObservationMaturity {
+  if (!response) {
+    return emptyForwardObservationMaturity();
+  }
+
+  const metadata = response.metadata;
+  const readyCount = metadata.completeCount + metadata.partialCount;
+  const { reason, count } = getDominantMissingReason(response.rows);
+
+  if (metadata.rowCount <= 0 || response.rows.length === 0) {
+    return {
+      ...emptyForwardObservationMaturity(),
+      rowCount: metadata.rowCount,
+      completeCount: metadata.completeCount,
+      partialCount: metadata.partialCount,
+      missingCount: metadata.missingCount,
+      dominantMissingReason: reason,
+      dominantMissingReasonCount: count,
+    };
+  }
+
+  if (readyCount > 0) {
+    return {
+      state: "ready",
+      readyCount,
+      rowCount: metadata.rowCount,
+      completeCount: metadata.completeCount,
+      partialCount: metadata.partialCount,
+      missingCount: metadata.missingCount,
+      dominantMissingReason: reason,
+      dominantMissingReasonCount: count,
+    };
+  }
+
+  const allRowsMissing =
+    metadata.missingCount === metadata.rowCount &&
+    metadata.rowCount > 0;
+  const state =
+    allRowsMissing && isFutureCandleMissingReason(reason)
+      ? "not_ready"
+      : "empty_or_unavailable";
+
+  return {
+    state,
+    readyCount,
+    rowCount: metadata.rowCount,
+    completeCount: metadata.completeCount,
+    partialCount: metadata.partialCount,
+    missingCount: metadata.missingCount,
+    dominantMissingReason: reason,
+    dominantMissingReasonCount: count,
+  };
+}
+
+export function selectForwardObservationResult({
+  selectedRunId,
+  candidates,
+}: {
+  selectedRunId: string | null;
+  candidates: ForwardObservationCandidate[];
+}): ForwardObservationSelection {
+  if (!selectedRunId || candidates.length === 0) {
+    return emptyForwardObservationSelection();
+  }
+
+  const enriched = candidates.map((candidate) => ({
+    ...candidate,
+    maturity: classifyForwardObservationMaturity(candidate.response),
+  }));
+  const selected =
+    enriched.find((candidate) => candidate.run.runId === selectedRunId) ??
+    enriched[0];
+
+  if (!selected.response && selected.isLoading) {
+    return {
+      response: null,
+      maturity: null,
+      run: selected.run,
+      mode: "selected",
+      isLoading: true,
+      isFetching: true,
+      error: null,
+    };
+  }
+
+  if (selected.error) {
+    return {
+      response: null,
+      maturity: null,
+      run: selected.run,
+      mode: "unavailable",
+      isLoading: false,
+      isFetching: selected.isFetching,
+      error: selected.error,
+    };
+  }
+
+  if (selected.maturity.state === "ready") {
+    return buildForwardObservationSelection({
+      candidate: selected,
+      mode: "selected",
+      candidates: enriched,
+    });
+  }
+
+  if (selected.maturity.state === "not_ready") {
+    const readyCandidate = enriched.find(
+      (candidate) => candidate.maturity.state === "ready",
+    );
+
+    if (readyCandidate) {
+      return buildForwardObservationSelection({
+        candidate: readyCandidate,
+        mode: "observable",
+        candidates: enriched,
+      });
+    }
+
+    const pendingProbe = enriched.some(
+      (candidate) =>
+        candidate.run.runId !== selectedRunId &&
+        !candidate.response &&
+        candidate.isLoading,
+    );
+
+    if (pendingProbe) {
+      return {
+        response: selected.response,
+        maturity: selected.maturity,
+        run: selected.response?.run ?? selected.run,
+        mode: "not_ready",
+        isLoading: true,
+        isFetching: true,
+        error: null,
+      };
+    }
+
+    return buildForwardObservationSelection({
+      candidate: selected,
+      mode: "not_ready",
+      candidates: enriched,
+    });
+  }
+
+  return buildForwardObservationSelection({
+    candidate: selected,
+    mode: "unavailable",
+    candidates: enriched,
+  });
 }
 
 function buildRunSummaryItems(run: HistoricalSnapshotRun | null) {
@@ -821,17 +1140,69 @@ function formatDataStatus(value: ObservationDataStatus) {
   return value.charAt(0).toUpperCase() + value.slice(1);
 }
 
+function formatForwardObservationSelectionMode(
+  value: ForwardObservationSelectionMode,
+) {
+  switch (value) {
+    case "selected":
+      return "Using selected run";
+    case "observable":
+      return "Using most recent observable run";
+    case "not_ready":
+      return "Not ready for selected run";
+    case "unavailable":
+      return "Observation unavailable";
+  }
+}
+
+function formatMaturityState(value: ForwardObservationMaturityState) {
+  switch (value) {
+    case "ready":
+      return "Ready";
+    case "not_ready":
+      return "Not ready";
+    case "empty_or_unavailable":
+      return "Unavailable";
+  }
+}
+
 function formatMissingReason(value: string) {
   switch (value) {
     case "insufficient_future_candles":
       return "Insufficient future candles";
     case "no_future_candles":
-      return "No future candles";
+      return "No completed future candles yet";
+    case "run_after_latest_candle":
+      return "Run is after the latest candle";
     case "missing_anchor":
       return "Missing anchor";
     default:
       return "Missing data";
   }
+}
+
+function formatApproximateObservationWait(
+  timeframe: HistoryTimeframe,
+  window: ObservationWindow,
+) {
+  switch (timeframe) {
+    case "1h":
+      return formatDuration(window, "hour");
+    case "4h":
+      return formatDuration(window * 4, "hour");
+    case "1d":
+      return formatDuration(window, "day");
+    case "1w":
+      return formatDuration(window, "week");
+  }
+}
+
+function formatDuration(value: number, unit: "hour" | "day" | "week") {
+  return `${value} ${unit}${value === 1 ? "" : "s"}`;
+}
+
+function shortRunId(value: string | null | undefined) {
+  return value ? value.slice(0, 8) : "-";
 }
 
 function formatFullUniverse(run: HistoricalSnapshotRun) {
@@ -892,4 +1263,85 @@ function formatVersions(row: HistoricalSnapshotRow) {
 
 function padDatePart(value: number) {
   return String(value).padStart(2, "0");
+}
+
+function getObservationProbeLimit(window: ObservationWindow) {
+  return Math.min(maxObservationProbeRuns, Math.max(3, window + 2));
+}
+
+function getDominantMissingReason(rows: HistoricalSnapshotObservationRow[]) {
+  const counts = new Map<string, number>();
+
+  for (const row of rows) {
+    if (!row.missingReason) {
+      continue;
+    }
+
+    counts.set(row.missingReason, (counts.get(row.missingReason) ?? 0) + 1);
+  }
+
+  return [...counts.entries()].reduce(
+    (dominant, [reason, count]) =>
+      count > dominant.count ? { reason, count } : dominant,
+    { reason: null as string | null, count: 0 },
+  );
+}
+
+function isFutureCandleMissingReason(reason: string | null) {
+  return (
+    reason === "no_future_candles" ||
+    reason === "insufficient_future_candles" ||
+    reason === "run_after_latest_candle"
+  );
+}
+
+function emptyForwardObservationMaturity(): ForwardObservationMaturity {
+  return {
+    state: "empty_or_unavailable",
+    readyCount: 0,
+    rowCount: 0,
+    completeCount: 0,
+    partialCount: 0,
+    missingCount: 0,
+    dominantMissingReason: null,
+    dominantMissingReasonCount: 0,
+  };
+}
+
+function emptyForwardObservationSelection(): ForwardObservationSelection {
+  return {
+    response: null,
+    maturity: null,
+    run: null,
+    mode: "unavailable",
+    isLoading: false,
+    isFetching: false,
+    error: null,
+  };
+}
+
+function buildForwardObservationSelection({
+  candidate,
+  mode,
+  candidates,
+}: {
+  candidate: ForwardObservationCandidate & {
+    maturity: ForwardObservationMaturity;
+  };
+  mode: ForwardObservationSelectionMode;
+  candidates: Array<
+    ForwardObservationCandidate & {
+      maturity: ForwardObservationMaturity;
+    }
+  >;
+}): ForwardObservationSelection {
+  return {
+    response: candidate.response,
+    maturity: candidate.maturity,
+    run: candidate.response?.run ?? candidate.run,
+    mode,
+    isLoading: false,
+    isFetching: candidates.some((item) => item.isFetching),
+    error: candidate.error,
+  };
 }
