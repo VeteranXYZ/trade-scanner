@@ -4,7 +4,6 @@ import { useQuery } from "@tanstack/react-query";
 import Link from "next/link";
 import { useMemo, useState } from "react";
 import {
-  formatDateTime,
   formatGroupLabel,
   formatScore,
   formatSignalLabel,
@@ -17,6 +16,10 @@ const assetClass = "crypto";
 const snapshotsLimit = 25;
 const historyDisclaimer =
   "Research-only. Not financial advice. Historical observations are not predictions.";
+const unsafePrimarySignalLabelMap: Record<string, string> = {
+  "do not chase": "Overheated caution",
+  avoid: "Risk review",
+};
 
 type HistoryTimeframe = (typeof HISTORY_TIMEFRAMES)[number];
 
@@ -227,7 +230,7 @@ export function HistoryPageClient() {
                     <div>
                       <p className="text-sm font-semibold">{run.runId}</p>
                       <p className="mt-1 text-xs text-[var(--muted)]">
-                        Finished {formatDateTime(run.finishedAt)}
+                        Finished {formatHistoryDateTime(run.finishedAt)}
                       </p>
                     </div>
                     <span className="rounded border border-[var(--border)] px-2 py-1 text-xs font-semibold">
@@ -292,7 +295,7 @@ export function HistoryPageClient() {
   );
 }
 
-function SnapshotTable({
+export function SnapshotTable({
   rows,
   isLoading,
 }: {
@@ -350,7 +353,9 @@ function SnapshotTable({
                     {formatGroupLabel(normalizeGroupKey(row.group))}
                   </td>
                   <td className="px-3 py-3">{formatSignalLabel(row.label)}</td>
-                  <td className="px-3 py-3">{row.primarySignal ?? "-"}</td>
+                  <td className="px-3 py-3">
+                    {formatHistoryPrimarySignal(row.primarySignal)}
+                  </td>
                   <td className="max-w-[280px] px-3 py-3 text-xs leading-5 text-[var(--muted)]">
                     {formatRiskNotes(row)}
                   </td>
@@ -412,8 +417,8 @@ function buildRunSummaryItems(run: HistoricalSnapshotRun | null) {
   return [
     ["Run ID", run.runId],
     ["Timeframe", run.timeframe],
-    ["Started", formatDateTime(run.startedAt)],
-    ["Finished", formatDateTime(run.finishedAt)],
+    ["Started", formatHistoryDateTime(run.startedAt)],
+    ["Finished", formatHistoryDateTime(run.finishedAt)],
     ["Universe", run.universe ?? "-"],
     ["Asset Class", assetClass],
     ["Symbols Total", formatCount(run.symbolsTotal)],
@@ -509,6 +514,34 @@ function formatQueryError(error: unknown) {
   return error instanceof Error ? error.message : "Request failed.";
 }
 
+export function formatHistoryDateTime(value: string | null | undefined) {
+  if (!value) {
+    return "Not available";
+  }
+
+  const date = new Date(value);
+
+  if (Number.isNaN(date.getTime())) {
+    return "Not available";
+  }
+
+  return [
+    date.getUTCFullYear(),
+    padDatePart(date.getUTCMonth() + 1),
+    padDatePart(date.getUTCDate()),
+  ].join("-") + ` ${padDatePart(date.getUTCHours())}:${padDatePart(date.getUTCMinutes())}`;
+}
+
+export function formatHistoryPrimarySignal(value: string | null | undefined) {
+  const label = value?.trim();
+
+  if (!label) {
+    return "-";
+  }
+
+  return unsafePrimarySignalLabelMap[label.toLowerCase()] ?? label;
+}
+
 function formatCount(value: number | null | undefined) {
   return typeof value === "number" && Number.isFinite(value)
     ? value.toLocaleString()
@@ -569,4 +602,8 @@ function formatVersions(row: HistoricalSnapshotRow) {
   ]
     .filter(Boolean)
     .join(" / ") || "-";
+}
+
+function padDatePart(value: number) {
+  return String(value).padStart(2, "0");
 }

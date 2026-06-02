@@ -2122,7 +2122,10 @@ async function handleHistorySnapshot(response: http.ServerResponse, url: URL) {
     sendJson(response, 400, {
       ok: false,
       service: serviceName,
-      error: "INVALID_RUN_ID",
+      error: {
+        code: "INVALID_RUN_ID",
+        message: "Invalid run id.",
+      },
     });
     return;
   }
@@ -2518,7 +2521,11 @@ function parseHistoryRunIdParam(value: string | null): {
 } {
   const runId = value?.trim() ?? "";
 
-  if (/^[A-Za-z0-9:_-]{1,120}$/.test(runId)) {
+  if (
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
+      runId,
+    )
+  ) {
     return { valid: true, value: runId };
   }
 

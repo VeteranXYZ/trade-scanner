@@ -480,6 +480,8 @@ describe("trade-api latest scan run selection", () => {
 });
 
 describe("trade-api historical snapshots", () => {
+  const historyRunId = "fcc05284-c7a0-4990-9bcb-5dd165d83c37";
+
   beforeEach(() => {
     resetScannerMocks();
     resetSymbolResearchMocks();
@@ -487,7 +489,7 @@ describe("trade-api historical snapshots", () => {
 
   it("lists recent successful single-timeframe historical snapshots", async () => {
     listHistoricalScanRunsMock.mockResolvedValue([
-      makeRun("run-history-4h", {
+      makeRun(historyRunId, {
         timeframe: "4h",
         symbolsTotal: 413,
         symbolsScanned: 409,
@@ -514,7 +516,7 @@ describe("trade-api historical snapshots", () => {
     });
     expect(body.metadata.disclaimer).toContain("Historical observations are not predictions");
     expect(body.snapshots[0]).toMatchObject({
-      runId: "run-history-4h",
+      runId: historyRunId,
       timeframe: "4h",
       status: "success",
       symbolsScanned: 409,
@@ -532,7 +534,7 @@ describe("trade-api historical snapshots", () => {
 
   it("returns full stored rows for a selected historical snapshot", async () => {
     getHistoricalScanRunMock.mockResolvedValue(
-      makeRun("run-history-4h", {
+      makeRun(historyRunId, {
         timeframe: "4h",
         symbolsTotal: 413,
         symbolsScanned: 409,
@@ -543,7 +545,7 @@ describe("trade-api historical snapshots", () => {
     listLatestScanSignalsForRunMock.mockResolvedValue([
       makeResearchSignal({
         id: "risk-signal",
-        scanRunId: "run-history-4h",
+        scanRunId: historyRunId,
         symbol: "RISKUSDT",
         rankScore: 120,
         signalLabel: "breakdown_risk",
@@ -553,20 +555,20 @@ describe("trade-api historical snapshots", () => {
       }),
       makeResearchSignal({
         id: "eligible-signal",
-        scanRunId: "run-history-4h",
+        scanRunId: historyRunId,
         symbol: "SEIUSDT",
         rankScore: 82,
       }),
     ]);
 
     const response = await requestTradeApi(
-      "/api/history/snapshot?runId=run-history-4h&assetClass=crypto",
+      `/api/history/snapshot?runId=${historyRunId}&assetClass=crypto`,
     );
     const body = JSON.parse(response.body);
 
     expect(response.status).toBe(200);
     expect(body.run).toMatchObject({
-      runId: "run-history-4h",
+      runId: historyRunId,
       timeframe: "4h",
       scannerVersion: "test",
       scoringVersion: "test",
@@ -595,12 +597,12 @@ describe("trade-api historical snapshots", () => {
       riskTypes: ["trend_breakdown_risk"],
     });
     expect(getHistoricalScanRunMock).toHaveBeenCalledWith({
-      scanRunId: "run-history-4h",
+      scanRunId: historyRunId,
       timeframe: undefined,
       assetClass: "crypto",
     });
     expect(listLatestScanSignalsForRunMock).toHaveBeenCalledWith({
-      scanRunId: "run-history-4h",
+      scanRunId: historyRunId,
       timeframe: "4h",
       assetClass: "crypto",
       includeNonScanner: false,
@@ -615,11 +617,34 @@ describe("trade-api historical snapshots", () => {
     const runResponse = await requestTradeApi(
       "/api/history/snapshot?runId=../../secret",
     );
+    const negativeRunResponse = await requestTradeApi(
+      "/api/history/snapshot?runId=-1",
+    );
+    const malformedRunResponse = await requestTradeApi(
+      "/api/history/snapshot?runId=abc",
+    );
 
     expect(timeframeResponse.status).toBe(400);
     expect(JSON.parse(timeframeResponse.body).error).toBe("INVALID_TIMEFRAME");
     expect(runResponse.status).toBe(400);
-    expect(JSON.parse(runResponse.body).error).toBe("INVALID_RUN_ID");
+    expect(JSON.parse(runResponse.body).error).toMatchObject({
+      code: "INVALID_RUN_ID",
+      message: "Invalid run id.",
+    });
+    expect(negativeRunResponse.status).toBe(400);
+    expect(JSON.parse(negativeRunResponse.body).error).toMatchObject({
+      code: "INVALID_RUN_ID",
+      message: "Invalid run id.",
+    });
+    expect(malformedRunResponse.status).toBe(400);
+    expect(JSON.parse(malformedRunResponse.body).error).toMatchObject({
+      code: "INVALID_RUN_ID",
+      message: "Invalid run id.",
+    });
+    expect(negativeRunResponse.body).not.toContain("22P02");
+    expect(negativeRunResponse.body).not.toContain(
+      "Dependency health check failed",
+    );
     expect(pgScannerResultsStoreMock).not.toHaveBeenCalled();
   });
 });
