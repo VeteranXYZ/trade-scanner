@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 import type { Pool } from "pg";
-import { PgScannerResultsStore, isLikelyFullUniverseRun } from "./scannerResultsPg";
+import {
+  PgScannerResultsStore,
+  isLikelyFullUniverseRun,
+  normalizeHistoricalSnapshotObservationWindow,
+} from "./scannerResultsPg";
 
 describe("PgScannerResultsStore latest scan queries", () => {
   it("selects the latest successful run by run metadata", async () => {
@@ -315,6 +319,185 @@ describe("PgScannerResultsStore latest scan queries", () => {
     expect(queries[0]).toContain("lower(sr.params->>'assetClass') = $3");
     expect(queries[0]).toContain("LIMIT 1");
   });
+
+  it("computes complete forward observations from stored signal anchors", async () => {
+    const queries: string[] = [];
+    const paramsList: unknown[][] = [];
+    const store = new PgScannerResultsStore(
+      makePool((sql, params) => {
+        queries.push(sql);
+        paramsList.push(params);
+
+        if (queries.length === 1) {
+          return { rows: [makeRunRow("history-run", { timeframe: "4h" })] };
+        }
+
+        return {
+          rows: [
+            makeObservationRow({
+              id: "signal-1",
+              scan_run_id: "history-run",
+              symbol: "SEIUSDT",
+              anchor_close: 100,
+              anchor_source: "stored_signal",
+              forward_candles: [
+                { close: 102, low: 98 },
+                { close: 104, low: 97 },
+                { close: 106, low: 96 },
+              ],
+            }),
+          ],
+        };
+      }),
+    );
+
+    const result = await store.getHistoricalSnapshotObservations({
+      scanRunId: "history-run",
+      assetClass: "crypto",
+      window: 3,
+    });
+
+    expect(result.run?.id).toBe("history-run");
+    expect(result.rows).toHaveLength(1);
+    expect(result.rows[0]).toMatchObject({
+      symbol: "SEIUSDT",
+      anchorClose: 100,
+      anchorSource: "stored_signal",
+      observedClose: 106,
+      observedChangePct: 6,
+      maxDrawdownPct: -4,
+      dataStatus: "complete",
+      missingReason: null,
+      forwardCandlesAvailable: 3,
+    });
+    expect(paramsList[1]).toEqual(["history-run", "4h", 3, "crypto"]);
+    expect(queries).toHaveLength(2);
+    expect(queries[1]).toContain("LEFT JOIN LATERAL");
+    expect(queries[1]).toContain("LIMIT $3");
+    expect(queries[1]).toContain("c.open_time > observation_anchor.anchor_time");
+  });
+
+  it("returns partial observations without dropping rows", async () => {
+    const store = new PgScannerResultsStore(
+      makePool(() => ({
+        rows: [
+          makeObservationRow({
+            id: "partial-signal",
+            scan_run_id: "history-run",
+            symbol: "PARTIALUSDT",
+            anchor_close: 100,
+            anchor_source: "nearest_prior_candle",
+            forward_candles: [
+              { close: 98, low: 95 },
+              { close: 99, low: 96 },
+            ],
+          }),
+          makeObservationRow({
+            id: "complete-signal",
+            scan_run_id: "history-run",
+            symbol: "COMPLETEUSDT",
+            anchor_close: 50,
+            anchor_source: "stored_signal",
+            forward_candles: [
+              { close: 51, low: 49 },
+              { close: 52, low: 48 },
+              { close: 53, low: 47 },
+              { close: 54, low: 46 },
+              { close: 55, low: 45 },
+            ],
+          }),
+        ],
+      })),
+    );
+
+    const rows = await store.listHistoricalSnapshotObservationsForRun({
+      scanRunId: "history-run",
+      timeframe: "4h",
+      assetClass: "crypto",
+      window: 5,
+    });
+
+    expect(rows).toHaveLength(2);
+    expect(rows[0]).toMatchObject({
+      symbol: "PARTIALUSDT",
+      anchorSource: "nearest_prior_candle",
+      observedClose: 99,
+      observedChangePct: -1,
+      maxDrawdownPct: -5,
+      dataStatus: "partial",
+      missingReason: "insufficient_future_candles",
+      forwardCandlesAvailable: 2,
+    });
+    expect(rows[1]).toMatchObject({
+      symbol: "COMPLETEUSDT",
+      observedClose: 55,
+      observedChangePct: 10,
+      maxDrawdownPct: -10,
+      dataStatus: "complete",
+      missingReason: null,
+      forwardCandlesAvailable: 5,
+    });
+  });
+
+  it("returns missing observations when anchor or future candles are unavailable", async () => {
+    const store = new PgScannerResultsStore(
+      makePool(() => ({
+        rows: [
+          makeObservationRow({
+            id: "missing-anchor",
+            scan_run_id: "history-run",
+            symbol: "ANCHORUSDT",
+            anchor_time: null,
+            anchor_close: null,
+            anchor_source: "unavailable",
+            forward_candles: [],
+          }),
+          makeObservationRow({
+            id: "missing-forward",
+            scan_run_id: "history-run",
+            symbol: "FUTUREUSDT",
+            anchor_close: 100,
+            anchor_source: "stored_signal",
+            forward_candles: [],
+          }),
+        ],
+      })),
+    );
+
+    const rows = await store.listHistoricalSnapshotObservationsForRun({
+      scanRunId: "history-run",
+      timeframe: "4h",
+      assetClass: "crypto",
+      window: 3,
+    });
+
+    expect(rows).toHaveLength(2);
+    expect(rows[0]).toMatchObject({
+      symbol: "ANCHORUSDT",
+      anchorSource: "unavailable",
+      observedClose: null,
+      observedChangePct: null,
+      maxDrawdownPct: null,
+      dataStatus: "missing",
+      missingReason: "missing_anchor",
+    });
+    expect(rows[1]).toMatchObject({
+      symbol: "FUTUREUSDT",
+      observedClose: null,
+      observedChangePct: null,
+      maxDrawdownPct: null,
+      dataStatus: "missing",
+      missingReason: "no_future_candles",
+    });
+  });
+
+  it("validates supported forward observation windows", async () => {
+    expect(normalizeHistoricalSnapshotObservationWindow(1)).toBe(1);
+    expect(normalizeHistoricalSnapshotObservationWindow(3)).toBe(3);
+    expect(normalizeHistoricalSnapshotObservationWindow(5)).toBe(5);
+    expect(normalizeHistoricalSnapshotObservationWindow(10)).toBe(10);
+    expect(normalizeHistoricalSnapshotObservationWindow(2)).toBeNull();
+  });
 });
 
 function makePool(
@@ -423,5 +606,29 @@ function makeSignalRow(
     is_market_context: false,
     candle_count: "1000",
     first_open_time: "2024-01-01T00:00:00.000Z",
+  };
+}
+
+function makeObservationRow(
+  overrides: Partial<Record<string, unknown>> & {
+    id: string;
+    scan_run_id: string;
+    symbol: string;
+  },
+) {
+  return {
+    ...makeSignalRow({
+      id: overrides.id,
+      scan_run_id: overrides.scan_run_id,
+      symbol: overrides.symbol,
+      scan_time:
+        typeof overrides.scan_time === "string"
+          ? overrides.scan_time
+          : "2026-05-31T00:00:01.000Z",
+    }),
+    anchor_time: overrides.anchor_time ?? "2026-05-30T20:00:00.000Z",
+    anchor_close: overrides.anchor_close ?? 100,
+    anchor_source: overrides.anchor_source ?? "stored_signal",
+    forward_candles: overrides.forward_candles ?? [],
   };
 }

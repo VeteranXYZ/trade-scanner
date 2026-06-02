@@ -27,9 +27,13 @@ import {
 } from "@/lib/scanner/scanResultGroups";
 import { PgMarketDataStore } from "@/lib/storage/postgres/marketDataPg";
 import {
+  HISTORICAL_SNAPSHOT_OBSERVATION_WINDOWS,
   LATEST_SCAN_FULL_UNIVERSE_MIN_SYMBOLS,
   PgScannerResultsStore,
   isLikelyFullUniverseRun,
+  normalizeHistoricalSnapshotObservationWindow,
+  type HistoricalSnapshotObservationRecord,
+  type HistoricalSnapshotObservationWindow,
   type LatestScanSignalRecord,
   type ScanRunRecord,
 } from "@/lib/storage/postgres/scannerResultsPg";
@@ -207,6 +211,11 @@ export async function handleTradeApiRequest(
 
     if (url.pathname === "/api/history/snapshot") {
       await handleHistorySnapshot(response, url);
+      return;
+    }
+
+    if (url.pathname === "/api/history/snapshot-observations") {
+      await handleHistorySnapshotObservations(response, url);
       return;
     }
 
@@ -2214,6 +2223,121 @@ async function handleHistorySnapshot(response: http.ServerResponse, url: URL) {
   }
 }
 
+async function handleHistorySnapshotObservations(
+  response: http.ServerResponse,
+  url: URL,
+) {
+  const runId = parseHistoryRunIdParam(url.searchParams.get("runId"));
+  const timeframe = parseOptionalHistorySnapshotTimeframeParam(
+    url.searchParams.get("timeframe"),
+  );
+  const assetClass = parseAssetClassParam(url.searchParams.get("assetClass"));
+  const window = parseHistoryObservationWindowParam(
+    url.searchParams.get("window"),
+  );
+
+  if (!runId.valid) {
+    sendJson(response, 400, {
+      ok: false,
+      service: serviceName,
+      error: {
+        code: "INVALID_RUN_ID",
+        message: "Invalid run id.",
+      },
+    });
+    return;
+  }
+
+  if (!window.valid) {
+    sendJson(response, 400, {
+      ok: false,
+      service: serviceName,
+      error: {
+        code: "INVALID_WINDOW",
+        message: `Observation window must be ${HISTORICAL_SNAPSHOT_OBSERVATION_WINDOWS.join(", ")} completed candles.`,
+      },
+    });
+    return;
+  }
+
+  if (!timeframe.valid) {
+    sendJson(response, 400, {
+      ok: false,
+      service: serviceName,
+      error: "INVALID_TIMEFRAME",
+    });
+    return;
+  }
+
+  if (!assetClass.valid) {
+    sendJson(response, 400, {
+      ok: false,
+      service: serviceName,
+      error: "INVALID_ASSET_CLASS",
+    });
+    return;
+  }
+
+  const store = new PgScannerResultsStore();
+
+  try {
+    const observations = await store.getHistoricalSnapshotObservations({
+      scanRunId: runId.value,
+      timeframe: timeframe.value ?? undefined,
+      assetClass: assetClass.value,
+      window: window.value,
+    });
+
+    if (!observations.run) {
+      sendJson(response, 404, {
+        ok: false,
+        service: serviceName,
+        source: "postgres",
+        error: "SNAPSHOT_NOT_FOUND",
+      });
+      return;
+    }
+
+    const rows = observations.rows
+      .map(buildHistoricalSnapshotObservationRow)
+      .sort(compareScanResultGroupItems);
+    const counts = buildHistoricalSnapshotObservationCounts(rows);
+
+    sendJson(response, 200, {
+      ok: true,
+      service: serviceName,
+      source: "postgres",
+      run: buildHistoricalSnapshotRunMetadata({
+        run: observations.run,
+        assetClass: assetClass.value,
+      }),
+      rows,
+      metadata: {
+        window: window.value,
+        selectedWindow: window.value,
+        windowUnit: "completed_candles",
+        rowCount: rows.length,
+        completeCount: counts.complete,
+        partialCount: counts.partial,
+        missingCount: counts.missing,
+        limited: false,
+        timeframe: observations.run.timeframe,
+        assetClass: assetClass.value,
+        disclaimer: HISTORY_RESEARCH_DISCLAIMER,
+      },
+    });
+  } catch {
+    sendJson(response, 503, {
+      ok: false,
+      service: serviceName,
+      source: "postgres",
+      error: "INTERNAL_ERROR",
+    });
+  } finally {
+    await store.close().catch(() => undefined);
+  }
+}
+
 function buildHistoricalSnapshotRunMetadata({
   run,
   assetClass,
@@ -2242,6 +2366,48 @@ function buildHistoricalSnapshotRunMetadata({
     }),
     fullUniverseMinExpectedSymbols: LATEST_SCAN_FULL_UNIVERSE_MIN_SYMBOLS,
   };
+}
+
+function buildHistoricalSnapshotObservationRow(
+  signal: HistoricalSnapshotObservationRecord,
+) {
+  const snapshotRow = buildHistoricalSnapshotRow(signal);
+
+  return {
+    id: snapshotRow.id,
+    scanRunId: snapshotRow.scanRunId,
+    symbol: snapshotRow.symbol,
+    exchange: snapshotRow.exchange,
+    market: snapshotRow.market,
+    timeframe: snapshotRow.timeframe,
+    group: snapshotRow.group,
+    resultGroup: snapshotRow.resultGroup,
+    label: snapshotRow.label,
+    primarySignal: snapshotRow.primarySignal,
+    rankScore: snapshotRow.rankScore,
+    anchorTime: signal.anchorTime,
+    anchorClose: signal.anchorClose,
+    anchorSource: signal.anchorSource,
+    window: signal.window,
+    observedClose: signal.observedClose,
+    observedChangePct: signal.observedChangePct,
+    maxDrawdownPct: signal.maxDrawdownPct,
+    dataStatus: signal.dataStatus,
+    missingReason: signal.missingReason,
+  };
+}
+
+function buildHistoricalSnapshotObservationCounts(
+  rows: ReturnType<typeof buildHistoricalSnapshotObservationRow>[],
+) {
+  return rows.reduce(
+    (counts, row) => ({
+      complete: counts.complete + (row.dataStatus === "complete" ? 1 : 0),
+      partial: counts.partial + (row.dataStatus === "partial" ? 1 : 0),
+      missing: counts.missing + (row.dataStatus === "missing" ? 1 : 0),
+    }),
+    { complete: 0, partial: 0, missing: 0 },
+  );
 }
 
 function buildHistoricalSnapshotRow(signal: LatestScanSignalRecord) {
@@ -2530,6 +2696,27 @@ function parseHistoryRunIdParam(value: string | null): {
   }
 
   return { valid: false, value: null };
+}
+
+function parseHistoryObservationWindowParam(value: string | null): {
+  valid: true;
+  value: HistoricalSnapshotObservationWindow;
+} | {
+  valid: false;
+  value: null;
+} {
+  const rawValue = value?.trim() || "3";
+  const parsed = Number(rawValue);
+
+  if (!Number.isInteger(parsed)) {
+    return { valid: false, value: null };
+  }
+
+  const window = normalizeHistoricalSnapshotObservationWindow(parsed);
+
+  return window === null
+    ? { valid: false, value: null }
+    : { valid: true, value: window };
 }
 
 function parseBooleanParam(value: string | null) {

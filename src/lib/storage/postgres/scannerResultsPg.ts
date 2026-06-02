@@ -10,6 +10,22 @@ import { createPostgresPool } from "./pool";
 
 export const PG_SCANNER_VERSION = "pg-scanner-v1";
 export const LATEST_SCAN_FULL_UNIVERSE_MIN_SYMBOLS = 300;
+export const HISTORICAL_SNAPSHOT_OBSERVATION_WINDOWS = [1, 3, 5, 10] as const;
+
+export type HistoricalSnapshotObservationWindow =
+  (typeof HISTORICAL_SNAPSHOT_OBSERVATION_WINDOWS)[number];
+export type HistoricalSnapshotObservationAnchorSource =
+  | "stored_signal"
+  | "nearest_prior_candle"
+  | "unavailable";
+export type HistoricalSnapshotObservationDataStatus =
+  | "complete"
+  | "partial"
+  | "missing";
+export type HistoricalSnapshotObservationMissingReason =
+  | "missing_anchor"
+  | "no_future_candles"
+  | "insufficient_future_candles";
 
 export type ScanRunRecord = {
   id: string;
@@ -71,6 +87,24 @@ export type LatestScanSignalRecord = ScanSignalRecord & {
   isMarketContext: boolean;
   candleCount: number;
   firstOpenTime: string | null;
+};
+
+export type HistoricalSnapshotObservationRecord = LatestScanSignalRecord & {
+  anchorTime: string | null;
+  anchorClose: number | null;
+  anchorSource: HistoricalSnapshotObservationAnchorSource;
+  window: HistoricalSnapshotObservationWindow;
+  observedClose: number | null;
+  observedChangePct: number | null;
+  maxDrawdownPct: number | null;
+  dataStatus: HistoricalSnapshotObservationDataStatus;
+  missingReason: HistoricalSnapshotObservationMissingReason | null;
+  forwardCandlesAvailable: number;
+};
+
+export type HistoricalSnapshotObservationsResult = {
+  run: ScanRunRecord | null;
+  rows: HistoricalSnapshotObservationRecord[];
 };
 
 export function isLikelyFullUniverseRun({
@@ -204,6 +238,18 @@ type LatestScanSignalRow = ScanSignalRow & {
   is_market_context: boolean | null;
   candle_count: string | null;
   first_open_time: Date | string | null;
+};
+
+type HistoricalSnapshotObservationRow = LatestScanSignalRow & {
+  anchor_time: Date | string | null;
+  anchor_close: number | string | null;
+  anchor_source: string | null;
+  forward_candles: unknown;
+};
+
+type HistoricalSnapshotForwardCandle = {
+  close: number;
+  low: number;
 };
 
 export class PgScannerResultsStore {
@@ -558,6 +604,191 @@ export class PgScannerResultsStore {
     return result.rows[0] ? toScanRunRecord(result.rows[0]) : null;
   }
 
+  async getHistoricalSnapshotObservations({
+    scanRunId,
+    timeframe,
+    assetClass = "crypto",
+    window,
+  }: {
+    scanRunId: string;
+    timeframe?: string;
+    assetClass?: SymbolAssetClassFilter;
+    window: number;
+  }): Promise<HistoricalSnapshotObservationsResult> {
+    const observationWindow = normalizeHistoricalSnapshotObservationWindow(window);
+
+    if (observationWindow === null) {
+      throw new Error("INVALID_OBSERVATION_WINDOW");
+    }
+
+    const run = await this.getHistoricalScanRun({
+      scanRunId,
+      timeframe,
+      assetClass,
+    });
+
+    if (!run) {
+      return { run: null, rows: [] };
+    }
+
+    const rows = await this.listHistoricalSnapshotObservationsForRun({
+      scanRunId: run.id,
+      timeframe: run.timeframe,
+      assetClass,
+      window: observationWindow,
+    });
+
+    return { run, rows };
+  }
+
+  async listHistoricalSnapshotObservationsForRun({
+    scanRunId,
+    timeframe,
+    assetClass = "crypto",
+    includeNonScanner = false,
+    includeMarketContext = false,
+    window,
+  }: {
+    scanRunId: string;
+    timeframe: string;
+    assetClass?: SymbolAssetClassFilter;
+    includeNonScanner?: boolean;
+    includeMarketContext?: boolean;
+    window: number;
+  }): Promise<HistoricalSnapshotObservationRecord[]> {
+    const observationWindow = normalizeHistoricalSnapshotObservationWindow(window);
+
+    if (observationWindow === null) {
+      throw new Error("INVALID_OBSERVATION_WINDOW");
+    }
+
+    const params: unknown[] = [scanRunId, timeframe, observationWindow];
+    const filters = ["ss.scan_run_id = $1", "ss.timeframe = $2"];
+
+    if (assetClass !== "all") {
+      params.push(assetClass);
+      filters.push(`s.asset_class = $${params.length}`);
+    }
+
+    if (!includeNonScanner) {
+      filters.push("s.is_scanner_eligible = true");
+    }
+
+    if (!includeMarketContext) {
+      filters.push("s.is_market_context = false");
+    }
+
+    const result = await this.pool.query<HistoricalSnapshotObservationRow>(
+      `
+        SELECT
+          ss.*,
+          s.asset_class,
+          s.is_scanner_eligible,
+          s.is_backtest_eligible,
+          s.is_market_context,
+          COALESCE(coverage.candle_count, 0) AS candle_count,
+          coverage.first_open_time,
+          observation_anchor.anchor_time,
+          observation_anchor.anchor_close,
+          observation_anchor.anchor_source,
+          COALESCE(forward.forward_candles, '[]'::jsonb) AS forward_candles
+        FROM scan_signals ss
+        JOIN symbols s
+          ON s.id = ss.symbol_id
+        LEFT JOIN (
+          SELECT
+            symbol_id,
+            COUNT(*) AS candle_count,
+            MIN(open_time) AS first_open_time
+          FROM market_candles
+          WHERE timeframe = $2
+            AND symbol_id IN (
+              SELECT symbol_id
+              FROM scan_signals
+              WHERE scan_run_id = $1
+            )
+          GROUP BY symbol_id
+        ) coverage
+          ON coverage.symbol_id = ss.symbol_id
+        LEFT JOIN LATERAL (
+          SELECT c.open_time, c.close
+          FROM market_candles c
+          WHERE c.symbol_id = ss.symbol_id
+            AND c.exchange = ss.exchange
+            AND c.market = ss.market
+            AND c.timeframe = ss.timeframe
+            AND c.open_time <= COALESCE(ss.candle_open_time, ss.scan_time)
+          ORDER BY c.open_time DESC
+          LIMIT 1
+        ) nearest_prior
+          ON true
+        LEFT JOIN LATERAL (
+          SELECT
+            CASE
+              WHEN ss.candle_open_time IS NOT NULL
+                AND ss.price_at_signal IS NOT NULL
+                AND ss.price_at_signal > 0
+                THEN ss.candle_open_time
+              WHEN nearest_prior.open_time IS NOT NULL
+                AND nearest_prior.close > 0
+                THEN nearest_prior.open_time
+              ELSE NULL
+            END AS anchor_time,
+            CASE
+              WHEN ss.candle_open_time IS NOT NULL
+                AND ss.price_at_signal IS NOT NULL
+                AND ss.price_at_signal > 0
+                THEN ss.price_at_signal
+              WHEN nearest_prior.open_time IS NOT NULL
+                AND nearest_prior.close > 0
+                THEN nearest_prior.close
+              ELSE NULL
+            END AS anchor_close,
+            CASE
+              WHEN ss.candle_open_time IS NOT NULL
+                AND ss.price_at_signal IS NOT NULL
+                AND ss.price_at_signal > 0
+                THEN 'stored_signal'
+              WHEN nearest_prior.open_time IS NOT NULL
+                AND nearest_prior.close > 0
+                THEN 'nearest_prior_candle'
+              ELSE 'unavailable'
+            END AS anchor_source
+        ) observation_anchor
+          ON true
+        LEFT JOIN LATERAL (
+          SELECT jsonb_agg(
+            jsonb_build_object(
+              'close', forward_candle.close,
+              'low', forward_candle.low
+            )
+            ORDER BY forward_candle.open_time ASC
+          ) AS forward_candles
+          FROM (
+            SELECT c.open_time, c.close, c.low
+            FROM market_candles c
+            WHERE c.symbol_id = ss.symbol_id
+              AND c.exchange = ss.exchange
+              AND c.market = ss.market
+              AND c.timeframe = ss.timeframe
+              AND observation_anchor.anchor_time IS NOT NULL
+              AND c.open_time > observation_anchor.anchor_time
+            ORDER BY c.open_time ASC
+            LIMIT $3
+          ) forward_candle
+        ) forward
+          ON true
+        WHERE ${filters.join("\n          AND ")}
+        ORDER BY ss.symbol ASC
+      `,
+      params,
+    );
+
+    return result.rows.map((row) =>
+      toHistoricalSnapshotObservationRecord(row, observationWindow),
+    );
+  }
+
   async listLatestScanSignals({
     scanRunId,
     limit,
@@ -667,6 +898,173 @@ function toLatestScanSignalRecord(row: LatestScanSignalRow): LatestScanSignalRec
       ? new Date(row.first_open_time).toISOString()
       : null,
   };
+}
+
+function toHistoricalSnapshotObservationRecord(
+  row: HistoricalSnapshotObservationRow,
+  window: HistoricalSnapshotObservationWindow,
+): HistoricalSnapshotObservationRecord {
+  const signal = toLatestScanSignalRecord(row);
+  const anchorTime = row.anchor_time ? new Date(row.anchor_time).toISOString() : null;
+  const anchorClose = toNullableNumber(row.anchor_close);
+  const anchorSource = toHistoricalSnapshotObservationAnchorSource(
+    row.anchor_source,
+  );
+  const forwardCandles = parseHistoricalSnapshotForwardCandles(
+    row.forward_candles,
+  );
+  const observation = calculateHistoricalSnapshotObservation({
+    anchorClose,
+    anchorSource,
+    forwardCandles,
+    window,
+  });
+
+  return {
+    ...signal,
+    anchorTime,
+    anchorClose,
+    anchorSource,
+    window,
+    ...observation,
+    forwardCandlesAvailable: forwardCandles.length,
+  };
+}
+
+function calculateHistoricalSnapshotObservation({
+  anchorClose,
+  anchorSource,
+  forwardCandles,
+  window,
+}: {
+  anchorClose: number | null;
+  anchorSource: HistoricalSnapshotObservationAnchorSource;
+  forwardCandles: HistoricalSnapshotForwardCandle[];
+  window: HistoricalSnapshotObservationWindow;
+}) {
+  if (anchorSource === "unavailable" || anchorClose === null || anchorClose <= 0) {
+    return {
+      observedClose: null,
+      observedChangePct: null,
+      maxDrawdownPct: null,
+      dataStatus: "missing" as const,
+      missingReason: "missing_anchor" as const,
+    };
+  }
+
+  if (forwardCandles.length === 0) {
+    return {
+      observedClose: null,
+      observedChangePct: null,
+      maxDrawdownPct: null,
+      dataStatus: "missing" as const,
+      missingReason: "no_future_candles" as const,
+    };
+  }
+
+  const observedCandle =
+    forwardCandles[Math.min(window, forwardCandles.length) - 1] ?? null;
+  const observedClose = observedCandle?.close ?? null;
+  const observedChangePct =
+    observedClose === null
+      ? null
+      : roundObservationPercent(((observedClose - anchorClose) / anchorClose) * 100);
+  const lowestAvailableLow = Math.min(
+    ...forwardCandles.map((candle) => candle.low),
+  );
+  const maxDrawdownPct = Number.isFinite(lowestAvailableLow)
+    ? roundObservationPercent(((lowestAvailableLow - anchorClose) / anchorClose) * 100)
+    : null;
+
+  if (forwardCandles.length < window) {
+    return {
+      observedClose,
+      observedChangePct,
+      maxDrawdownPct,
+      dataStatus: "partial" as const,
+      missingReason: "insufficient_future_candles" as const,
+    };
+  }
+
+  return {
+    observedClose,
+    observedChangePct,
+    maxDrawdownPct,
+    dataStatus: "complete" as const,
+    missingReason: null,
+  };
+}
+
+function parseHistoricalSnapshotForwardCandles(
+  value: unknown,
+): HistoricalSnapshotForwardCandle[] {
+  const raw = typeof value === "string" ? safeParseJson(value) : value;
+
+  if (!Array.isArray(raw)) {
+    return [];
+  }
+
+  return raw
+    .map((item) => {
+      if (!item || typeof item !== "object") {
+        return null;
+      }
+
+      const close = toNullableNumber(
+        "close" in item
+          ? (item.close as number | string | null)
+          : null,
+      );
+      const low = toNullableNumber(
+        "low" in item
+          ? (item.low as number | string | null)
+          : null,
+      );
+
+      if (close === null || close <= 0) {
+        return null;
+      }
+
+      return {
+        close,
+        low: low === null || low <= 0 ? close : low,
+      };
+    })
+    .filter((item): item is HistoricalSnapshotForwardCandle => item !== null);
+}
+
+function safeParseJson(value: string) {
+  try {
+    return JSON.parse(value) as unknown;
+  } catch {
+    return null;
+  }
+}
+
+function toHistoricalSnapshotObservationAnchorSource(
+  value: string | null,
+): HistoricalSnapshotObservationAnchorSource {
+  if (value === "stored_signal" || value === "nearest_prior_candle") {
+    return value;
+  }
+
+  return "unavailable";
+}
+
+export function normalizeHistoricalSnapshotObservationWindow(
+  value: number,
+): HistoricalSnapshotObservationWindow | null {
+  const parsed = Math.trunc(value);
+
+  return HISTORICAL_SNAPSHOT_OBSERVATION_WINDOWS.includes(
+    parsed as HistoricalSnapshotObservationWindow,
+  )
+    ? (parsed as HistoricalSnapshotObservationWindow)
+    : null;
+}
+
+function roundObservationPercent(value: number) {
+  return Number.isFinite(value) ? Math.round(value * 100) / 100 : null;
 }
 
 function toNullableNumber(value: number | string | null) {

@@ -6,6 +6,7 @@ const getLatestScanRunMock = vi.hoisted(() => vi.fn());
 const listLatestScanSignalsForRunMock = vi.hoisted(() => vi.fn());
 const listHistoricalScanRunsMock = vi.hoisted(() => vi.fn());
 const getHistoricalScanRunMock = vi.hoisted(() => vi.fn());
+const getHistoricalSnapshotObservationsMock = vi.hoisted(() => vi.fn());
 const closeMock = vi.hoisted(() => vi.fn());
 const getSymbolResearchLatestSignalPgMock = vi.hoisted(() => vi.fn());
 const getSymbolSignalHistoryPgMock = vi.hoisted(() => vi.fn());
@@ -23,6 +24,7 @@ const pgScannerResultsStoreMock = vi.hoisted(() =>
       listLatestScanSignalsForRun: listLatestScanSignalsForRunMock,
       listHistoricalScanRuns: listHistoricalScanRunsMock,
       getHistoricalScanRun: getHistoricalScanRunMock,
+      getHistoricalSnapshotObservations: getHistoricalSnapshotObservationsMock,
       close: closeMock,
     };
   }),
@@ -50,8 +52,11 @@ const pgSignalEvaluationStoreMock = vi.hoisted(() =>
 );
 
 vi.mock("@/lib/storage/postgres/scannerResultsPg", () => ({
+  HISTORICAL_SNAPSHOT_OBSERVATION_WINDOWS: [1, 3, 5, 10],
   LATEST_SCAN_FULL_UNIVERSE_MIN_SYMBOLS: 300,
   PgScannerResultsStore: pgScannerResultsStoreMock,
+  normalizeHistoricalSnapshotObservationWindow: (value: number) =>
+    [1, 3, 5, 10].includes(value) ? value : null,
   isLikelyFullUniverseRun: ({
     run,
     assetClass,
@@ -646,6 +651,145 @@ describe("trade-api historical snapshots", () => {
       "Dependency health check failed",
     );
     expect(pgScannerResultsStoreMock).not.toHaveBeenCalled();
+  });
+
+  it("returns forward observations for a selected historical snapshot", async () => {
+    getHistoricalSnapshotObservationsMock.mockResolvedValue({
+      run: makeRun(historyRunId, {
+        timeframe: "4h",
+        symbolsTotal: 413,
+        symbolsScanned: 409,
+        signalsCreated: 3,
+        params: { assetClass: "crypto", allSymbols: true },
+      }),
+      rows: [
+        makeObservationRecord({
+          id: "complete-signal",
+          scanRunId: historyRunId,
+          symbol: "SEIUSDT",
+          dataStatus: "complete",
+          observedChangePct: 2.5,
+          maxDrawdownPct: -1.25,
+          missingReason: null,
+        }),
+        makeObservationRecord({
+          id: "partial-signal",
+          scanRunId: historyRunId,
+          symbol: "RISKUSDT",
+          signalLabel: "breakdown_risk",
+          actionBias: "avoid",
+          primaryStructure: "trend_breakdown",
+          detectedRiskTypes: ["trend_breakdown_risk"],
+          dataStatus: "partial",
+          observedChangePct: -1,
+          maxDrawdownPct: -3.5,
+          missingReason: "insufficient_future_candles",
+        }),
+        makeObservationRecord({
+          id: "missing-signal",
+          scanRunId: historyRunId,
+          symbol: "NEWUSDT",
+          dataStatus: "missing",
+          observedClose: null,
+          observedChangePct: null,
+          maxDrawdownPct: null,
+          missingReason: "no_future_candles",
+        }),
+      ],
+    });
+
+    const response = await requestTradeApi(
+      `/api/history/snapshot-observations?runId=${historyRunId}&assetClass=crypto&window=3`,
+    );
+    const body = JSON.parse(response.body);
+
+    expect(response.status).toBe(200);
+    expect(body.ok).toBe(true);
+    expect(body.service).toBe("trade-api");
+    expect(body.source).toBe("postgres");
+    expect(body.metadata).toMatchObject({
+      window: 3,
+      selectedWindow: 3,
+      windowUnit: "completed_candles",
+      rowCount: 3,
+      completeCount: 1,
+      partialCount: 1,
+      missingCount: 1,
+      limited: false,
+      timeframe: "4h",
+      assetClass: "crypto",
+    });
+    expect(body.metadata.disclaimer).toContain(
+      "Historical observations are not predictions",
+    );
+    expect(body.rows).toHaveLength(3);
+    const rowsBySymbol = new Map(
+      body.rows.map((row: { symbol: string }) => [row.symbol, row]),
+    );
+
+    expect(rowsBySymbol.get("SEIUSDT")).toMatchObject({
+      symbol: "SEIUSDT",
+      group: "eligible",
+      primarySignal: "Manual review",
+      anchorSource: "stored_signal",
+      window: 3,
+      observedChangePct: 2.5,
+      maxDrawdownPct: -1.25,
+      dataStatus: "complete",
+      missingReason: null,
+    });
+    expect(rowsBySymbol.get("RISKUSDT")).toMatchObject({
+      symbol: "RISKUSDT",
+      group: "risk",
+      dataStatus: "partial",
+      missingReason: "insufficient_future_candles",
+    });
+    expect(rowsBySymbol.get("SEIUSDT")).toHaveProperty("observedChangePct");
+    expect(rowsBySymbol.get("SEIUSDT")).not.toHaveProperty("winRate");
+    expect(rowsBySymbol.get("SEIUSDT")).not.toHaveProperty("accuracy");
+    expect(rowsBySymbol.get("SEIUSDT")).not.toHaveProperty("worked");
+    expect(rowsBySymbol.get("SEIUSDT")).not.toHaveProperty("failed");
+    expect(rowsBySymbol.get("SEIUSDT")).not.toHaveProperty("recommendation");
+    expect(getHistoricalSnapshotObservationsMock).toHaveBeenCalledWith({
+      scanRunId: historyRunId,
+      timeframe: undefined,
+      assetClass: "crypto",
+      window: 3,
+    });
+  });
+
+  it("rejects invalid historical observation inputs before opening the store", async () => {
+    const invalidWindowResponse = await requestTradeApi(
+      `/api/history/snapshot-observations?runId=${historyRunId}&window=2`,
+    );
+    const malformedRunResponse = await requestTradeApi(
+      "/api/history/snapshot-observations?runId=abc&window=3",
+    );
+
+    expect(invalidWindowResponse.status).toBe(400);
+    expect(JSON.parse(invalidWindowResponse.body).error).toMatchObject({
+      code: "INVALID_WINDOW",
+    });
+    expect(malformedRunResponse.status).toBe(400);
+    expect(JSON.parse(malformedRunResponse.body).error).toMatchObject({
+      code: "INVALID_RUN_ID",
+      message: "Invalid run id.",
+    });
+    expect(pgScannerResultsStoreMock).not.toHaveBeenCalled();
+  });
+
+  it("sanitizes internal errors from historical observation requests", async () => {
+    getHistoricalSnapshotObservationsMock.mockRejectedValue({ code: "22P02" });
+
+    const response = await requestTradeApi(
+      `/api/history/snapshot-observations?runId=${historyRunId}&window=3`,
+    );
+    const body = JSON.parse(response.body);
+
+    expect(response.status).toBe(503);
+    expect(body.error).toBe("INTERNAL_ERROR");
+    expect(response.body).not.toContain("22P02");
+    expect(response.body).not.toContain("Dependency health check failed");
   });
 });
 
@@ -1569,6 +1713,8 @@ function resetScannerMocks() {
   listHistoricalScanRunsMock.mockResolvedValue([]);
   getHistoricalScanRunMock.mockReset();
   getHistoricalScanRunMock.mockResolvedValue(null);
+  getHistoricalSnapshotObservationsMock.mockReset();
+  getHistoricalSnapshotObservationsMock.mockResolvedValue({ run: null, rows: [] });
   closeMock.mockReset();
   closeMock.mockResolvedValue(undefined);
   pgScannerResultsStoreMock.mockClear();
@@ -1730,6 +1876,40 @@ function makeResearchSignal(
     isMarketContext: false,
     candleCount: 1000,
     firstOpenTime: "2024-01-01T00:00:00.000Z",
+  };
+}
+
+function makeObservationRecord(
+  overrides: Partial<ReturnType<typeof makeResearchSignal>> &
+    Partial<{
+      anchorTime: string | null;
+      anchorClose: number | null;
+      anchorSource: "stored_signal" | "nearest_prior_candle" | "unavailable";
+      window: 1 | 3 | 5 | 10;
+      observedClose: number | null;
+      observedChangePct: number | null;
+      maxDrawdownPct: number | null;
+      dataStatus: "complete" | "partial" | "missing";
+      missingReason:
+        | "missing_anchor"
+        | "no_future_candles"
+        | "insufficient_future_candles"
+        | null;
+      forwardCandlesAvailable: number;
+    }> = {},
+) {
+  return {
+    ...makeResearchSignal(overrides),
+    anchorTime: overrides.anchorTime ?? "2026-05-31T00:00:00.000Z",
+    anchorClose: overrides.anchorClose ?? 100,
+    anchorSource: overrides.anchorSource ?? "stored_signal",
+    window: overrides.window ?? 3,
+    observedClose: overrides.observedClose ?? 102.5,
+    observedChangePct: overrides.observedChangePct ?? 2.5,
+    maxDrawdownPct: overrides.maxDrawdownPct ?? -1.25,
+    dataStatus: overrides.dataStatus ?? "complete",
+    missingReason: overrides.missingReason ?? null,
+    forwardCandlesAvailable: overrides.forwardCandlesAvailable ?? 3,
   };
 }
 

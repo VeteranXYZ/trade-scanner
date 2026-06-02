@@ -3,8 +3,10 @@ import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import {
+  buildHistoricalSnapshotObservationsUrl,
   buildHistoricalSnapshotUrl,
   buildHistoricalSnapshotsUrl,
+  ForwardObservationSection,
   formatHistoryDateTime,
   formatHistoryPrimarySignal,
   HistoryPageClient,
@@ -33,6 +35,16 @@ describe("HistoryPageClient API URLs", () => {
       }),
     ).toBe(
       `https://api.auere.com/api/history/snapshot?runId=${runId}&assetClass=crypto`,
+    );
+    expect(
+      buildHistoricalSnapshotObservationsUrl({
+        runId,
+        assetClass: "crypto",
+        window: 3,
+        tradeApiBaseUrl: "https://api.auere.com/",
+      }),
+    ).toBe(
+      `https://api.auere.com/api/history/snapshot-observations?runId=${runId}&assetClass=crypto&window=3`,
     );
   });
 });
@@ -100,6 +112,47 @@ describe("HistoryPageClient display formatting", () => {
     expect(html).not.toContain("Show More");
     expect(html).not.toContain("Pagination");
   });
+
+  it("renders Forward Observation with neutral copy and full row visibility", () => {
+    const html = renderToStaticMarkup(
+      createElement(ForwardObservationSection, {
+        window: 3,
+        onWindowChange: () => undefined,
+        response: makeObservationResponse(),
+        isLoading: false,
+        isFetching: false,
+        error: null,
+      }),
+    );
+
+    expect(html).toContain("Forward Observation");
+    expect(html).toContain("Research-only. Historical observations are not predictions.");
+    expect(html).toContain("1 candle");
+    expect(html).toContain("3 candles");
+    expect(html).toContain("5 candles");
+    expect(html).toContain("10 candles");
+    expect(html).toContain("Selected Window");
+    expect(html).toContain("Complete");
+    expect(html).toContain("Partial");
+    expect(html).toContain("Missing");
+    expect(html).toContain("Observed Change");
+    expect(html).toContain("Max Drawdown");
+    expect(html).toContain("Data Status");
+    expect(html).toContain("SEIUSDT");
+    expect(html).toContain("RISKUSDT");
+    expect(html).toContain("NEWUSDT");
+    expect(html).toContain("Insufficient future candles");
+    expect(html).not.toContain("Observed Return");
+    expect(html).not.toContain("Win rate");
+    expect(html).not.toContain("Accuracy");
+    expect(html).not.toContain("Worked");
+    expect(html).not.toContain("Buy");
+    expect(html).not.toContain("Sell");
+    expect(html).not.toContain("Prediction");
+    expect(html).not.toContain("Show More");
+    expect(html).not.toContain("Pagination");
+    expect(html).not.toContain("top-100");
+  });
 });
 
 function makeHistoryRow(overrides: {
@@ -129,5 +182,88 @@ function makeHistoryRow(overrides: {
     },
     scannerVersion: "test",
     scoringVersion: "test",
+  };
+}
+
+function makeObservationResponse() {
+  return {
+    ok: true,
+    run: {
+      runId: "fcc05284-c7a0-4990-9bcb-5dd165d83c37",
+      timeframe: "4h" as const,
+      status: "success" as const,
+      symbolsScanned: 409,
+      signalsCreated: 409,
+      finishedAt: "2026-06-02T08:05:00.000Z",
+    },
+    metadata: {
+      window: 3 as const,
+      selectedWindow: 3 as const,
+      windowUnit: "completed_candles" as const,
+      rowCount: 3,
+      completeCount: 1,
+      partialCount: 1,
+      missingCount: 1,
+      limited: false,
+      timeframe: "4h" as const,
+      assetClass: "crypto",
+      disclaimer:
+        "Research-only. Not financial advice. Historical observations are not predictions.",
+    },
+    rows: [
+      makeObservationRow({
+        id: "complete-row",
+        symbol: "SEIUSDT",
+        dataStatus: "complete",
+        missingReason: null,
+      }),
+      makeObservationRow({
+        id: "partial-row",
+        symbol: "RISKUSDT",
+        dataStatus: "partial",
+        missingReason: "insufficient_future_candles",
+      }),
+      makeObservationRow({
+        id: "missing-row",
+        symbol: "NEWUSDT",
+        observedClose: null,
+        observedChangePct: null,
+        maxDrawdownPct: null,
+        dataStatus: "missing",
+        missingReason: "no_future_candles",
+      }),
+    ],
+  };
+}
+
+function makeObservationRow(overrides: {
+  id: string;
+  symbol: string;
+  observedClose?: number | null;
+  observedChangePct?: number | null;
+  maxDrawdownPct?: number | null;
+  dataStatus: "complete" | "partial" | "missing";
+  missingReason: string | null;
+}) {
+  return {
+    id: overrides.id,
+    scanRunId: "fcc05284-c7a0-4990-9bcb-5dd165d83c37",
+    symbol: overrides.symbol,
+    exchange: "binance",
+    market: "spot",
+    timeframe: "4h" as const,
+    group: "risk",
+    label: "breakdown_risk",
+    primarySignal: "Risk review",
+    rankScore: 12,
+    anchorTime: "2026-06-02T00:00:00.000Z",
+    anchorClose: 100,
+    anchorSource: "stored_signal" as const,
+    window: 3 as const,
+    observedClose: overrides.observedClose ?? 102,
+    observedChangePct: overrides.observedChangePct ?? 2,
+    maxDrawdownPct: overrides.maxDrawdownPct ?? -3,
+    dataStatus: overrides.dataStatus,
+    missingReason: overrides.missingReason,
   };
 }

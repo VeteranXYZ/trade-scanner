@@ -12,6 +12,7 @@ import {
 import { buildSymbolResearchHref } from "@/components/symbol/symbolResearchLinks";
 
 const HISTORY_TIMEFRAMES = ["1h", "4h", "1d", "1w"] as const;
+const OBSERVATION_WINDOWS = [1, 3, 5, 10] as const;
 const assetClass = "crypto";
 const snapshotsLimit = 25;
 const historyDisclaimer =
@@ -22,6 +23,8 @@ const unsafePrimarySignalLabelMap: Record<string, string> = {
 };
 
 type HistoryTimeframe = (typeof HISTORY_TIMEFRAMES)[number];
+type ObservationWindow = (typeof OBSERVATION_WINDOWS)[number];
+type ObservationDataStatus = "complete" | "partial" | "missing";
 
 type HistoricalSnapshotRun = {
   runId: string;
@@ -102,8 +105,51 @@ type HistoricalSnapshotDetailResponse = {
   };
 };
 
+type HistoricalSnapshotObservationRow = {
+  id: string;
+  scanRunId: string;
+  symbol: string;
+  exchange?: string | null;
+  market?: string | null;
+  timeframe: HistoryTimeframe;
+  group?: string | null;
+  label?: string | null;
+  primarySignal?: string | null;
+  rankScore?: number | null;
+  anchorTime?: string | null;
+  anchorClose?: number | null;
+  anchorSource?: "stored_signal" | "nearest_prior_candle" | "unavailable";
+  window: ObservationWindow;
+  observedClose?: number | null;
+  observedChangePct?: number | null;
+  maxDrawdownPct?: number | null;
+  dataStatus: ObservationDataStatus;
+  missingReason?: string | null;
+};
+
+type HistoricalSnapshotObservationsResponse = {
+  ok: boolean;
+  run: HistoricalSnapshotRun;
+  rows: HistoricalSnapshotObservationRow[];
+  metadata: {
+    window: ObservationWindow;
+    selectedWindow: ObservationWindow;
+    windowUnit: "completed_candles";
+    rowCount: number;
+    completeCount: number;
+    partialCount: number;
+    missingCount: number;
+    limited: boolean;
+    timeframe: HistoryTimeframe;
+    assetClass: string;
+    disclaimer: string;
+  };
+};
+
 export function HistoryPageClient() {
   const [timeframe, setTimeframe] = useState<HistoryTimeframe>("4h");
+  const [observationWindow, setObservationWindow] =
+    useState<ObservationWindow>(3);
   const [manualSelectedRunId, setManualSelectedRunId] = useState<string | null>(
     null,
   );
@@ -130,6 +176,23 @@ export function HistoryPageClient() {
     enabled: selectedRunId !== null,
     staleTime: 60_000,
   });
+  const observationsQuery = useQuery({
+    queryKey: [
+      "history-snapshot-observations",
+      selectedRunId,
+      assetClass,
+      observationWindow,
+    ],
+    queryFn: ({ signal }) =>
+      fetchHistoricalSnapshotObservations({
+        runId: selectedRunId ?? "",
+        assetClass,
+        window: observationWindow,
+        signal,
+      }),
+    enabled: selectedRunId !== null,
+    staleTime: 60_000,
+  });
   const rows = snapshotQuery.data?.rows ?? [];
   const selectedRun = snapshotQuery.data?.run ?? null;
   const summaryItems = useMemo(
@@ -139,8 +202,15 @@ export function HistoryPageClient() {
 
   const refreshData = () => {
     void snapshotsQuery.refetch();
-    void snapshotQuery.refetch();
+    if (selectedRunId !== null) {
+      void snapshotQuery.refetch();
+      void observationsQuery.refetch();
+    }
   };
+  const isRefreshing =
+    snapshotsQuery.isFetching ||
+    snapshotQuery.isFetching ||
+    observationsQuery.isFetching;
 
   return (
     <section className="mx-auto max-w-[1800px] px-3 py-5 sm:px-4">
@@ -157,12 +227,10 @@ export function HistoryPageClient() {
         <button
           type="button"
           onClick={refreshData}
-          disabled={snapshotsQuery.isFetching || snapshotQuery.isFetching}
+          disabled={isRefreshing}
           className="rounded-md border border-[var(--border)] px-3 py-2 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-60"
         >
-          {snapshotsQuery.isFetching || snapshotQuery.isFetching
-            ? "Refreshing"
-            : "Refresh"}
+          {isRefreshing ? "Refreshing" : "Refresh"}
         </button>
       </div>
 
@@ -288,9 +356,152 @@ export function HistoryPageClient() {
             )}
           </section>
 
+          <ForwardObservationSection
+            window={observationWindow}
+            onWindowChange={setObservationWindow}
+            response={observationsQuery.data ?? null}
+            isLoading={selectedRunId !== null && observationsQuery.isLoading}
+            isFetching={observationsQuery.isFetching}
+            error={
+              observationsQuery.isError
+                ? formatQueryError(observationsQuery.error)
+                : null
+            }
+          />
+
           <SnapshotTable rows={rows} isLoading={snapshotQuery.isFetching} />
         </div>
       </div>
+    </section>
+  );
+}
+
+export function ForwardObservationSection({
+  window,
+  onWindowChange,
+  response,
+  isLoading,
+  isFetching,
+  error,
+}: {
+  window: ObservationWindow;
+  onWindowChange: (window: ObservationWindow) => void;
+  response: HistoricalSnapshotObservationsResponse | null;
+  isLoading: boolean;
+  isFetching: boolean;
+  error: string | null;
+}) {
+  const rows = response?.rows ?? [];
+  const metadata = response?.metadata ?? null;
+
+  return (
+    <section className="rounded-md border border-[var(--border)] bg-[var(--panel)] p-4">
+      <div className="mb-3 flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h2 className="text-base font-semibold">Forward Observation</h2>
+          <p className="mt-1 text-xs text-[var(--muted)]">
+            Research-only. Historical observations are not predictions.
+          </p>
+        </div>
+        <div className="flex rounded-md border border-[var(--border)] p-1">
+          {OBSERVATION_WINDOWS.map((option) => (
+            <button
+              key={option}
+              type="button"
+              onClick={() => onWindowChange(option)}
+              className={`rounded px-3 py-1.5 text-xs font-semibold ${
+                option === window
+                  ? "bg-[var(--foreground)] text-[var(--background)]"
+                  : "text-[var(--muted)] hover:text-[var(--foreground)]"
+              }`}
+            >
+              {option} {option === 1 ? "candle" : "candles"}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {metadata ? (
+        <div className="mb-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-6">
+          <Metric label="Selected Window" value={`${metadata.window} candles`} />
+          <Metric label="Timeframe" value={metadata.timeframe} />
+          <Metric label="Rows" value={formatCount(metadata.rowCount)} />
+          <Metric label="Complete" value={formatCount(metadata.completeCount)} />
+          <Metric label="Partial" value={formatCount(metadata.partialCount)} />
+          <Metric label="Missing" value={formatCount(metadata.missingCount)} />
+        </div>
+      ) : null}
+
+      {error ? (
+        <StatePanel title="Observation unavailable" message={error} />
+      ) : isLoading ? (
+        <StatePanel
+          title="Loading observation"
+          message="Loading forward observation rows."
+        />
+      ) : rows.length === 0 ? (
+        <StatePanel
+          title="Observation unavailable"
+          message="No forward observation rows are available for the selected stored run."
+        />
+      ) : (
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-[1060px] border-collapse text-left text-sm">
+            <thead className="bg-[#0d131a] text-xs uppercase text-[var(--muted)]">
+              <tr>
+                <th className="px-3 py-3 font-semibold">Symbol</th>
+                <th className="px-3 py-3 font-semibold">Group</th>
+                <th className="px-3 py-3 font-semibold">Label</th>
+                <th className="px-3 py-3 font-semibold">Rank Score</th>
+                <th className="px-3 py-3 font-semibold">Anchor Close</th>
+                <th className="px-3 py-3 font-semibold">Observed Close</th>
+                <th className="px-3 py-3 font-semibold">Observed Change</th>
+                <th className="px-3 py-3 font-semibold">Max Drawdown</th>
+                <th className="px-3 py-3 font-semibold">Data Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((row) => (
+                <tr key={row.id} className="border-t border-[var(--border)]">
+                  <td className="px-3 py-3 font-semibold">{row.symbol}</td>
+                  <td className="px-3 py-3">
+                    {formatGroupLabel(normalizeGroupKey(row.group))}
+                  </td>
+                  <td className="px-3 py-3">{formatSignalLabel(row.label)}</td>
+                  <td className="px-3 py-3 tabular-nums">
+                    {formatScore(row.rankScore)}
+                  </td>
+                  <td className="px-3 py-3 tabular-nums">
+                    {formatObservationNumber(row.anchorClose)}
+                  </td>
+                  <td className="px-3 py-3 tabular-nums">
+                    {formatObservationNumber(row.observedClose)}
+                  </td>
+                  <td className="px-3 py-3 tabular-nums">
+                    {formatObservationPercent(row.observedChangePct)}
+                  </td>
+                  <td className="px-3 py-3 tabular-nums">
+                    {formatObservationPercent(row.maxDrawdownPct)}
+                  </td>
+                  <td className="px-3 py-3">
+                    <span className="font-semibold">
+                      {formatDataStatus(row.dataStatus)}
+                    </span>
+                    {row.missingReason ? (
+                      <span className="block text-xs text-[var(--muted)]">
+                        {formatMissingReason(row.missingReason)}
+                      </span>
+                    ) : null}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          {isFetching ? (
+            <p className="mt-2 text-xs text-[var(--muted)]">Refreshing</p>
+          ) : null}
+        </div>
+      )}
     </section>
   );
 }
@@ -474,6 +685,31 @@ async function fetchHistoricalSnapshot({
   return (await response.json()) as HistoricalSnapshotDetailResponse;
 }
 
+async function fetchHistoricalSnapshotObservations({
+  runId,
+  assetClass,
+  window,
+  signal,
+}: {
+  runId: string;
+  assetClass: string;
+  window: ObservationWindow;
+  signal?: AbortSignal;
+}) {
+  const response = await fetch(
+    buildHistoricalSnapshotObservationsUrl({ runId, assetClass, window }),
+    { signal },
+  );
+
+  if (!response.ok) {
+    throw new Error(
+      `Unable to load forward observation (${response.status}).`,
+    );
+  }
+
+  return (await response.json()) as HistoricalSnapshotObservationsResponse;
+}
+
 export function buildHistoricalSnapshotsUrl({
   timeframe,
   assetClass,
@@ -508,6 +744,27 @@ export function buildHistoricalSnapshotUrl({
   const baseUrl = tradeApiBaseUrl?.trim().replace(/\/+$/, "") ?? "";
 
   return `${baseUrl}/api/history/snapshot?${params.toString()}`;
+}
+
+export function buildHistoricalSnapshotObservationsUrl({
+  runId,
+  assetClass,
+  window,
+  tradeApiBaseUrl = process.env.NEXT_PUBLIC_TRADE_API_BASE_URL,
+}: {
+  runId: string;
+  assetClass: string;
+  window: ObservationWindow;
+  tradeApiBaseUrl?: string;
+}) {
+  const params = new URLSearchParams({
+    runId,
+    assetClass,
+    window: String(window),
+  });
+  const baseUrl = tradeApiBaseUrl?.trim().replace(/\/+$/, "") ?? "";
+
+  return `${baseUrl}/api/history/snapshot-observations?${params.toString()}`;
 }
 
 function formatQueryError(error: unknown) {
@@ -546,6 +803,35 @@ function formatCount(value: number | null | undefined) {
   return typeof value === "number" && Number.isFinite(value)
     ? value.toLocaleString()
     : "-";
+}
+
+function formatObservationNumber(value: number | null | undefined) {
+  return typeof value === "number" && Number.isFinite(value)
+    ? value.toLocaleString(undefined, { maximumFractionDigits: 6 })
+    : "-";
+}
+
+function formatObservationPercent(value: number | null | undefined) {
+  return typeof value === "number" && Number.isFinite(value)
+    ? `${value.toFixed(2)}%`
+    : "-";
+}
+
+function formatDataStatus(value: ObservationDataStatus) {
+  return value.charAt(0).toUpperCase() + value.slice(1);
+}
+
+function formatMissingReason(value: string) {
+  switch (value) {
+    case "insufficient_future_candles":
+      return "Insufficient future candles";
+    case "no_future_candles":
+      return "No future candles";
+    case "missing_anchor":
+      return "Missing anchor";
+    default:
+      return "Missing data";
+  }
 }
 
 function formatFullUniverse(run: HistoricalSnapshotRun) {
