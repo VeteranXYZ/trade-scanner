@@ -36,6 +36,10 @@ Implemented MVP phases:
 - Phase 7: In-memory cache, TTLs, response metadata, concurrency limits, and partial scan errors.
 - Phase 8: README, known limitations, and final validation.
 
+## Production Operations
+
+Use the [production operations runbook](docs/production-operations.md) for VPS deployment, BaoTa schedules, production scan commands, validation, and troubleshooting.
+
 ## Setup
 
 ```bash
