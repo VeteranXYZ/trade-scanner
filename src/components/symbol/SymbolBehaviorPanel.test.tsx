@@ -19,7 +19,7 @@ describe("SymbolBehaviorPanel", () => {
 
     expect(html).toContain("Historical Behavior");
     expect(html).toContain("How similar prior signals behaved");
-    expect(html).toContain("research context, not financial advice");
+    expect(html).toContain("for this symbol and timeframe only");
     expect(html).toContain("Behavior Readout");
     expect(html).toContain("Constructive tendency");
     expect(html).toContain("Sample Confidence");

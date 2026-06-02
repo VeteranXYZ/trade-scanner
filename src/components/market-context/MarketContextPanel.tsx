@@ -35,7 +35,7 @@ export function MarketContextPanel({
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
           <div className="text-[10px] font-semibold uppercase tracking-wide text-[var(--muted)]">
-            {isCompact ? "Market backdrop" : "Market Context"}
+            {isCompact ? "Market Backdrop" : "Market Context"}
           </div>
           <h2 className="mt-1 text-sm font-semibold text-[var(--foreground)]">
             {view.title}

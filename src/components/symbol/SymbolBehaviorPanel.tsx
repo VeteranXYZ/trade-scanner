@@ -70,9 +70,7 @@ export function SymbolBehaviorPanel({
         <div>
           <h2 className="text-sm font-semibold">Historical Behavior</h2>
           <p className="mt-1 text-xs text-[var(--muted)]">
-            How similar prior signals behaved after this setup appeared. Same
-            symbol/timeframe scanner history only; research context, not financial
-            advice.
+            How similar prior signals behaved for this symbol and timeframe only.
           </p>
         </div>
         {isAvailable && behavior ? (

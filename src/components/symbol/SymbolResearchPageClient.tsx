@@ -607,7 +607,7 @@ export function SymbolResearchPageClient({
         availabilityRows={timeframeAvailability}
       />
 
-      <header className="mb-4 border border-[var(--border)] bg-[var(--panel)] px-4 py-4">
+      <header className="mb-5 border border-[var(--border)] bg-[var(--panel)] px-4 py-4">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
             <p className="text-xs uppercase tracking-wide text-[var(--muted)]">
@@ -617,6 +617,10 @@ export function SymbolResearchPageClient({
             <p className="mt-2 text-sm text-[var(--muted)]">
               {data.symbol.exchange} · {data.symbol.market} · {selectedTimeframe} ·{" "}
               {toTitleCase(data.symbol.assetClass)}
+            </p>
+            <p className="mt-3 max-w-3xl text-xs leading-5 text-[var(--muted)]">
+              Research workflow only. Scanner classification, market backdrop, and
+              historical context are not financial advice.
             </p>
           </div>
           <div className="text-left text-sm text-[var(--muted)] md:text-right">
@@ -637,144 +641,160 @@ export function SymbolResearchPageClient({
         </div>
       </header>
 
-      <TimeframeAvailabilityPanel
-        rows={timeframeAvailability}
-        className="mb-4"
-      />
+      <ResearchWorkflowSection
+        title="Research Overview"
+        description="Start with timeframe availability, the broader BTC/ETH backdrop, and the current research posture before reviewing detailed structure."
+        className="mt-0"
+      >
+        <TimeframeAvailabilityPanel rows={timeframeAvailability} />
 
-      <div className="grid gap-4 xl:grid-cols-[minmax(0,1.05fr)_minmax(320px,0.95fr)]">
-        <Panel title="Current Classification">
-          <div className="grid gap-3 sm:grid-cols-2">
-            <Fact label="Group" value={formatSymbolResearchGroup(interpretation.group)} />
-            <Fact label="Signal" value={interpretation.label} />
-            <Fact
-              label="Action"
-              value={formatSymbolResearchAction(interpretation.action)}
-            />
-            <Fact
-              label="Setup Type"
-              value={formatSymbolResearchSetup(interpretation.setupType)}
-            />
-            <Fact label="Status Note" value={interpretation.statusNote} />
-            <Fact
-              label="Price"
-              value={formatSymbolResearchPrice(latestSignal.priceAtSignal)}
-            />
-          </div>
-          <TextList title="Status Reasons" values={interpretation.reasons} />
-        </Panel>
+        <MarketContextPanel
+          variant="compact"
+          data={marketContextQuery.data}
+          isLoading={marketContextQuery.isLoading}
+          isError={marketContextQuery.isError}
+          implication={marketContextImplication}
+        />
 
-        <Panel title="Score Breakdown">
-          <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
-            {getSymbolResearchScoreRows(scoreBreakdown).map((row) => (
-              <div
-                key={row.label}
-                className="border border-[var(--border)] bg-[#080d12] px-3 py-2"
-              >
+        <ResearchDecisionSummaryPanel summary={decisionSummary} />
+      </ResearchWorkflowSection>
+
+      <ResearchWorkflowSection
+        title="Current Signal Structure"
+        description="Current scanner classification, score components, confirmation areas, caution points, and selected run context."
+      >
+        <div className="grid gap-4 xl:grid-cols-[minmax(0,1.05fr)_minmax(320px,0.95fr)]">
+          <Panel title="Current Classification">
+            <div className="grid gap-3 sm:grid-cols-2">
+              <Fact label="Group" value={formatSymbolResearchGroup(interpretation.group)} />
+              <Fact label="Signal" value={interpretation.label} />
+              <Fact
+                label="Action"
+                value={formatSymbolResearchAction(interpretation.action)}
+              />
+              <Fact
+                label="Setup Type"
+                value={formatSymbolResearchSetup(interpretation.setupType)}
+              />
+              <Fact label="Status Note" value={interpretation.statusNote} />
+              <Fact
+                label="Price"
+                value={formatSymbolResearchPrice(latestSignal.priceAtSignal)}
+              />
+            </div>
+            <TextList title="Status Reasons" values={interpretation.reasons} />
+          </Panel>
+
+          <Panel title="Score Breakdown">
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+              {getSymbolResearchScoreRows(scoreBreakdown).map((row) => (
+                <div
+                  key={row.label}
+                  className="border border-[var(--border)] bg-[#080d12] px-3 py-2"
+                >
+                  <div className="text-[11px] uppercase text-[var(--muted)]">
+                    {row.label}
+                  </div>
+                  <div className="mt-1 font-mono text-sm tabular-nums">
+                    {row.value}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </Panel>
+        </div>
+
+        <div className="grid gap-4 xl:grid-cols-[minmax(0,1.35fr)_minmax(320px,0.65fr)]">
+          <Panel title="Research Summary">
+            <div className="grid gap-4 lg:grid-cols-[minmax(0,0.8fr)_minmax(0,1.2fr)]">
+              <div>
                 <div className="text-[11px] uppercase text-[var(--muted)]">
-                  {row.label}
+                  Current Stance
                 </div>
-                <div className="mt-1 font-mono text-sm tabular-nums">
-                  {row.value}
+                <div className="mt-1 text-lg font-semibold text-[var(--foreground)]">
+                  {researchSummary.stance}
                 </div>
+                <p className="mt-2 text-sm text-[var(--muted)]">
+                  {researchSummary.runBasis}
+                </p>
               </div>
-            ))}
-          </div>
-        </Panel>
-      </div>
-
-      <MarketContextPanel
-        variant="compact"
-        data={marketContextQuery.data}
-        isLoading={marketContextQuery.isLoading}
-        isError={marketContextQuery.isError}
-        implication={marketContextImplication}
-        className="mt-4"
-      />
-
-      <ResearchDecisionSummaryPanel summary={decisionSummary} />
-
-      <SignalEvaluationPanel
-        readout={signalEvaluationReadout}
-        isLoading={
-          signalEvaluationQuery.isLoading ||
-          (signalEvaluationQuery.isFetching && !signalEvaluationQuery.data)
-        }
-        isError={signalEvaluationQuery.isError}
-      />
-
-      <div className="mt-4 grid gap-4 xl:grid-cols-[minmax(0,1.35fr)_minmax(320px,0.65fr)]">
-        <Panel title="Research Summary">
-          <div className="grid gap-4 lg:grid-cols-[minmax(0,0.8fr)_minmax(0,1.2fr)]">
-            <div>
-              <div className="text-[11px] uppercase text-[var(--muted)]">
-                Current Stance
+              <div className="grid gap-4 md:grid-cols-3">
+                <SummaryList title="Why" values={researchSummary.why} />
+                <SummaryList
+                  title="Next Confirmation"
+                  values={researchSummary.nextConfirmation}
+                />
+                <SummaryList
+                  title="Invalidation / Caution"
+                  values={researchSummary.invalidation}
+                />
               </div>
-              <div className="mt-1 text-lg font-semibold text-[var(--foreground)]">
-                {researchSummary.stance}
-              </div>
-              <p className="mt-2 text-sm text-[var(--muted)]">
-                {researchSummary.runBasis}
-              </p>
             </div>
-            <div className="grid gap-4 md:grid-cols-3">
-              <SummaryList title="Why" values={researchSummary.why} />
-              <SummaryList
-                title="Next Confirmation"
-                values={researchSummary.nextConfirmation}
-              />
-              <SummaryList
-                title="Invalidation / Caution"
-                values={researchSummary.invalidation}
-              />
+          </Panel>
+
+          <Panel title="Data Source">
+            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-1">
+              {diagnostics.rows.map((row) => (
+                <Fact key={row.label} label={row.label} value={row.value} />
+              ))}
+              <Fact label="API Origin" value={apiOrigin} />
             </div>
-          </div>
-        </Panel>
+            <p
+              className={`mt-3 border px-3 py-2 text-xs ${
+                diagnostics.hasWarning
+                  ? "border-amber-500/30 bg-amber-500/10 text-amber-100"
+                  : "border-[var(--border)] bg-[#080d12] text-[var(--muted)]"
+              }`}
+            >
+              {diagnostics.notice}
+            </p>
+          </Panel>
+        </div>
+      </ResearchWorkflowSection>
 
-        <Panel title="Data Source">
-          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-1">
-            {diagnostics.rows.map((row) => (
-              <Fact key={row.label} label={row.label} value={row.value} />
-            ))}
-            <Fact label="API Origin" value={apiOrigin} />
-          </div>
-          <p
-            className={`mt-3 border px-3 py-2 text-xs ${
-              diagnostics.hasWarning
-                ? "border-amber-500/30 bg-amber-500/10 text-amber-100"
-                : "border-[var(--border)] bg-[#080d12] text-[var(--muted)]"
-            }`}
-          >
-            {diagnostics.notice}
-          </p>
-        </Panel>
-      </div>
+      <ResearchWorkflowSection
+        title="Historical Context"
+        description="Broad-market signal evaluation and same-symbol behavior are shown separately; they are not merged into one score."
+      >
+        <SignalEvaluationPanel
+          readout={signalEvaluationReadout}
+          isLoading={
+            signalEvaluationQuery.isLoading ||
+            (signalEvaluationQuery.isFetching && !signalEvaluationQuery.data)
+          }
+          isError={signalEvaluationQuery.isError}
+        />
 
-      <SymbolBehaviorPanel
-        behavior={data.behavior}
-        diagnostics={data.behaviorDiagnostics}
-        signalHistory={history}
-        className="mt-4"
-      />
+        <SymbolBehaviorPanel
+          behavior={data.behavior}
+          diagnostics={data.behaviorDiagnostics}
+          signalHistory={history}
+        />
+      </ResearchWorkflowSection>
 
-      <SymbolResearchChart
-        symbol={data.symbol.symbol}
-        timeframe={selectedTimeframe}
-        candles={candles.rows}
-        candleCount={candles.count}
-        latestSignal={{
-          candleOpenTime: latestSignal.candleOpenTime,
-          resultGroup: latestSignal.resultGroup,
-          statusNote: latestSignal.statusNote,
-        }}
-      />
+      <ResearchWorkflowSection
+        title="Manual Review"
+        description="Chart, signal timeline, and multi-timeframe snapshots for follow-up review."
+      >
+        <SymbolResearchChart
+          symbol={data.symbol.symbol}
+          timeframe={selectedTimeframe}
+          candles={candles.rows}
+          candleCount={candles.count}
+          className=""
+          latestSignal={{
+            candleOpenTime: latestSignal.candleOpenTime,
+            resultGroup: latestSignal.resultGroup,
+            statusNote: latestSignal.statusNote,
+          }}
+        />
 
-      <SymbolSignalTimeline
-        history={history}
-        showSelectionNotice={showHistorySelectionNotice}
-      />
+        <SymbolSignalTimeline
+          history={history}
+          showSelectionNotice={showHistorySelectionNotice}
+          className=""
+        />
 
-      <div className="mt-4 grid gap-4 xl:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
         <Panel title={timeframeSnapshotTitle}>
           {timeframeSnapshotNote ? (
             <p className="mb-3 text-xs text-[var(--muted)]">{timeframeSnapshotNote}</p>
@@ -792,7 +812,12 @@ export function SymbolResearchPageClient({
             emptyText="No timeframe snapshots available."
           />
         </Panel>
+      </ResearchWorkflowSection>
 
+      <ResearchWorkflowSection
+        title="Details"
+        description="Recent candle coverage and selected raw fields for deeper inspection."
+      >
         <Panel title="Recent Candles Summary">
           {candleRowsNotice ? (
             <p className="mb-3 text-xs text-[var(--muted)]">{candleRowsNotice}</p>
@@ -821,27 +846,23 @@ export function SymbolResearchPageClient({
             />
           </div>
         </Panel>
-      </div>
 
-      <Panel title="Raw Details" className="mt-4">
-        <details>
-          <summary className="cursor-pointer text-sm font-semibold text-[var(--info)]">
-            Show selected details
-          </summary>
-          <div className="mt-3 grid gap-3 md:grid-cols-2">
-            <TextList title="Secondary Structures" values={secondaryStructures} />
-            <TextList title="Detected Risks" values={riskTypes} />
-            <JsonBlock title="Next Confirmation" value={latestSignal.nextConfirmation} />
-            <JsonBlock title="Invalidation" value={latestSignal.invalidation} />
-            <JsonBlock title="Factors" value={latestSignal.factors} />
-            <JsonBlock title="Selected Metrics" value={latestSignal.rawMetrics} />
-          </div>
-        </details>
-      </Panel>
-
-      <footer className="mt-5 text-xs text-[var(--muted)]">
-        Research output only. Not financial advice.
-      </footer>
+        <Panel title="Raw Details">
+          <details>
+            <summary className="cursor-pointer text-sm font-semibold text-[var(--info)]">
+              Show selected details
+            </summary>
+            <div className="mt-3 grid gap-3 md:grid-cols-2">
+              <TextList title="Secondary Structures" values={secondaryStructures} />
+              <TextList title="Detected Risks" values={riskTypes} />
+              <JsonBlock title="Next Confirmation" value={latestSignal.nextConfirmation} />
+              <JsonBlock title="Invalidation" value={latestSignal.invalidation} />
+              <JsonBlock title="Factors" value={latestSignal.factors} />
+              <JsonBlock title="Selected Metrics" value={latestSignal.rawMetrics} />
+            </div>
+          </details>
+        </Panel>
+      </ResearchWorkflowSection>
     </main>
   );
 }
@@ -1572,13 +1593,43 @@ function SymbolResearchUnavailableState({
   );
 }
 
-function ResearchDecisionSummaryPanel({
-  summary,
+function ResearchWorkflowSection({
+  title,
+  description,
+  className = "",
+  children,
 }: {
-  summary: ResearchDecisionSummary;
+  title: string;
+  description?: string;
+  className?: string;
+  children: ReactNode;
 }) {
   return (
-    <Panel title="Research Decision Summary" className="mt-4">
+    <section className={className || "mt-6"}>
+      <div className="mb-3">
+        <h2 className="text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">
+          {title}
+        </h2>
+        {description ? (
+          <p className="mt-1 max-w-5xl text-xs leading-5 text-[var(--muted)]">
+            {description}
+          </p>
+        ) : null}
+      </div>
+      <div className="space-y-4">{children}</div>
+    </section>
+  );
+}
+
+function ResearchDecisionSummaryPanel({
+  summary,
+  className = "",
+}: {
+  summary: ResearchDecisionSummary;
+  className?: string;
+}) {
+  return (
+    <Panel title="Research Decision Summary" className={className}>
       <div className="grid gap-4 lg:grid-cols-[minmax(0,0.7fr)_minmax(0,1.3fr)]">
         <div>
           <div className="text-[11px] uppercase text-[var(--muted)]">
@@ -1588,7 +1639,8 @@ function ResearchDecisionSummaryPanel({
             {summary.summaryLabel}
           </div>
           <p className="mt-2 text-sm text-[var(--muted)]">
-            Research-only framing; not a score or trading instruction.
+            Use as a review summary alongside scanner classification and
+            historical context.
           </p>
         </div>
         <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
@@ -1614,16 +1666,18 @@ function SignalEvaluationPanel({
   readout,
   isLoading,
   isError,
+  className = "",
 }: {
   readout: SignalEvaluationReadout;
   isLoading?: boolean;
   isError?: boolean;
+  className?: string;
 }) {
   return (
-    <Panel title="Signal Evaluation" className="mt-4">
+    <Panel title="Signal Evaluation" className={className}>
       <p className="mb-4 max-w-3xl text-sm text-[var(--muted)]">
-        How this type of scanner signal behaved across the broader market. Separate
-        from this symbol&apos;s own history.
+        Across the broader market, how this signal type has behaved historically.
+        Separate from this symbol&apos;s own history.
       </p>
       {isLoading ? (
         <p className="text-sm text-[var(--muted)]">

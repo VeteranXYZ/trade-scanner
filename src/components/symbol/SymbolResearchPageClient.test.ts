@@ -391,10 +391,35 @@ describe("SymbolResearchPageClient success state", () => {
       }),
     );
 
+    expect(html).toContain("Research Overview");
+    expect(html).toContain("Current Signal Structure");
+    expect(html).toContain("Historical Context");
+    expect(html).toContain("Manual Review");
+    expect(html).toContain("Details");
+    expect(html.indexOf("Research Overview")).toBeLessThan(
+      html.indexOf("Current Signal Structure"),
+    );
+    expect(html.indexOf("Current Signal Structure")).toBeLessThan(
+      html.indexOf("Historical Context"),
+    );
+    expect(html.indexOf("Historical Context")).toBeLessThan(
+      html.indexOf("Manual Review"),
+    );
+    expect(html.indexOf("Manual Review")).toBeLessThan(html.indexOf("Details"));
+    expect(html).toContain("Timeframe Availability");
+    expect(html).toContain("Market Backdrop");
     expect(html).toContain("Research Decision Summary");
     expect(html).toContain("Constructive research context");
     expect(html).toContain("Suggested Research Posture");
     expect(html).toContain("Candidate for deeper research");
+    expect(html).toContain("Current Classification");
+    expect(html).toContain("Score Breakdown");
+    expect(html).toContain("Research Summary");
+    expect(html).toContain("Next Confirmation");
+    expect(html).toContain("Invalidation / Caution");
+    expect(html).toContain("Data Source");
+    expect(html).toContain("Signal Evaluation");
+    expect(html).toContain("Across the broader market");
     expect(html).toContain("Historical Behavior");
     expect(html).toContain("Historical Follow-through Evaluation");
     expect(html).toContain("How similar prior signals behaved");
@@ -403,6 +428,13 @@ describe("SymbolResearchPageClient success state", () => {
     expect(html).toContain("Current context");
     expect(html).toContain("Recent outcomes");
     expect(html).toContain("Most recent prior observations with available forward returns.");
+    expect(html).toContain("Research Chart");
+    expect(html).toContain("Signal History");
+    expect(html).toMatch(/Timeframe Snapshot|Multi-Timeframe Snapshot/);
+    expect(html).toContain("Recent Candles Summary");
+    expect(html).toContain("Raw Details");
+    expect(html).toContain("<details>");
+    expect(html).not.toContain("<details open");
     expect(html).toContain("In Watchlist");
     expect(html).toContain('href="/watchlist"');
   });
@@ -437,7 +469,7 @@ describe("SymbolResearchPageClient success state", () => {
       ([options]) => options.queryKey[0] === "market-context",
     );
 
-    expect(html).toContain("Market backdrop");
+    expect(html).toContain("Market Backdrop");
     expect(html).toContain("Risk-oriented transition");
     expect(html).toContain("Broader regime context is shown as a backdrop only");
     expect(html).toContain("does not alter this symbol");
@@ -482,6 +514,74 @@ describe("SymbolResearchPageClient success state", () => {
     expect(html).toContain("Current Classification");
   });
 
+  it("keeps symbol research request shape unchanged while adding layout sections", () => {
+    useQueryMock.mockImplementation(
+      ({ queryKey }: { queryKey: [string, unknown] }) => ({
+        isLoading: false,
+        isError: false,
+        isFetching: false,
+        refetch: vi.fn(),
+        data:
+          queryKey[0] === "signal-evaluation"
+            ? null
+            : queryKey[0] === "market-context"
+              ? makeMarketContextResponse()
+              : makeSuccessResponse(),
+      }),
+    );
+
+    renderToStaticMarkup(
+      createElement(SymbolResearchPageClient, {
+        exchange: "binance",
+        symbol: "SEIUSDT",
+      }),
+    );
+
+    const symbolResearchCall = useQueryMock.mock.calls.find(
+      ([options]) => options.queryKey[0] === "symbol-research",
+    );
+
+    expect(symbolResearchCall?.[0].queryKey[1]).toEqual({
+      exchange: "binance",
+      market: "spot",
+      symbol: "SEIUSDT",
+      timeframe: "4h",
+      assetClass: "crypto",
+      historyLimit: 30,
+      candleLimit: 120,
+    });
+    expect(symbolResearchCall?.[0].queryKey[1]).not.toHaveProperty(
+      "includeMarketContext",
+    );
+  });
+
+  it("does not render direct trading command wording", () => {
+    useQueryMock.mockImplementation(
+      ({ queryKey }: { queryKey: [string, unknown] }) => ({
+        isLoading: false,
+        isError: false,
+        isFetching: false,
+        refetch: vi.fn(),
+        data:
+          queryKey[0] === "signal-evaluation"
+            ? makeSignalEvaluationResponse()
+            : queryKey[0] === "market-context"
+              ? makeMarketContextResponse()
+              : makeSuccessResponse(),
+      }),
+    );
+
+    const html = renderToStaticMarkup(
+      createElement(SymbolResearchPageClient, {
+        exchange: "binance",
+        symbol: "SEIUSDT",
+      }),
+    ).toLowerCase();
+
+    expect(html).not.toMatch(/\b(buy|sell|entry|exit)\b/);
+    expect(html).not.toMatch(/take\s+profit|stop\s+loss/);
+  });
+
   it("renders the Signal Evaluation card from the broad-market response", () => {
     useQueryMock.mockImplementation(
       ({ queryKey }: { queryKey: [string, unknown] }) => ({
@@ -515,7 +615,7 @@ describe("SymbolResearchPageClient success state", () => {
 
     expect(html).toContain("Signal Evaluation");
     expect(html).toContain(
-      "How this type of scanner signal behaved across the broader market",
+      "Across the broader market, how this signal type has behaved historically",
     );
     expect(html).toContain("Expected Direction");
     expect(html).toContain("Risk follow-through observed");

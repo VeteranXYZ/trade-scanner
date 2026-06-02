@@ -39,7 +39,7 @@ describe("MarketContextPanel", () => {
       }),
     );
 
-    expect(html).toContain("Market backdrop");
+    expect(html).toContain("Market Backdrop");
     expect(html).toContain("Risk-oriented transition");
     expect(html).toContain("Broader regime context is shown as a backdrop only");
     expect(html).toContain("does not alter this symbol&#x27;s scanner classification");

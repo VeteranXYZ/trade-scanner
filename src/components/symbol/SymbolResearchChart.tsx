@@ -24,6 +24,7 @@ type SymbolResearchChartProps = {
   timeframe: string;
   candles: RawSymbolChartCandle[];
   candleCount: number;
+  className?: string;
   latestSignal?: {
     candleOpenTime?: string | null;
     resultGroup?: string | null;
@@ -36,6 +37,7 @@ export function SymbolResearchChart({
   timeframe,
   candles,
   candleCount,
+  className = "mt-4",
   latestSignal,
 }: SymbolResearchChartProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -147,7 +149,9 @@ export function SymbolResearchChart({
         : "No candle rows available for this symbol/timeframe yet.";
 
   return (
-    <section className="mt-4 min-w-0 border border-[var(--border)] bg-[var(--panel)] px-4 py-4">
+    <section
+      className={`min-w-0 border border-[var(--border)] bg-[var(--panel)] px-4 py-4 ${className}`}
+    >
       <div className="mb-3 flex flex-wrap items-start justify-between gap-3">
         <div>
           <h2 className="text-sm font-semibold">Research Chart</h2>

@@ -12,11 +12,13 @@ import {
 type SymbolSignalTimelineProps = {
   history: RawSymbolTimelineSignal[];
   showSelectionNotice?: boolean;
+  className?: string;
 };
 
 export function SymbolSignalTimeline({
   history,
   showSelectionNotice = false,
+  className = "mt-4",
 }: SymbolSignalTimelineProps) {
   const [showAll, setShowAll] = useState(false);
   const items = useMemo(() => normalizeSignalHistory(history), [history]);
@@ -25,7 +27,9 @@ export function SymbolSignalTimeline({
   const canToggle = compactHistory.hiddenCount > 0;
 
   return (
-    <section className="mt-4 min-w-0 border border-[var(--border)] bg-[var(--panel)] px-4 py-4">
+    <section
+      className={`min-w-0 border border-[var(--border)] bg-[var(--panel)] px-4 py-4 ${className}`}
+    >
       <div className="mb-3">
         <h2 className="text-sm font-semibold">Signal History</h2>
         <p className="mt-1 text-xs text-[var(--muted)]">
