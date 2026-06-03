@@ -40,6 +40,28 @@ const unsafePrimarySignalLabelMap: Record<string, string> = {
   "do not chase": "Overheated caution",
   avoid: "Risk review",
 };
+const historyWorkflowSteps = [
+  {
+    label: "1. Runs",
+    description: "Choose a recent stored scanner snapshot.",
+  },
+  {
+    label: "2. Selected snapshot",
+    description: "Review metadata and Snapshot Rows from the selected run.",
+  },
+  {
+    label: "3. Forward observation",
+    description: "Use the mature observation run shown for historical metrics.",
+  },
+  {
+    label: "4. Observation rows",
+    description: "Inspect loaded historical outcome rows with local filters.",
+  },
+  {
+    label: "5. Snapshot rows",
+    description: "Compare the selected scanner output separately.",
+  },
+] as const;
 
 type HistoryTimeframe = (typeof HISTORY_TIMEFRAMES)[number];
 type ObservationWindow = (typeof OBSERVATION_WINDOWS)[number];
@@ -539,6 +561,8 @@ export function HistoryPageClient() {
         </div>
       </section>
 
+      <ResearchWorkflowSummary />
+
       <div className="grid gap-4 xl:grid-cols-[380px_minmax(0,1fr)] xl:items-start">
         <RecentSuccessfulRunsPanel
           timeframe={timeframe}
@@ -561,12 +585,17 @@ export function HistoryPageClient() {
           <section className="rounded-md border border-[var(--border)] bg-[var(--panel)] p-4">
             <div className="mb-3 flex flex-wrap items-start justify-between gap-3">
               <div>
-                <h2 className="text-base font-semibold">Selected Stored Run</h2>
+                <p className="text-xs uppercase text-[var(--muted)]">
+                  Selected Stored Run
+                </p>
+                <h2 className="mt-1 text-base font-semibold">
+                  Selected Snapshot
+                </h2>
                 <p className="mt-1 text-xs text-[var(--muted)]">
                   This is the scanner snapshot you selected. Snapshot Rows below
-                  come from this run. Forward Observation may use a different
-                  mature observation run for research context when this selected
-                  stored run is still waiting for future candles.
+                  come from this run. Forward Observation may use the mature
+                  observation run shown there when this selected snapshot is
+                  still waiting for future candles.
                 </p>
               </div>
               {snapshotQuery.data ? (
@@ -614,6 +643,34 @@ export function HistoryPageClient() {
   );
 }
 
+function ResearchWorkflowSummary() {
+  return (
+    <section className="mb-4 rounded-md border border-[var(--border)] bg-[var(--panel)] p-4">
+      <div className="mb-3">
+        <h2 className="text-base font-semibold">History Research Workflow</h2>
+        <p className="mt-1 max-w-3xl text-xs leading-5 text-[var(--muted)]">
+          Read the page as selected snapshot first, mature observation context
+          second. Snapshot Rows stay tied to the selected run; observation
+          metrics and Observation Rows use the observation run shown in Forward
+          Observation.
+        </p>
+      </div>
+      <div className="grid gap-2 md:grid-cols-5">
+        {historyWorkflowSteps.map((step) => (
+          <div key={step.label} className="rounded-md border border-[var(--border)] p-3">
+            <p className="text-xs font-semibold text-[var(--foreground)]">
+              {step.label}
+            </p>
+            <p className="mt-1 text-xs leading-5 text-[var(--muted)]">
+              {step.description}
+            </p>
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
 export function RecentSuccessfulRunsPanel({
   timeframe,
   snapshots,
@@ -646,7 +703,8 @@ export function RecentSuccessfulRunsPanel({
       <div className="mb-3 shrink-0">
         <h2 className="text-base font-semibold">Recent Successful Runs</h2>
         <p className="mt-1 text-xs text-[var(--muted)]">
-          Showing recent successful {timeframe} runs from Postgres.
+          Choose the stored {timeframe} scanner snapshot to review. Selection
+          controls the Selected Snapshot section and Snapshot Rows.
         </p>
       </div>
       {isError ? (
@@ -831,7 +889,8 @@ export function ForwardObservationSection({
         <div>
           <h2 className="text-base font-semibold">Forward Observation</h2>
           <p className="mt-1 text-xs text-[var(--muted)]">
-            Research-only. Historical observations are not predictions.
+            Observation source and historical metrics. Research-only, not
+            predictions.
           </p>
           <p className="mt-1 max-w-3xl text-xs leading-5 text-[var(--muted)]">
             Forward Observation uses completed future candles from the observation
@@ -889,6 +948,13 @@ export function ForwardObservationSection({
             Maturity {formatMaturityState(uiState.maturity.state)}
           </span>
         </div>
+      ) : null}
+
+      {observationRun ? (
+        <p className="mb-3 max-w-3xl text-xs leading-5 text-[var(--muted)]">
+          Observation Summary, Research Takeaways, and Observation Rows use this
+          observation run. Snapshot Rows remain tied to the selected snapshot.
+        </p>
       ) : null}
 
       {readyContextNote ? (
@@ -962,7 +1028,7 @@ export function ObservationRowsTable({
   );
 
   return (
-    <div className="overflow-x-auto">
+    <div>
       <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
         <div>
           <h3 className="text-sm font-semibold">Observation Rows</h3>
@@ -1011,55 +1077,57 @@ export function ObservationRowsTable({
           message="No observation rows match the current filters."
         />
       ) : (
-        <table className="w-full min-w-[1060px] border-collapse text-left text-sm">
-          <thead className="sticky top-0 bg-[#0d131a] text-xs uppercase text-[var(--muted)]">
-            <tr>
-              <th className="px-3 py-3 font-semibold">Symbol</th>
-              <th className="px-3 py-3 font-semibold">Group</th>
-              <th className="px-3 py-3 font-semibold">Label</th>
-              <th className="px-3 py-3 font-semibold">Rank Score</th>
-              <th className="px-3 py-3 font-semibold">Anchor Close</th>
-              <th className="px-3 py-3 font-semibold">Observed Close</th>
-              <th className="px-3 py-3 font-semibold">Observed Change</th>
-              <th className="px-3 py-3 font-semibold">Max Drawdown</th>
-              <th className="px-3 py-3 font-semibold">Data Status</th>
-            </tr>
-          </thead>
-          <tbody>
-            {filteredRows.map((row) => (
-              <tr key={row.id} className="border-t border-[var(--border)]">
-                <td className="px-3 py-3 font-semibold">{row.symbol}</td>
-                <td className="px-3 py-3">
-                  {formatGroupLabel(normalizeGroupKey(row.group))}
-                </td>
-                <td className="px-3 py-3">{formatSignalLabel(row.label)}</td>
-                <td className="px-3 py-3 tabular-nums">
-                  {formatScore(row.rankScore)}
-                </td>
-                <td className="px-3 py-3 tabular-nums">
-                  {formatObservationNumber(row.anchorClose)}
-                </td>
-                <td className="px-3 py-3 tabular-nums">
-                  {formatObservationNumber(row.observedClose)}
-                </td>
-                <td className="px-3 py-3 tabular-nums">
-                  {formatObservationPercent(row.observedChangePct)}
-                </td>
-                <td className="px-3 py-3 tabular-nums">
-                  {formatObservationPercent(row.maxDrawdownPct)}
-                </td>
-                <td className="px-3 py-3">
-                  <ObservationDataStatusBadge status={row.dataStatus} />
-                  {row.missingReason ? (
-                    <span className="block text-xs text-[var(--muted)]">
-                      {formatMissingReason(row.missingReason)}
-                    </span>
-                  ) : null}
-                </td>
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-[1060px] border-collapse text-left text-sm">
+            <thead className="sticky top-0 bg-[#0d131a] text-xs uppercase text-[var(--muted)]">
+              <tr>
+                <th className="px-3 py-3 font-semibold">Symbol</th>
+                <th className="px-3 py-3 font-semibold">Group</th>
+                <th className="px-3 py-3 font-semibold">Label</th>
+                <th className="px-3 py-3 font-semibold">Rank Score</th>
+                <th className="px-3 py-3 font-semibold">Anchor Close</th>
+                <th className="px-3 py-3 font-semibold">Observed Close</th>
+                <th className="px-3 py-3 font-semibold">Observed Change</th>
+                <th className="px-3 py-3 font-semibold">Max Drawdown</th>
+                <th className="px-3 py-3 font-semibold">Data Status</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {filteredRows.map((row) => (
+                <tr key={row.id} className="border-t border-[var(--border)]">
+                  <td className="px-3 py-3 font-semibold">{row.symbol}</td>
+                  <td className="px-3 py-3">
+                    {formatGroupLabel(normalizeGroupKey(row.group))}
+                  </td>
+                  <td className="px-3 py-3">{formatSignalLabel(row.label)}</td>
+                  <td className="px-3 py-3 tabular-nums">
+                    {formatScore(row.rankScore)}
+                  </td>
+                  <td className="px-3 py-3 tabular-nums">
+                    {formatObservationNumber(row.anchorClose)}
+                  </td>
+                  <td className="px-3 py-3 tabular-nums">
+                    {formatObservationNumber(row.observedClose)}
+                  </td>
+                  <td className="px-3 py-3 tabular-nums">
+                    {formatObservationPercent(row.observedChangePct)}
+                  </td>
+                  <td className="px-3 py-3 tabular-nums">
+                    {formatObservationPercent(row.maxDrawdownPct)}
+                  </td>
+                  <td className="px-3 py-3">
+                    <ObservationDataStatusBadge status={row.dataStatus} />
+                    {row.missingReason ? (
+                      <span className="mt-1 block text-xs text-[var(--muted)]">
+                        {formatMissingReason(row.missingReason)}
+                      </span>
+                    ) : null}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       )}
 
       {isFetching ? (
@@ -1338,8 +1406,9 @@ function ObservationSummarySection({
         <h3 className="text-sm font-semibold">Observation Summary</h3>
         <p className="mt-1 max-w-3xl text-xs leading-5 text-[var(--muted)]">
           Observation metrics are calculated from the observation run shown in
-          Forward Observation. They are historical observations for research
-          context, not predictions or financial advice.
+          Forward Observation. Metrics appear first; interpretation and research
+          context follow below. These are historical observations, not
+          predictions or financial advice.
         </p>
       </div>
 
@@ -1446,7 +1515,7 @@ function buildResearchTakeaways({
     }
 
     return [
-      "This observation window has some complete rows, but coverage is limited for group-level historical review.",
+      "This observation window has some complete rows, but complete-row metrics are not stable enough for broad group comparison.",
       "Group metrics use complete rows only.",
       "Notable examples may include outliers and should not be treated as predictions.",
     ];
@@ -1833,7 +1902,8 @@ export function SnapshotTable({
             Snapshot Rows are the scanner output from the selected stored run.
             They are not necessarily the same run used for Forward Observation.
             Snapshot Rows are not affected by Observation Rows filters. Current
-            Symbol Research links open the current research view.
+            Symbol Research links open the current Symbol Research view, not a
+            historical point-in-time research view.
           </p>
         </div>
         <span className="text-xs text-[var(--muted)]">
