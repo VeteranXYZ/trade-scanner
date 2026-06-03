@@ -2,8 +2,10 @@ import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import { MarketContextPanel } from "@/components/market-context/MarketContextPanel";
+import { sortDataRows } from "@/components/table/dataTableSorting";
 import {
   buildMtfLatestScanUrl,
+  getMtfScreenerTableSortValue,
   MtfScreenerExportControls,
   MtfScreenerSourcePanel,
   MtfResearchBucketsPanel,
@@ -123,6 +125,52 @@ describe("MultiTimeframeScreenerTable", () => {
     );
   });
 
+  it("preserves incoming table row order until a header sort is active", () => {
+    const rows = buildMtfScreenerRows({
+      "4h": makeResponse("4h", [
+        makeItem({ symbol: "AAAUSDT", timeframe: "4h", rankScore: 80 }),
+        makeItem({ symbol: "BBBUSDT", timeframe: "4h", rankScore: 60 }),
+        makeItem({ symbol: "CCCUSDT", timeframe: "4h", rankScore: 40 }),
+      ]),
+    });
+    const incomingRows = [rows[2], rows[0], rows[1]];
+    const html = renderToStaticMarkup(
+      createElement(MtfScreenerTable, { rows: incomingRows }),
+    );
+
+    expectMarkupOrder(html, ["CCCUSDT", "AAAUSDT", "BBBUSDT"]);
+    expect(html).not.toContain("ASC");
+    expect(html).not.toContain("DESC");
+  });
+
+  it("renders rows in the active header sort order with an accessible sort indicator", () => {
+    const rows = buildMtfScreenerRows({
+      "4h": makeResponse("4h", [
+        makeItem({ symbol: "LOWUSDT", timeframe: "4h", rankScore: 20 }),
+        makeItem({ symbol: "HIGHUSDT", timeframe: "4h", rankScore: 90 }),
+        makeItem({ symbol: "MIDUSDT", timeframe: "4h", rankScore: 50 }),
+      ]),
+    });
+    const incomingRows = [rows[2], rows[0], rows[1]];
+    const sortState = { key: "combined_rank" as const, direction: "desc" as const };
+    const visibleRows = sortDataRows(
+      incomingRows,
+      sortState,
+      getMtfScreenerTableSortValue,
+    );
+    const html = renderToStaticMarkup(
+      createElement(MtfScreenerTable, {
+        rows: visibleRows,
+        sortState,
+        onSortChange: noop,
+      }),
+    );
+
+    expectMarkupOrder(html, ["HIGHUSDT", "MIDUSDT", "LOWUSDT"]);
+    expect(html).toContain("DESC");
+    expect(html).toContain('aria-sort="descending"');
+  });
+
   it("renders compact export controls in the source panel", () => {
     const html = renderToStaticMarkup(
       createElement(MtfScreenerSourcePanel, {
@@ -185,7 +233,7 @@ describe("MultiTimeframeScreenerTable", () => {
       createElement(MtfScreenerTable, { rows }),
     );
 
-    expect(html).toContain("+1 more");
+    expect(html).toContain("+1 risk notes");
     expect(html).toContain("1w:");
     expect(html).toContain("4h Research");
   });
@@ -246,6 +294,18 @@ describe("MultiTimeframeScreenerTable", () => {
 });
 
 function noop() {}
+
+function expectMarkupOrder(html: string, labels: string[]) {
+  const positions = labels.map((label) => html.indexOf(label));
+
+  for (const position of positions) {
+    expect(position).toBeGreaterThanOrEqual(0);
+  }
+
+  for (let index = 1; index < positions.length; index += 1) {
+    expect(positions[index]).toBeGreaterThan(positions[index - 1]);
+  }
+}
 
 function makeResponse(
   timeframe: "1h" | "4h" | "1d" | "1w",

@@ -9,6 +9,21 @@ import {
   formatSignalLabel,
   normalizeGroupKey,
 } from "@/components/scanner/latestScanUi";
+import {
+  DataTable,
+  DataTableCell,
+  DataTableChip,
+  DataTableHeaderCell,
+  DataTableScroll,
+  type ChipTone,
+} from "@/components/table/DataTable";
+import {
+  getNextDataSortState,
+  sortDataRows,
+  type DataSortDirection,
+  type DataSortState,
+  type DataSortValue,
+} from "@/components/table/dataTableSorting";
 import { buildSymbolResearchHref } from "@/components/symbol/symbolResearchLinks";
 import {
   buildObservationSummary,
@@ -74,6 +89,27 @@ type ObservationRowsGroupFilter =
   | "overheated"
   | "risk"
   | "neutral";
+export type ObservationRowsSortKey =
+  | "symbol"
+  | "group"
+  | "label"
+  | "rank_score"
+  | "anchor_close"
+  | "observed_close"
+  | "observed_change"
+  | "max_drawdown"
+  | "data_status";
+export type SnapshotRowsSortKey =
+  | "index"
+  | "symbol"
+  | "market"
+  | "group"
+  | "label"
+  | "rank_score";
+type SnapshotIndexedRow = {
+  row: HistoricalSnapshotRow;
+  sourceIndex: number;
+};
 type ObservationReadinessBlocker =
   | "observable"
   | "time_maturity"
@@ -1007,16 +1043,20 @@ export function ObservationRowsTable({
   isFetching,
   initialDataStatusFilter = "all",
   initialGroupFilter = "all",
+  initialSortState = null,
 }: {
   rows: HistoricalSnapshotObservationRow[];
   isFetching: boolean;
   initialDataStatusFilter?: ObservationRowsDataStatusFilter;
   initialGroupFilter?: ObservationRowsGroupFilter;
+  initialSortState?: DataSortState<ObservationRowsSortKey> | null;
 }) {
   const [dataStatusFilter, setDataStatusFilter] =
     useState<ObservationRowsDataStatusFilter>(initialDataStatusFilter);
   const [groupFilter, setGroupFilter] =
     useState<ObservationRowsGroupFilter>(initialGroupFilter);
+  const [sortState, setSortState] =
+    useState<DataSortState<ObservationRowsSortKey> | null>(initialSortState);
   const filteredRows = useMemo(
     () =>
       filterObservationRows({
@@ -1026,6 +1066,18 @@ export function ObservationRowsTable({
       }),
     [rows, dataStatusFilter, groupFilter],
   );
+  const visibleRows = useMemo(
+    () => sortDataRows(filteredRows, sortState, getObservationRowsSortValue),
+    [filteredRows, sortState],
+  );
+  const updateSort = (
+    key: ObservationRowsSortKey,
+    defaultDirection: DataSortDirection,
+  ) => {
+    setSortState((current) =>
+      getNextDataSortState({ current, key, defaultDirection }),
+    );
+  };
 
   return (
     <div>
@@ -1038,7 +1090,7 @@ export function ObservationRowsTable({
         </div>
         <span className="text-xs text-[var(--muted)]">
           {formatObservationRowsFilterCount({
-            visibleCount: filteredRows.length,
+            visibleCount: visibleRows.length,
             totalCount: rows.length,
           })}
         </span>
@@ -1061,7 +1113,7 @@ export function ObservationRowsTable({
         </div>
         <p className="mt-3 text-xs leading-5 text-[var(--muted)]">
           {formatObservationRowsFilterCount({
-            visibleCount: filteredRows.length,
+            visibleCount: visibleRows.length,
             totalCount: rows.length,
           })}
         </p>
@@ -1071,63 +1123,141 @@ export function ObservationRowsTable({
         </p>
       </div>
 
-      {filteredRows.length === 0 ? (
+      {visibleRows.length === 0 ? (
         <StatePanel
           title="No matching observation rows"
           message="No observation rows match the current filters."
         />
       ) : (
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-[1060px] border-collapse text-left text-sm">
+        <DataTableScroll>
+          <DataTable minWidth="min-w-[1060px]">
             <thead className="sticky top-0 bg-[var(--table-header)] text-xs uppercase text-[var(--muted)]">
               <tr>
-                <th className="px-3 py-3 font-semibold">Symbol</th>
-                <th className="px-3 py-3 font-semibold">Group</th>
-                <th className="px-3 py-3 font-semibold">Label</th>
-                <th className="px-3 py-3 font-semibold">Rank Score</th>
-                <th className="px-3 py-3 font-semibold">Anchor Close</th>
-                <th className="px-3 py-3 font-semibold">Observed Close</th>
-                <th className="px-3 py-3 font-semibold">Observed Change</th>
-                <th className="px-3 py-3 font-semibold">Max Drawdown</th>
-                <th className="px-3 py-3 font-semibold">Data Status</th>
+                <DataTableHeaderCell
+                  sortKey="symbol"
+                  sortState={sortState}
+                  onSortChange={updateSort}
+                >
+                  Symbol
+                </DataTableHeaderCell>
+                <DataTableHeaderCell
+                  sortKey="group"
+                  sortState={sortState}
+                  defaultDirection="desc"
+                  onSortChange={updateSort}
+                >
+                  Group
+                </DataTableHeaderCell>
+                <DataTableHeaderCell
+                  sortKey="label"
+                  sortState={sortState}
+                  onSortChange={updateSort}
+                >
+                  Label
+                </DataTableHeaderCell>
+                <DataTableHeaderCell
+                  sortKey="rank_score"
+                  sortState={sortState}
+                  defaultDirection="desc"
+                  onSortChange={updateSort}
+                  align="right"
+                >
+                  Rank Score
+                </DataTableHeaderCell>
+                <DataTableHeaderCell
+                  sortKey="anchor_close"
+                  sortState={sortState}
+                  defaultDirection="desc"
+                  onSortChange={updateSort}
+                  align="right"
+                >
+                  Anchor Close
+                </DataTableHeaderCell>
+                <DataTableHeaderCell
+                  sortKey="observed_close"
+                  sortState={sortState}
+                  defaultDirection="desc"
+                  onSortChange={updateSort}
+                  align="right"
+                >
+                  Observed Close
+                </DataTableHeaderCell>
+                <DataTableHeaderCell
+                  sortKey="observed_change"
+                  sortState={sortState}
+                  defaultDirection="desc"
+                  onSortChange={updateSort}
+                  align="right"
+                >
+                  Observed Change
+                </DataTableHeaderCell>
+                <DataTableHeaderCell
+                  sortKey="max_drawdown"
+                  sortState={sortState}
+                  defaultDirection="desc"
+                  onSortChange={updateSort}
+                  align="right"
+                >
+                  Max Drawdown
+                </DataTableHeaderCell>
+                <DataTableHeaderCell
+                  sortKey="data_status"
+                  sortState={sortState}
+                  defaultDirection="desc"
+                  onSortChange={updateSort}
+                >
+                  Data Status
+                </DataTableHeaderCell>
               </tr>
             </thead>
             <tbody>
-              {filteredRows.map((row) => (
-                <tr key={row.id} className="border-t border-[var(--border)]">
-                  <td className="px-3 py-3 font-semibold">{row.symbol}</td>
-                  <td className="px-3 py-3">
-                    {formatGroupLabel(normalizeGroupKey(row.group))}
-                  </td>
-                  <td className="px-3 py-3">{formatSignalLabel(row.label)}</td>
-                  <td className="px-3 py-3 tabular-nums">
+              {visibleRows.map((row) => (
+                <tr
+                  key={row.id}
+                  className="border-t border-[var(--border)] hover:bg-[var(--row-hover)]"
+                >
+                  <DataTableCell className="font-semibold text-[var(--foreground)]">
+                    {row.symbol}
+                  </DataTableCell>
+                  <DataTableCell>
+                    <GroupChip group={normalizeGroupKey(row.group)} />
+                  </DataTableCell>
+                  <DataTableCell>
+                    <DataTableChip title={formatSignalLabel(row.label)}>
+                      {formatSignalLabel(row.label)}
+                    </DataTableChip>
+                  </DataTableCell>
+                  <DataTableCell align="right" className="font-mono tabular-nums">
                     {formatScore(row.rankScore)}
-                  </td>
-                  <td className="px-3 py-3 tabular-nums">
+                  </DataTableCell>
+                  <DataTableCell align="right" className="font-mono tabular-nums">
                     {formatObservationNumber(row.anchorClose)}
-                  </td>
-                  <td className="px-3 py-3 tabular-nums">
+                  </DataTableCell>
+                  <DataTableCell align="right" className="font-mono tabular-nums">
                     {formatObservationNumber(row.observedClose)}
-                  </td>
-                  <td className="px-3 py-3 tabular-nums">
+                  </DataTableCell>
+                  <DataTableCell align="right" className="font-mono tabular-nums">
                     {formatObservationPercent(row.observedChangePct)}
-                  </td>
-                  <td className="px-3 py-3 tabular-nums">
+                  </DataTableCell>
+                  <DataTableCell align="right" className="font-mono tabular-nums">
                     {formatObservationPercent(row.maxDrawdownPct)}
-                  </td>
-                  <td className="px-3 py-3">
+                  </DataTableCell>
+                  <DataTableCell>
                     <ObservationDataStatusBadge status={row.dataStatus} />
                     {row.missingReason ? (
-                      <span className="mt-1 block text-xs text-[var(--muted)]">
+                      <span
+                        className="mt-1 block max-w-[170px] truncate text-[10px] text-[var(--muted)]"
+                        title={formatMissingReason(row.missingReason)}
+                      >
                         {formatMissingReason(row.missingReason)}
                       </span>
                     ) : null}
-                  </td>
+                  </DataTableCell>
                 </tr>
               ))}
             </tbody>
-          </table>
-        </div>
+          </DataTable>
+        </DataTableScroll>
       )}
 
       {isFetching ? (
@@ -1178,14 +1308,44 @@ function ObservationDataStatusBadge({
   status: ObservationDataStatus;
 }) {
   return (
-    <span
-      className={`inline-flex rounded-full border px-2 py-0.5 text-xs font-semibold ${formatObservationDataStatusBadgeClassName(
-        status,
-      )}`}
-    >
+    <DataTableChip tone={getObservationDataStatusChipTone(status)}>
       {formatDataStatus(status)}
-    </span>
+    </DataTableChip>
   );
+}
+
+function GroupChip({ group }: { group: ReturnType<typeof normalizeGroupKey> }) {
+  return (
+    <DataTableChip tone={getHistoryGroupChipTone(group)}>
+      {formatGroupLabel(group)}
+    </DataTableChip>
+  );
+}
+
+export function getObservationRowsSortValue(
+  row: HistoricalSnapshotObservationRow,
+  key: ObservationRowsSortKey,
+): DataSortValue {
+  switch (key) {
+    case "symbol":
+      return row.symbol;
+    case "group":
+      return getHistoryGroupSortRank(normalizeGroupKey(row.group));
+    case "label":
+      return formatSignalLabel(row.label);
+    case "rank_score":
+      return row.rankScore;
+    case "anchor_close":
+      return row.anchorClose;
+    case "observed_close":
+      return row.observedClose;
+    case "observed_change":
+      return row.observedChangePct;
+    case "max_drawdown":
+      return row.maxDrawdownPct;
+    case "data_status":
+      return getObservationDataStatusSortRank(row.dataStatus);
+  }
 }
 
 function filterObservationRows({
@@ -1215,16 +1375,60 @@ function formatObservationRowsFilterButtonClassName(isSelected: boolean) {
     : `${base} border-[var(--border)] text-[var(--muted)] hover:text-[var(--foreground)]`;
 }
 
-function formatObservationDataStatusBadgeClassName(
-  status: ObservationDataStatus,
-) {
+function getObservationDataStatusChipTone(status: ObservationDataStatus): ChipTone {
   switch (status) {
     case "complete":
-      return "border-emerald-500/30 bg-emerald-500/10 text-[var(--positive)]";
+      return "positive";
     case "partial":
-      return "border-amber-500/30 bg-[var(--warning-bg)] text-[var(--warning)]";
+      return "warning";
     case "missing":
-      return "border-[var(--border)] bg-[var(--panel-strong)] text-[var(--muted)]";
+      return "neutral";
+  }
+}
+
+function getObservationDataStatusSortRank(status: ObservationDataStatus) {
+  switch (status) {
+    case "complete":
+      return 3;
+    case "partial":
+      return 2;
+    case "missing":
+      return 1;
+  }
+}
+
+function getHistoryGroupSortRank(group: ReturnType<typeof normalizeGroupKey>) {
+  switch (group) {
+    case "eligible":
+      return 5;
+    case "watch":
+      return 4;
+    case "neutral":
+      return 3;
+    case "overheated":
+      return 2;
+    case "risk":
+      return 1;
+    case "insufficient_history":
+      return 0;
+  }
+}
+
+function getHistoryGroupChipTone(
+  group: ReturnType<typeof normalizeGroupKey>,
+): ChipTone {
+  switch (group) {
+    case "eligible":
+      return "positive";
+    case "watch":
+      return "info";
+    case "overheated":
+      return "warning";
+    case "risk":
+      return "danger";
+    case "neutral":
+    case "insufficient_history":
+      return "neutral";
   }
 }
 
@@ -1889,10 +2093,31 @@ function formatCoverageLag(readinessRun: HistoricalObservationReadinessRun) {
 export function SnapshotTable({
   rows,
   isLoading,
+  initialSortState = null,
 }: {
   rows: HistoricalSnapshotRow[];
   isLoading: boolean;
+  initialSortState?: DataSortState<SnapshotRowsSortKey> | null;
 }) {
+  const [sortState, setSortState] =
+    useState<DataSortState<SnapshotRowsSortKey> | null>(initialSortState);
+  const indexedRows = useMemo(
+    () => rows.map((row, sourceIndex) => ({ row, sourceIndex })),
+    [rows],
+  );
+  const visibleRows = useMemo(
+    () => sortDataRows(indexedRows, sortState, getSnapshotRowsSortValue),
+    [indexedRows, sortState],
+  );
+  const updateSort = (
+    key: SnapshotRowsSortKey,
+    defaultDirection: DataSortDirection,
+  ) => {
+    setSortState((current) =>
+      getNextDataSortState({ current, key, defaultDirection }),
+    );
+  };
+
   return (
     <section className="rounded-md border border-[var(--border)] bg-[var(--panel)] p-4">
       <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
@@ -1916,53 +2141,118 @@ export function SnapshotTable({
           message="No scan signals are available for the selected stored run."
         />
       ) : (
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-[1180px] border-collapse text-left text-sm">
+        <DataTableScroll>
+          <DataTable minWidth="min-w-[1180px]">
             <thead className="bg-[var(--table-header)] text-xs uppercase text-[var(--muted)]">
               <tr>
-                <th className="px-3 py-3 font-semibold">#</th>
-                <th className="px-3 py-3 font-semibold">Symbol</th>
-                <th className="px-3 py-3 font-semibold">Market</th>
-                <th className="px-3 py-3 font-semibold">Group</th>
-                <th className="px-3 py-3 font-semibold">Label</th>
-                <th className="px-3 py-3 font-semibold">Primary Signal</th>
-                <th className="px-3 py-3 font-semibold">Risk Notes</th>
-                <th className="px-3 py-3 font-semibold">Rank Score</th>
-                <th className="px-3 py-3 font-semibold">Components</th>
-                <th className="px-3 py-3 font-semibold">Versions</th>
-                <th className="px-3 py-3 font-semibold">Research</th>
+                <DataTableHeaderCell
+                  sortKey="index"
+                  sortState={sortState}
+                  onSortChange={updateSort}
+                  align="right"
+                >
+                  #
+                </DataTableHeaderCell>
+                <DataTableHeaderCell
+                  sortKey="symbol"
+                  sortState={sortState}
+                  onSortChange={updateSort}
+                >
+                  Symbol
+                </DataTableHeaderCell>
+                <DataTableHeaderCell
+                  sortKey="market"
+                  sortState={sortState}
+                  onSortChange={updateSort}
+                >
+                  Market
+                </DataTableHeaderCell>
+                <DataTableHeaderCell
+                  sortKey="group"
+                  sortState={sortState}
+                  defaultDirection="desc"
+                  onSortChange={updateSort}
+                >
+                  Group
+                </DataTableHeaderCell>
+                <DataTableHeaderCell
+                  sortKey="label"
+                  sortState={sortState}
+                  onSortChange={updateSort}
+                >
+                  Label
+                </DataTableHeaderCell>
+                <DataTableHeaderCell>Primary Signal</DataTableHeaderCell>
+                <DataTableHeaderCell>Risk Notes</DataTableHeaderCell>
+                <DataTableHeaderCell
+                  sortKey="rank_score"
+                  sortState={sortState}
+                  defaultDirection="desc"
+                  onSortChange={updateSort}
+                  align="right"
+                >
+                  Rank Score
+                </DataTableHeaderCell>
+                <DataTableHeaderCell>Components</DataTableHeaderCell>
+                <DataTableHeaderCell>Versions</DataTableHeaderCell>
+                <DataTableHeaderCell>Research</DataTableHeaderCell>
               </tr>
             </thead>
             <tbody>
-              {rows.map((row, index) => (
-                <tr key={row.id} className="border-t border-[var(--border)]">
-                  <td className="px-3 py-3 tabular-nums text-[var(--muted)]">
-                    {index + 1}
-                  </td>
-                  <td className="px-3 py-3 font-semibold">{row.symbol}</td>
-                  <td className="px-3 py-3 text-xs text-[var(--muted)]">
+              {visibleRows.map(({ row, sourceIndex }) => (
+                <tr
+                  key={row.id}
+                  className="border-t border-[var(--border)] hover:bg-[var(--row-hover)]"
+                >
+                  <DataTableCell align="right" className="font-mono tabular-nums">
+                    {sourceIndex + 1}
+                  </DataTableCell>
+                  <DataTableCell className="font-semibold text-[var(--foreground)]">
+                    {row.symbol}
+                  </DataTableCell>
+                  <DataTableCell>
                     {formatMarket(row)}
-                  </td>
-                  <td className="px-3 py-3">
-                    {formatGroupLabel(normalizeGroupKey(row.group))}
-                  </td>
-                  <td className="px-3 py-3">{formatSignalLabel(row.label)}</td>
-                  <td className="px-3 py-3">
+                  </DataTableCell>
+                  <DataTableCell>
+                    <GroupChip group={normalizeGroupKey(row.group)} />
+                  </DataTableCell>
+                  <DataTableCell>
+                    <DataTableChip title={formatSignalLabel(row.label)}>
+                      {formatSignalLabel(row.label)}
+                    </DataTableChip>
+                  </DataTableCell>
+                  <DataTableCell
+                    className="max-w-[160px] text-[var(--foreground)]"
+                    truncate
+                    title={formatHistoryPrimarySignal(row.primarySignal)}
+                  >
                     {formatHistoryPrimarySignal(row.primarySignal)}
-                  </td>
-                  <td className="max-w-[280px] px-3 py-3 text-xs leading-5 text-[var(--muted)]">
+                  </DataTableCell>
+                  <DataTableCell
+                    className="max-w-[240px]"
+                    truncate
+                    title={formatRiskNotes(row)}
+                  >
                     {formatRiskNotes(row)}
-                  </td>
-                  <td className="px-3 py-3 tabular-nums">
+                  </DataTableCell>
+                  <DataTableCell align="right" className="font-mono tabular-nums">
                     {formatScore(row.rankScore)}
-                  </td>
-                  <td className="px-3 py-3 text-xs leading-5 text-[var(--muted)]">
+                  </DataTableCell>
+                  <DataTableCell
+                    className="max-w-[180px]"
+                    truncate
+                    title={formatComponentScores(row.componentScores)}
+                  >
                     {formatComponentScores(row.componentScores)}
-                  </td>
-                  <td className="px-3 py-3 text-xs leading-5 text-[var(--muted)]">
+                  </DataTableCell>
+                  <DataTableCell
+                    className="max-w-[150px]"
+                    truncate
+                    title={formatVersions(row)}
+                  >
                     {formatVersions(row)}
-                  </td>
-                  <td className="px-3 py-3">
+                  </DataTableCell>
+                  <DataTableCell>
                     <Link
                       href={buildSymbolResearchHref({
                         exchange: row.exchange ?? "binance",
@@ -1974,15 +2264,35 @@ export function SnapshotTable({
                     >
                       Current research
                     </Link>
-                  </td>
+                  </DataTableCell>
                 </tr>
               ))}
             </tbody>
-          </table>
-        </div>
+          </DataTable>
+        </DataTableScroll>
       )}
     </section>
   );
+}
+
+function getSnapshotRowsSortValue(
+  item: SnapshotIndexedRow,
+  key: SnapshotRowsSortKey,
+): DataSortValue {
+  switch (key) {
+    case "index":
+      return item.sourceIndex + 1;
+    case "symbol":
+      return item.row.symbol;
+    case "market":
+      return formatMarket(item.row);
+    case "group":
+      return getHistoryGroupSortRank(normalizeGroupKey(item.row.group));
+    case "label":
+      return formatSignalLabel(item.row.label);
+    case "rank_score":
+      return item.row.rankScore;
+  }
 }
 
 function Metric({ label, value }: { label: string; value: string }) {

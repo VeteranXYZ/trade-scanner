@@ -258,6 +258,37 @@ describe("HistoryPageClient display formatting", () => {
     expect(html).not.toContain("Pagination");
   });
 
+  it("sorts Snapshot Rows independently with an accessible sort indicator", () => {
+    const html = renderToStaticMarkup(
+      createElement(SnapshotTable, {
+        isLoading: false,
+        rows: [
+          makeHistoryRow({
+            id: "zed-row",
+            symbol: "ZEDUSDT",
+            primarySignal: "Manual review",
+          }),
+          makeHistoryRow({
+            id: "alpha-row",
+            symbol: "ALPHAUSDT",
+            primarySignal: "Manual review",
+          }),
+          makeHistoryRow({
+            id: "mid-row",
+            symbol: "MIDUSDT",
+            primarySignal: "Manual review",
+          }),
+        ],
+        initialSortState: { key: "symbol", direction: "asc" },
+      }),
+    );
+
+    expect(html).toContain("3 rows");
+    expectMarkupOrder(html, ["ALPHAUSDT", "MIDUSDT", "ZEDUSDT"]);
+    expect(html).toContain("ASC");
+    expect(html).toContain('aria-sort="ascending"');
+  });
+
   it("renders Observation Rows default filters with all rows visible", () => {
     const html = renderObservationRowsTable();
 
@@ -272,6 +303,58 @@ describe("HistoryPageClient display formatting", () => {
     expect(html).toContain("PARTIALRISKUSDT");
     expect(html).toContain("MISSINGRISKUSDT");
     expect(html).toContain("rounded-full");
+  });
+
+  it("sorts Observation Rows locally without changing filter counts or hiding rows", () => {
+    const html = renderObservationRowsTable({
+      rows: [
+        makeObservationRow({
+          id: "low-row",
+          symbol: "LOWUSDT",
+          group: "risk",
+          observedChangePct: -4,
+          maxDrawdownPct: -8,
+          dataStatus: "complete",
+          missingReason: null,
+        }),
+        makeObservationRow({
+          id: "high-row",
+          symbol: "HIGHUSDT",
+          group: "eligible",
+          observedChangePct: 8,
+          maxDrawdownPct: -2,
+          dataStatus: "complete",
+          missingReason: null,
+        }),
+        makeObservationRow({
+          id: "mid-row",
+          symbol: "MIDUSDT",
+          group: "watch",
+          observedChangePct: 2,
+          maxDrawdownPct: -3,
+          dataStatus: "partial",
+          missingReason: "insufficient_future_candles",
+        }),
+        {
+          ...makeObservationRow({
+            id: "missing-row",
+            symbol: "MISSINGUSDT",
+            group: "neutral",
+            dataStatus: "missing",
+            missingReason: "no_future_candles",
+          }),
+          observedClose: null,
+          observedChangePct: null,
+          maxDrawdownPct: null,
+        },
+      ],
+      initialSortState: { key: "observed_change", direction: "desc" },
+    });
+
+    expect(html).toContain("Showing 4 of 4 observation rows.");
+    expectMarkupOrder(html, ["HIGHUSDT", "MIDUSDT", "LOWUSDT", "MISSINGUSDT"]);
+    expect(html).toContain("DESC");
+    expect(html).toContain('aria-sort="descending"');
   });
 
   it("filters Observation Rows to Complete status", () => {
@@ -1471,6 +1554,18 @@ function renderObservationRowsTable(
       ...overrides,
     }),
   );
+}
+
+function expectMarkupOrder(html: string, labels: string[]) {
+  const positions = labels.map((label) => html.indexOf(label));
+
+  for (const position of positions) {
+    expect(position).toBeGreaterThanOrEqual(0);
+  }
+
+  for (let index = 1; index < positions.length; index += 1) {
+    expect(positions[index]).toBeGreaterThan(positions[index - 1]);
+  }
 }
 
 function makeObservationRowsForFilters() {
