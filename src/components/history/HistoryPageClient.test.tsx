@@ -18,6 +18,7 @@ import {
   getObservationProbeRuns,
   HistoryPageClient,
   isHistoryRefreshActiveForTimeframe,
+  ObservationRowsTable,
   RecentSuccessfulRunsPanel,
   recentRunsPanelClassName,
   recentRunsScrollContainerClassName,
@@ -239,6 +240,9 @@ describe("HistoryPageClient display formatting", () => {
     expect(html).toContain(
       "They are not necessarily the same run used for Forward Observation",
     );
+    expect(html).toContain(
+      "Snapshot Rows are not affected by Observation Rows filters",
+    );
     expect(html).toContain("2 rows");
     expect(html).toContain("Overheated caution");
     expect(html).toContain("Risk review");
@@ -246,6 +250,99 @@ describe("HistoryPageClient display formatting", () => {
     expect(html).not.toContain("Avoid");
     expect(html).not.toContain("Show More");
     expect(html).not.toContain("Pagination");
+  });
+
+  it("renders Observation Rows default filters with all rows visible", () => {
+    const html = renderObservationRowsTable();
+
+    expect(html).toContain("Observation Rows");
+    expect(html).toContain("Historical outcome rows from the observation run shown above");
+    expect(html).toContain("Showing 4 of 4 observation rows.");
+    expect(html).toContain(
+      "Filters only change the Observation Rows table view. They do not change summary metrics.",
+    );
+    expect(html).toContain("COMPLETEELIGIBLEUSDT");
+    expect(html).toContain("COMPLETEWATCHUSDT");
+    expect(html).toContain("PARTIALRISKUSDT");
+    expect(html).toContain("MISSINGRISKUSDT");
+    expect(html).toContain("rounded-full");
+  });
+
+  it("filters Observation Rows to Complete status", () => {
+    const html = renderObservationRowsTable({
+      initialDataStatusFilter: "complete",
+    });
+
+    expect(html).toContain("Showing 2 of 4 observation rows.");
+    expect(html).toContain("COMPLETEELIGIBLEUSDT");
+    expect(html).toContain("COMPLETEWATCHUSDT");
+    expect(html).not.toContain("PARTIALRISKUSDT");
+    expect(html).not.toContain("MISSINGRISKUSDT");
+  });
+
+  it("filters Observation Rows to Partial status", () => {
+    const html = renderObservationRowsTable({
+      initialDataStatusFilter: "partial",
+    });
+
+    expect(html).toContain("Showing 1 of 4 observation rows.");
+    expect(html).toContain("PARTIALRISKUSDT");
+    expect(html).toContain("Insufficient future candles");
+    expect(html).not.toContain("COMPLETEELIGIBLEUSDT");
+    expect(html).not.toContain("COMPLETEWATCHUSDT");
+    expect(html).not.toContain("MISSINGRISKUSDT");
+  });
+
+  it("filters Observation Rows to Missing status", () => {
+    const html = renderObservationRowsTable({
+      initialDataStatusFilter: "missing",
+    });
+
+    expect(html).toContain("Showing 1 of 4 observation rows.");
+    expect(html).toContain("MISSINGRISKUSDT");
+    expect(html).toContain("No completed future candles yet");
+    expect(html).not.toContain("COMPLETEELIGIBLEUSDT");
+    expect(html).not.toContain("COMPLETEWATCHUSDT");
+    expect(html).not.toContain("PARTIALRISKUSDT");
+  });
+
+  it("filters Observation Rows by group", () => {
+    const html = renderObservationRowsTable({
+      initialGroupFilter: "risk",
+    });
+
+    expect(html).toContain("Showing 2 of 4 observation rows.");
+    expect(html).toContain("PARTIALRISKUSDT");
+    expect(html).toContain("MISSINGRISKUSDT");
+    expect(html).not.toContain("COMPLETEELIGIBLEUSDT");
+    expect(html).not.toContain("COMPLETEWATCHUSDT");
+  });
+
+  it("combines Observation Rows filters", () => {
+    const html = renderObservationRowsTable({
+      initialDataStatusFilter: "partial",
+      initialGroupFilter: "risk",
+    });
+
+    expect(html).toContain("Showing 1 of 4 observation rows.");
+    expect(html).toContain("PARTIALRISKUSDT");
+    expect(html).not.toContain("MISSINGRISKUSDT");
+    expect(html).not.toContain("COMPLETEELIGIBLEUSDT");
+    expect(html).not.toContain("COMPLETEWATCHUSDT");
+  });
+
+  it("renders an empty Observation Rows filtered state", () => {
+    const html = renderObservationRowsTable({
+      initialDataStatusFilter: "complete",
+      initialGroupFilter: "risk",
+    });
+
+    expect(html).toContain("Showing 0 of 4 observation rows.");
+    expect(html).toContain("No matching observation rows");
+    expect(html).toContain("No observation rows match the current filters.");
+    expect(html).not.toContain("COMPLETEELIGIBLEUSDT");
+    expect(html).not.toContain("PARTIALRISKUSDT");
+    expect(html).not.toContain("MISSINGRISKUSDT");
   });
 
   it("renders Recent Successful Runs as a wide-screen contained scroll panel", () => {
@@ -1343,6 +1440,54 @@ describe("HistoryPageClient display formatting", () => {
     ).toEqual(snapshots.slice(5, 10).map((run) => run.runId));
   });
 });
+
+function renderObservationRowsTable(
+  overrides: Partial<Parameters<typeof ObservationRowsTable>[0]> = {},
+) {
+  return renderToStaticMarkup(
+    createElement(ObservationRowsTable, {
+      rows: makeObservationRowsForFilters(),
+      isFetching: false,
+      ...overrides,
+    }),
+  );
+}
+
+function makeObservationRowsForFilters() {
+  return [
+    makeObservationRow({
+      id: "complete-eligible",
+      symbol: "COMPLETEELIGIBLEUSDT",
+      group: "eligible",
+      dataStatus: "complete",
+      missingReason: null,
+    }),
+    makeObservationRow({
+      id: "complete-watch",
+      symbol: "COMPLETEWATCHUSDT",
+      group: "watch",
+      dataStatus: "complete",
+      missingReason: null,
+    }),
+    makeObservationRow({
+      id: "partial-risk",
+      symbol: "PARTIALRISKUSDT",
+      group: "risk",
+      dataStatus: "partial",
+      missingReason: "insufficient_future_candles",
+    }),
+    makeObservationRow({
+      id: "missing-risk",
+      symbol: "MISSINGRISKUSDT",
+      group: "risk",
+      observedClose: null,
+      observedChangePct: null,
+      maxDrawdownPct: null,
+      dataStatus: "missing",
+      missingReason: "no_future_candles",
+    }),
+  ];
+}
 
 function makeUiState(
   overrides: Partial<{

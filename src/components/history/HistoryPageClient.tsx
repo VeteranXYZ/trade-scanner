@@ -44,6 +44,14 @@ const unsafePrimarySignalLabelMap: Record<string, string> = {
 type HistoryTimeframe = (typeof HISTORY_TIMEFRAMES)[number];
 type ObservationWindow = (typeof OBSERVATION_WINDOWS)[number];
 type ObservationDataStatus = "complete" | "partial" | "missing";
+type ObservationRowsDataStatusFilter = "all" | ObservationDataStatus;
+type ObservationRowsGroupFilter =
+  | "all"
+  | "eligible"
+  | "watch"
+  | "overheated"
+  | "risk"
+  | "neutral";
 type ObservationReadinessBlocker =
   | "observable"
   | "time_maturity"
@@ -320,6 +328,28 @@ type ForwardObservationSelection = {
   isFetching: boolean;
   error: string | null;
 };
+
+const observationRowsDataStatusFilters = [
+  { value: "all", label: "All" },
+  { value: "complete", label: "Complete" },
+  { value: "partial", label: "Partial" },
+  { value: "missing", label: "Missing" },
+] satisfies Array<{
+  value: ObservationRowsDataStatusFilter;
+  label: string;
+}>;
+
+const observationRowsGroupFilters = [
+  { value: "all", label: "All" },
+  { value: "eligible", label: "Eligible" },
+  { value: "watch", label: "Watch" },
+  { value: "overheated", label: "Overheated" },
+  { value: "risk", label: "Risk" },
+  { value: "neutral", label: "Neutral" },
+] satisfies Array<{
+  value: ObservationRowsGroupFilter;
+  label: string;
+}>;
 
 export function HistoryPageClient() {
   const [timeframe, setTimeframe] = useState<HistoryTimeframe>("4h");
@@ -900,76 +930,246 @@ export function ForwardObservationSection({
           message="No forward observation rows are available for the selected observation run."
         />
       ) : (
-        <div className="overflow-x-auto">
-          <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
-            <div>
-              <h3 className="text-sm font-semibold">Observation Rows</h3>
-              <p className="mt-1 text-xs text-[var(--muted)]">
-                Historical outcome rows from the observation run shown above.
-              </p>
-            </div>
-            <span className="text-xs text-[var(--muted)]">
-              {rows.length} rows
-            </span>
-          </div>
-          <table className="w-full min-w-[1060px] border-collapse text-left text-sm">
-            <thead className="sticky top-0 bg-[#0d131a] text-xs uppercase text-[var(--muted)]">
-              <tr>
-                <th className="px-3 py-3 font-semibold">Symbol</th>
-                <th className="px-3 py-3 font-semibold">Group</th>
-                <th className="px-3 py-3 font-semibold">Label</th>
-                <th className="px-3 py-3 font-semibold">Rank Score</th>
-                <th className="px-3 py-3 font-semibold">Anchor Close</th>
-                <th className="px-3 py-3 font-semibold">Observed Close</th>
-                <th className="px-3 py-3 font-semibold">Observed Change</th>
-                <th className="px-3 py-3 font-semibold">Max Drawdown</th>
-                <th className="px-3 py-3 font-semibold">Data Status</th>
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map((row) => (
-                <tr key={row.id} className="border-t border-[var(--border)]">
-                  <td className="px-3 py-3 font-semibold">{row.symbol}</td>
-                  <td className="px-3 py-3">
-                    {formatGroupLabel(normalizeGroupKey(row.group))}
-                  </td>
-                  <td className="px-3 py-3">{formatSignalLabel(row.label)}</td>
-                  <td className="px-3 py-3 tabular-nums">
-                    {formatScore(row.rankScore)}
-                  </td>
-                  <td className="px-3 py-3 tabular-nums">
-                    {formatObservationNumber(row.anchorClose)}
-                  </td>
-                  <td className="px-3 py-3 tabular-nums">
-                    {formatObservationNumber(row.observedClose)}
-                  </td>
-                  <td className="px-3 py-3 tabular-nums">
-                    {formatObservationPercent(row.observedChangePct)}
-                  </td>
-                  <td className="px-3 py-3 tabular-nums">
-                    {formatObservationPercent(row.maxDrawdownPct)}
-                  </td>
-                  <td className="px-3 py-3">
-                    <span className="font-semibold">
-                      {formatDataStatus(row.dataStatus)}
-                    </span>
-                    {row.missingReason ? (
-                      <span className="block text-xs text-[var(--muted)]">
-                        {formatMissingReason(row.missingReason)}
-                      </span>
-                    ) : null}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-          {uiState.isFetching ? (
-            <p className="mt-2 text-xs text-[var(--muted)]">Refreshing</p>
-          ) : null}
-        </div>
+        <ObservationRowsTable rows={rows} isFetching={uiState.isFetching} />
       )}
     </section>
   );
+}
+
+export function ObservationRowsTable({
+  rows,
+  isFetching,
+  initialDataStatusFilter = "all",
+  initialGroupFilter = "all",
+}: {
+  rows: HistoricalSnapshotObservationRow[];
+  isFetching: boolean;
+  initialDataStatusFilter?: ObservationRowsDataStatusFilter;
+  initialGroupFilter?: ObservationRowsGroupFilter;
+}) {
+  const [dataStatusFilter, setDataStatusFilter] =
+    useState<ObservationRowsDataStatusFilter>(initialDataStatusFilter);
+  const [groupFilter, setGroupFilter] =
+    useState<ObservationRowsGroupFilter>(initialGroupFilter);
+  const filteredRows = useMemo(
+    () =>
+      filterObservationRows({
+        rows,
+        dataStatusFilter,
+        groupFilter,
+      }),
+    [rows, dataStatusFilter, groupFilter],
+  );
+
+  return (
+    <div className="overflow-x-auto">
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <h3 className="text-sm font-semibold">Observation Rows</h3>
+          <p className="mt-1 text-xs text-[var(--muted)]">
+            Historical outcome rows from the observation run shown above.
+          </p>
+        </div>
+        <span className="text-xs text-[var(--muted)]">
+          {formatObservationRowsFilterCount({
+            visibleCount: filteredRows.length,
+            totalCount: rows.length,
+          })}
+        </span>
+      </div>
+
+      <div className="mb-3 rounded-md border border-[var(--border)] p-3">
+        <div className="grid gap-3 lg:grid-cols-2">
+          <ObservationRowsFilterGroup
+            label="Data status"
+            options={observationRowsDataStatusFilters}
+            selectedValue={dataStatusFilter}
+            onSelect={(value) => setDataStatusFilter(value)}
+          />
+          <ObservationRowsFilterGroup
+            label="Group"
+            options={observationRowsGroupFilters}
+            selectedValue={groupFilter}
+            onSelect={(value) => setGroupFilter(value)}
+          />
+        </div>
+        <p className="mt-3 text-xs leading-5 text-[var(--muted)]">
+          {formatObservationRowsFilterCount({
+            visibleCount: filteredRows.length,
+            totalCount: rows.length,
+          })}
+        </p>
+        <p className="mt-1 text-xs leading-5 text-[var(--muted)]">
+          Filters only change the Observation Rows table view. They do not
+          change summary metrics.
+        </p>
+      </div>
+
+      {filteredRows.length === 0 ? (
+        <StatePanel
+          title="No matching observation rows"
+          message="No observation rows match the current filters."
+        />
+      ) : (
+        <table className="w-full min-w-[1060px] border-collapse text-left text-sm">
+          <thead className="sticky top-0 bg-[#0d131a] text-xs uppercase text-[var(--muted)]">
+            <tr>
+              <th className="px-3 py-3 font-semibold">Symbol</th>
+              <th className="px-3 py-3 font-semibold">Group</th>
+              <th className="px-3 py-3 font-semibold">Label</th>
+              <th className="px-3 py-3 font-semibold">Rank Score</th>
+              <th className="px-3 py-3 font-semibold">Anchor Close</th>
+              <th className="px-3 py-3 font-semibold">Observed Close</th>
+              <th className="px-3 py-3 font-semibold">Observed Change</th>
+              <th className="px-3 py-3 font-semibold">Max Drawdown</th>
+              <th className="px-3 py-3 font-semibold">Data Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            {filteredRows.map((row) => (
+              <tr key={row.id} className="border-t border-[var(--border)]">
+                <td className="px-3 py-3 font-semibold">{row.symbol}</td>
+                <td className="px-3 py-3">
+                  {formatGroupLabel(normalizeGroupKey(row.group))}
+                </td>
+                <td className="px-3 py-3">{formatSignalLabel(row.label)}</td>
+                <td className="px-3 py-3 tabular-nums">
+                  {formatScore(row.rankScore)}
+                </td>
+                <td className="px-3 py-3 tabular-nums">
+                  {formatObservationNumber(row.anchorClose)}
+                </td>
+                <td className="px-3 py-3 tabular-nums">
+                  {formatObservationNumber(row.observedClose)}
+                </td>
+                <td className="px-3 py-3 tabular-nums">
+                  {formatObservationPercent(row.observedChangePct)}
+                </td>
+                <td className="px-3 py-3 tabular-nums">
+                  {formatObservationPercent(row.maxDrawdownPct)}
+                </td>
+                <td className="px-3 py-3">
+                  <ObservationDataStatusBadge status={row.dataStatus} />
+                  {row.missingReason ? (
+                    <span className="block text-xs text-[var(--muted)]">
+                      {formatMissingReason(row.missingReason)}
+                    </span>
+                  ) : null}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+
+      {isFetching ? (
+        <p className="mt-2 text-xs text-[var(--muted)]">Refreshing</p>
+      ) : null}
+    </div>
+  );
+}
+
+function ObservationRowsFilterGroup<TValue extends string>({
+  label,
+  options,
+  selectedValue,
+  onSelect,
+}: {
+  label: string;
+  options: Array<{ value: TValue; label: string }>;
+  selectedValue: TValue;
+  onSelect: (value: TValue) => void;
+}) {
+  return (
+    <div>
+      <p className="text-xs font-semibold text-[var(--muted)]">{label}</p>
+      <div className="mt-2 flex flex-wrap gap-1.5">
+        {options.map((option) => {
+          const isSelected = option.value === selectedValue;
+
+          return (
+            <button
+              key={option.value}
+              type="button"
+              onClick={() => onSelect(option.value)}
+              aria-pressed={isSelected}
+              className={formatObservationRowsFilterButtonClassName(isSelected)}
+            >
+              {option.label}
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function ObservationDataStatusBadge({
+  status,
+}: {
+  status: ObservationDataStatus;
+}) {
+  return (
+    <span
+      className={`inline-flex rounded-full border px-2 py-0.5 text-xs font-semibold ${formatObservationDataStatusBadgeClassName(
+        status,
+      )}`}
+    >
+      {formatDataStatus(status)}
+    </span>
+  );
+}
+
+function filterObservationRows({
+  rows,
+  dataStatusFilter,
+  groupFilter,
+}: {
+  rows: HistoricalSnapshotObservationRow[];
+  dataStatusFilter: ObservationRowsDataStatusFilter;
+  groupFilter: ObservationRowsGroupFilter;
+}) {
+  return rows.filter((row) => {
+    const matchesDataStatus =
+      dataStatusFilter === "all" || row.dataStatus === dataStatusFilter;
+    const matchesGroup =
+      groupFilter === "all" || normalizeGroupKey(row.group) === groupFilter;
+
+    return matchesDataStatus && matchesGroup;
+  });
+}
+
+function formatObservationRowsFilterButtonClassName(isSelected: boolean) {
+  const base = "rounded-md border px-2.5 py-1 text-xs font-semibold";
+
+  return isSelected
+    ? `${base} border-[var(--foreground)] bg-[var(--foreground)] text-[var(--background)]`
+    : `${base} border-[var(--border)] text-[var(--muted)] hover:text-[var(--foreground)]`;
+}
+
+function formatObservationDataStatusBadgeClassName(
+  status: ObservationDataStatus,
+) {
+  switch (status) {
+    case "complete":
+      return "border-emerald-500/30 bg-emerald-500/10 text-emerald-200";
+    case "partial":
+      return "border-amber-500/30 bg-amber-500/10 text-amber-200";
+    case "missing":
+      return "border-[var(--border)] bg-[#111820] text-[var(--muted)]";
+  }
+}
+
+function formatObservationRowsFilterCount({
+  visibleCount,
+  totalCount,
+}: {
+  visibleCount: number;
+  totalCount: number;
+}) {
+  return `Showing ${formatCount(visibleCount)} of ${formatCount(
+    totalCount,
+  )} observation rows.`;
 }
 
 function ForwardObservationStatePanel({
@@ -1632,7 +1832,8 @@ export function SnapshotTable({
           <p className="mt-1 text-xs text-[var(--muted)]">
             Snapshot Rows are the scanner output from the selected stored run.
             They are not necessarily the same run used for Forward Observation.
-            Current Symbol Research links open the current research view.
+            Snapshot Rows are not affected by Observation Rows filters. Current
+            Symbol Research links open the current research view.
           </p>
         </div>
         <span className="text-xs text-[var(--muted)]">
