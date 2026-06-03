@@ -170,7 +170,7 @@ export function ScannerTable({
                 row.original.detectedRiskTypes.length ||
                 row.original.warnings.length
               } ${t.scanner.warnings}`}
-              className="inline-flex border border-[#8f6b24]/40 bg-[var(--warning-bg)] px-1 py-0.5 text-[10px] font-semibold text-[var(--warning)]"
+              className="inline-flex border border-[var(--warning-border)] bg-[var(--warning-bg)] px-1 py-0.5 text-[10px] font-semibold text-[var(--warning)]"
             >
               W{row.original.detectedRiskTypes.length || row.original.warnings.length}
             </span>
@@ -333,7 +333,7 @@ function MaStatus({ result }: { result: ScanResult }) {
           key={label}
           className={`inline-flex h-4 min-w-5 items-center justify-center border px-0.5 text-[10px] font-semibold ${
             active
-              ? "border-[#2f7d46] bg-[var(--positive-bg)] text-[var(--accent)]"
+              ? "border-[var(--positive-border)] bg-[var(--positive-bg)] text-[var(--positive)]"
               : "border-[var(--border)] bg-[var(--control)] text-[var(--muted)]"
           }`}
         >
@@ -444,20 +444,20 @@ function getActionTextClass(actionBias: ScanResult["actionBias"]) {
 function getSignalTextClass(signalLabel: ScanResult["signalLabel"]) {
   switch (signalLabel) {
     case "confirmed":
-      return "border-[#2f7d46] bg-[var(--positive-bg)] text-[var(--accent)]";
+      return "border-[var(--eligible-border)] bg-[var(--eligible-bg)] text-[var(--eligible)]";
     case "watch":
     case "trend":
-      return "border-[#2563eb]/45 bg-[var(--info-bg)] text-[var(--info)]";
+      return "border-[var(--watch-border)] bg-[var(--watch-bg)] text-[var(--watch)]";
     case "overheated":
-      return "border-[#8f6b24]/50 bg-[var(--warning-bg)] text-[var(--warning)]";
+      return "border-[var(--overheated-border)] bg-[var(--overheated-bg)] text-[var(--overheated)]";
     case "distribution_risk":
     case "breakdown_risk":
-      return "border-[#7f1d1d]/60 bg-[var(--danger-bg)] text-[var(--danger)]";
+      return "border-[var(--risk-border)] bg-[var(--risk-bg)] text-[var(--risk)]";
     case "weak_bounce":
     case "weak":
-      return "border-[#6b7280]/45 bg-[var(--panel-strong)] text-[var(--muted)]";
+      return "border-[var(--neutral-border)] bg-[var(--neutral-bg)] text-[var(--neutral)]";
     case "neutral":
-      return "border-[var(--border)] bg-[var(--control)] text-[var(--muted)]";
+      return "border-[var(--neutral-border)] bg-[var(--neutral-bg)] text-[var(--neutral)]";
   }
 }
 

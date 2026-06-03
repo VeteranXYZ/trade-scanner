@@ -364,7 +364,7 @@ export function SymbolResearchPageClient({
 
   if (query.isLoading) {
     return (
-      <main className="mx-auto w-full max-w-7xl px-4 py-6 text-[var(--foreground)]">
+      <main className="mx-auto w-full max-w-[1800px] px-2 py-2 text-[var(--foreground)] sm:px-3">
         <SymbolResearchNavigation
           key={normalizedSymbol}
           exchange={exchange}
@@ -393,7 +393,7 @@ export function SymbolResearchPageClient({
     const errorMessage = getSymbolResearchErrorDisplayMessage(query.error);
 
     return (
-      <main className="mx-auto w-full max-w-7xl px-4 py-6 text-[var(--foreground)]">
+      <main className="mx-auto w-full max-w-[1800px] px-2 py-2 text-[var(--foreground)] sm:px-3">
         <SymbolResearchNavigation
           key={normalizedSymbol}
           exchange={exchange}
@@ -421,7 +421,7 @@ export function SymbolResearchPageClient({
 
   if (!data) {
     return (
-      <main className="mx-auto w-full max-w-7xl px-4 py-6 text-[var(--foreground)]">
+      <main className="mx-auto w-full max-w-[1800px] px-2 py-2 text-[var(--foreground)] sm:px-3">
         <SymbolResearchNavigation
           key={normalizedSymbol}
           exchange={exchange}
@@ -471,7 +471,7 @@ export function SymbolResearchPageClient({
     });
 
     return (
-      <main className="mx-auto w-full max-w-7xl px-4 py-6 text-[var(--foreground)]">
+      <main className="mx-auto w-full max-w-[1800px] px-2 py-2 text-[var(--foreground)] sm:px-3">
         <SymbolResearchNavigation
           key={unavailableSymbol}
           exchange={exchange}
@@ -511,7 +511,7 @@ export function SymbolResearchPageClient({
 
   if (!latestSignal) {
     return (
-      <main className="mx-auto w-full max-w-7xl px-4 py-6 text-[var(--foreground)]">
+      <main className="mx-auto w-full max-w-[1800px] px-2 py-2 text-[var(--foreground)] sm:px-3">
         <SymbolResearchNavigation
           key={normalizedSymbol}
           exchange={exchange}
@@ -608,7 +608,7 @@ export function SymbolResearchPageClient({
   const candleRowsNotice = getCandleRowsNotice(candles);
 
   return (
-    <main className="mx-auto w-full max-w-7xl px-4 py-6 text-[var(--foreground)]">
+    <main className="mx-auto w-full max-w-[1800px] px-2 py-2 text-[var(--foreground)] sm:px-3">
       <SymbolResearchNavigation
         key={data.symbol.symbol}
         exchange={exchange}
@@ -624,14 +624,14 @@ export function SymbolResearchPageClient({
         availabilityRows={timeframeAvailability}
       />
 
-      <header className="mb-5 border border-[var(--border)] bg-[var(--panel)] px-4 py-4">
+      <header className="mb-2 border border-[var(--border)] bg-[var(--panel)] px-3 py-3 shadow-[var(--shadow-panel)]">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
             <p className="text-xs uppercase tracking-wide text-[var(--muted)]">
               Symbol Research
             </p>
-            <h1 className="mt-1 text-2xl font-semibold">{data.symbol.symbol}</h1>
-            <p className="mt-2 text-sm text-[var(--muted)]">
+            <h1 className="mt-1 text-xl font-semibold">{data.symbol.symbol}</h1>
+            <p className="mt-2 text-xs text-[var(--muted)]">
               {data.symbol.exchange} · {data.symbol.market} · {selectedTimeframe} ·{" "}
               {toTitleCase(data.symbol.assetClass)}
             </p>
@@ -639,7 +639,7 @@ export function SymbolResearchPageClient({
               {longResearchDisclaimer}
             </p>
           </div>
-          <div className="text-left text-sm text-[var(--muted)] md:text-right">
+          <div className="text-left text-xs text-[var(--muted)] md:text-right">
             <SymbolWatchlistControl symbol={data.symbol.symbol} />
             <div>
               Quality:{" "}
@@ -758,7 +758,7 @@ export function SymbolResearchPageClient({
             <p
               className={`mt-3 border px-3 py-2 text-xs ${
                 diagnostics.hasWarning
-                  ? "border-amber-500/30 bg-[var(--warning-bg)] text-[var(--warning)]"
+                  ? "border-[var(--warning-border)] bg-[var(--warning-bg)] text-[var(--warning)]"
                   : "border-[var(--border)] bg-[var(--panel-2)] text-[var(--muted)]"
               }`}
             >
@@ -1445,7 +1445,7 @@ export function SymbolWatchlistControl({
   return (
     <div className="mb-2 flex flex-wrap items-center gap-2 md:justify-end">
       {inWatchlist ? (
-        <span className="border border-emerald-500/40 px-2 py-1 text-[11px] font-semibold text-[var(--positive)]">
+        <span className="border border-[var(--positive-border)] bg-[var(--positive-bg)] px-2 py-1 text-[11px] font-semibold text-[var(--positive)]">
           In Watchlist
         </span>
       ) : (
@@ -1533,11 +1533,11 @@ function getTimeframeNavigationClass(option: SymbolResearchTimeframeNavigationOp
   }
 
   if (option.status === "selected_unavailable") {
-    return `${base} border-amber-400/50 bg-[var(--warning-bg)] text-[var(--warning)] hover:border-amber-300`;
+    return `${base} border-[var(--warning-border)] bg-[var(--warning-bg)] text-[var(--warning)] hover:border-[var(--border-strong)]`;
   }
 
   if (option.status === "unavailable") {
-    return `${base} border-[var(--border)] bg-[var(--panel-2)] text-[var(--muted)] hover:border-amber-400/50 hover:text-[var(--foreground)]`;
+    return `${base} border-[var(--border)] bg-[var(--panel-2)] text-[var(--muted)] hover:border-[var(--warning-border)] hover:text-[var(--foreground)]`;
   }
 
   if (option.isSelected) {

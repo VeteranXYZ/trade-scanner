@@ -211,9 +211,9 @@ function SampleQualityNotice({
 
   const className =
     quality.sampleQualityTone === "warning"
-      ? "border-amber-500/30 bg-[var(--warning-bg)] text-[var(--warning)]"
+      ? "border-[var(--warning-border)] bg-[var(--warning-bg)] text-[var(--warning)]"
       : quality.sampleQualityTone === "notice"
-        ? "border-sky-500/25 bg-sky-500/10 text-sky-100"
+        ? "border-[var(--info-border)] bg-[var(--info-bg)] text-[var(--info)]"
         : "border-[var(--border)] bg-[var(--panel-2)] text-[var(--muted)]";
 
   return (
@@ -245,7 +245,7 @@ function HistoricalFollowThroughEvaluationCard({
 }) {
   const toneClass = evaluation.available
     ? "border-[var(--border)] bg-[var(--panel-2)]"
-    : "border-amber-500/30 bg-[var(--warning-bg)]";
+    : "border-[var(--warning-border)] bg-[var(--warning-bg)]";
 
   return (
     <div className={`mb-3 border px-3 py-3 ${toneClass}`}>
@@ -311,13 +311,13 @@ function BehaviorSummary({ behavior }: { behavior: SymbolBehavior }) {
 function getBehaviorReadoutToneClass(readout: BehaviorReadout) {
   switch (readout.tone) {
     case "constructive":
-      return "border-emerald-500/30 bg-emerald-500/10";
+      return "border-[var(--positive-border)] bg-[var(--positive-bg)]";
     case "weak":
-      return "border-amber-500/30 bg-[var(--warning-bg)]";
+      return "border-[var(--warning-border)] bg-[var(--warning-bg)]";
     case "risk":
-      return "border-rose-500/35 bg-rose-500/10";
+      return "border-[var(--danger-border)] bg-[var(--danger-bg)]";
     case "mixed":
-      return "border-sky-500/25 bg-sky-500/10";
+      return "border-[var(--info-border)] bg-[var(--info-bg)]";
     case "insufficient":
       return "border-[var(--border)] bg-[var(--panel-2)]";
   }
@@ -333,7 +333,7 @@ function BehaviorWarnings({ warnings }: { warnings: string[] }) {
       {warnings.map((warning) => (
         <p
           key={warning}
-          className="border border-amber-500/30 bg-[var(--warning-bg)] px-3 py-2 text-xs text-[var(--warning)]"
+          className="border border-[var(--warning-border)] bg-[var(--warning-bg)] px-3 py-2 text-xs text-[var(--warning)]"
         >
           {getBehaviorWarningLabel(warning)}
         </p>
@@ -458,7 +458,7 @@ function RecentBehaviorOutcomes({
       </div>
 
       {hasClusteredRuns ? (
-        <p className="mb-3 border border-amber-500/30 bg-[var(--warning-bg)] px-3 py-2 text-xs text-[var(--warning)]">
+        <p className="mb-3 border border-[var(--warning-border)] bg-[var(--warning-bg)] px-3 py-2 text-xs text-[var(--warning)]">
           Several recent observations are close together in time; treat near-term
           behavior samples cautiously.
         </p>

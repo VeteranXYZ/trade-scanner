@@ -17,13 +17,13 @@ export function Header() {
   const pathname = usePathname();
 
   return (
-    <header className="sticky top-0 z-40 border-b border-[var(--border)] bg-[var(--header-bg)] backdrop-blur">
-      <div className="mx-auto flex min-h-10 max-w-[1800px] flex-wrap items-center justify-between gap-2 px-3 py-1 sm:px-4">
+    <header className="sticky top-0 z-40 border-b border-[var(--border)] bg-[var(--header-bg)] shadow-[var(--shadow-panel)] backdrop-blur">
+      <div className="mx-auto flex min-h-10 max-w-[1800px] flex-wrap items-center justify-between gap-2 px-2 py-1 sm:px-3">
         <Link
           href="/"
           className="flex items-center gap-2 text-[13px] font-semibold leading-none text-[var(--foreground)]"
         >
-          <span className="h-2 w-2 rounded-full bg-[var(--accent)]" />
+          <span className="h-2.5 w-2.5 rounded-full border border-[var(--accent-border)] bg-[var(--accent)]" />
           <span>{t.nav.brand}</span>
         </Link>
         <nav className="flex flex-wrap items-center justify-end gap-1 text-[11px] font-semibold text-[var(--muted)]">
@@ -39,10 +39,10 @@ export function Header() {
               <Link
                 key={item.href}
                 href={item.href}
-                className={`rounded border px-2 py-1 transition ${
+                className={`border px-2 py-1 transition ${
                   isActive
-                    ? "border-[var(--accent)] bg-[var(--positive-bg)] text-[var(--accent)]"
-                    : "border-transparent hover:border-[var(--border)] hover:bg-[var(--row-hover)] hover:text-[var(--foreground)]"
+                    ? "border-[var(--accent-border)] bg-[var(--accent-soft)] text-[var(--accent)] shadow-[inset_0_-2px_0_var(--accent)]"
+                    : "border-transparent hover:border-[var(--border-medium)] hover:bg-[var(--row-hover)] hover:text-[var(--foreground)]"
                 }`}
               >
                 {label}

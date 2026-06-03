@@ -6,12 +6,16 @@ type SignalBadgeProps = {
 };
 
 export const signalToneClass: Record<ScannerSignal["state"], string> = {
-  WATCHLIST: "border-[#8f7a31]/70 bg-[var(--warning-bg)] text-[var(--warning)]",
-  CONFIRMED: "border-[#2f7d46]/70 bg-[var(--positive-bg)] text-[var(--accent)]",
-  TREND_CONTINUATION: "border-[#2d5b89]/70 bg-[var(--info-bg)] text-[var(--info)]",
-  HIGH_RISK: "border-[#8f3a3a]/70 bg-[var(--danger-bg)] text-[var(--danger)]",
-  WEAK: "border-[#6d4a2f]/70 bg-[var(--warning-bg)] text-[var(--warning)]",
-  NEUTRAL: "border-[var(--border)] bg-[var(--control)] text-[var(--muted)]",
+  WATCHLIST: "border-[var(--watch-border)] bg-[var(--watch-bg)] text-[var(--watch)]",
+  CONFIRMED:
+    "border-[var(--eligible-border)] bg-[var(--eligible-bg)] text-[var(--eligible)]",
+  TREND_CONTINUATION:
+    "border-[var(--info-border)] bg-[var(--info-bg)] text-[var(--info)]",
+  HIGH_RISK: "border-[var(--risk-border)] bg-[var(--risk-bg)] text-[var(--risk)]",
+  WEAK:
+    "border-[var(--overheated-border)] bg-[var(--overheated-bg)] text-[var(--overheated)]",
+  NEUTRAL:
+    "border-[var(--neutral-border)] bg-[var(--neutral-bg)] text-[var(--neutral)]",
 };
 
 export function SignalBadge({ signal }: SignalBadgeProps) {

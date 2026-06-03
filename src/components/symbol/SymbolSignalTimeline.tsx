@@ -51,7 +51,7 @@ export function SymbolSignalTimeline({
           ) : null}
 
           {showSelectionNotice ? (
-            <p className="mb-3 border border-amber-500/30 bg-[var(--warning-bg)] px-3 py-2 text-xs text-[var(--warning)]">
+            <p className="mb-3 border border-[var(--warning-border)] bg-[var(--warning-bg)] px-3 py-2 text-xs text-[var(--warning)]">
               Some newer history rows may come from non-preferred or smaller runs.
               Current classification uses the selected full-universe scan run.
             </p>
@@ -171,16 +171,16 @@ function TimelineFact({
 function getGroupClassName(group: string) {
   switch (group) {
     case "eligible":
-      return "border-emerald-500/35 bg-emerald-500/10 text-[var(--positive)]";
+      return "border-[var(--eligible-border)] bg-[var(--eligible-bg)] text-[var(--eligible)]";
     case "watch":
-      return "border-sky-500/35 bg-sky-500/10 text-[var(--info)]";
+      return "border-[var(--watch-border)] bg-[var(--watch-bg)] text-[var(--watch)]";
     case "overheated":
-      return "border-amber-500/35 bg-[var(--warning-bg)] text-[var(--warning)]";
+      return "border-[var(--overheated-border)] bg-[var(--overheated-bg)] text-[var(--overheated)]";
     case "risk":
-      return "border-rose-500/35 bg-rose-500/10 text-[var(--danger)]";
+      return "border-[var(--risk-border)] bg-[var(--risk-bg)] text-[var(--risk)]";
     case "insufficient_history":
-      return "border-zinc-500/35 bg-zinc-500/10 text-zinc-200";
+      return "border-[var(--missing-border)] bg-[var(--missing-bg)] text-[var(--missing)]";
     default:
-      return "border-slate-500/35 bg-slate-500/10 text-slate-200";
+      return "border-[var(--neutral-border)] bg-[var(--neutral-bg)] text-[var(--neutral)]";
   }
 }

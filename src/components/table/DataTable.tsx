@@ -6,7 +6,20 @@ import {
 } from "./dataTableSorting";
 
 type CellAlign = "left" | "center" | "right";
-export type ChipTone = "neutral" | "positive" | "info" | "warning" | "danger";
+export type ChipTone =
+  | "neutral"
+  | "accent"
+  | "positive"
+  | "info"
+  | "warning"
+  | "danger"
+  | "eligible"
+  | "watch"
+  | "risk"
+  | "overheated"
+  | "complete"
+  | "partial"
+  | "missing";
 
 const alignClass: Record<CellAlign, string> = {
   left: "text-left",
@@ -15,17 +28,35 @@ const alignClass: Record<CellAlign, string> = {
 };
 
 const chipToneClass: Record<ChipTone, string> = {
-  neutral: "border-[var(--border)] bg-[var(--neutral-bg)] text-[var(--muted)]",
+  neutral:
+    "border-[var(--neutral-border)] bg-[var(--neutral-bg)] text-[var(--neutral)]",
+  accent: "border-[var(--accent-border)] bg-[var(--accent-soft)] text-[var(--accent)]",
   positive:
-    "border-emerald-500/35 bg-[var(--positive-bg)] text-[var(--positive)]",
-  info: "border-sky-500/35 bg-[var(--info-bg)] text-[var(--info)]",
+    "border-[var(--positive-border)] bg-[var(--positive-bg)] text-[var(--positive)]",
+  info: "border-[var(--info-border)] bg-[var(--info-bg)] text-[var(--info)]",
   warning:
-    "border-amber-500/35 bg-[var(--warning-bg)] text-[var(--warning)]",
-  danger: "border-rose-500/35 bg-[var(--danger-bg)] text-[var(--danger)]",
+    "border-[var(--warning-border)] bg-[var(--warning-bg)] text-[var(--warning)]",
+  danger: "border-[var(--danger-border)] bg-[var(--danger-bg)] text-[var(--danger)]",
+  eligible:
+    "border-[var(--eligible-border)] bg-[var(--eligible-bg)] text-[var(--eligible)]",
+  watch: "border-[var(--watch-border)] bg-[var(--watch-bg)] text-[var(--watch)]",
+  risk: "border-[var(--risk-border)] bg-[var(--risk-bg)] text-[var(--risk)]",
+  overheated:
+    "border-[var(--overheated-border)] bg-[var(--overheated-bg)] text-[var(--overheated)]",
+  complete:
+    "border-[var(--complete-border)] bg-[var(--complete-bg)] text-[var(--complete)]",
+  partial:
+    "border-[var(--partial-border)] bg-[var(--partial-bg)] text-[var(--partial)]",
+  missing:
+    "border-[var(--missing-border)] bg-[var(--missing-bg)] text-[var(--missing)]",
 };
 
 export function DataTableScroll({ children }: { children: ReactNode }) {
-  return <div className="overflow-x-auto">{children}</div>;
+  return (
+    <div className="overflow-x-auto bg-[var(--panel-data)] [scrollbar-gutter:stable]">
+      {children}
+    </div>
+  );
 }
 
 export function DataTable({
@@ -80,13 +111,13 @@ export function DataTableHeaderCell<TKey extends string>({
       colSpan={colSpan}
       rowSpan={rowSpan}
       aria-sort={ariaSort}
-      className={`h-8 px-2 py-1.5 text-[10px] font-semibold uppercase tracking-normal ${alignClass[align]} ${className}`}
+      className={`h-8 border-b border-[var(--border-medium)] bg-[var(--table-header)] px-2 py-1.5 text-[10px] font-semibold uppercase tracking-normal text-[var(--muted)] ${alignClass[align]} ${className}`}
     >
       {isSortable && sortKey ? (
         <button
           type="button"
           onClick={() => onSortChange?.(sortKey, defaultDirection)}
-          className={`inline-flex w-full items-center gap-1 rounded-sm text-[10px] font-semibold uppercase ${
+          className={`inline-flex min-h-6 w-full items-center gap-1 rounded-sm border px-1 text-[10px] font-semibold uppercase transition ${
             align === "right"
               ? "justify-end"
               : align === "center"
@@ -94,20 +125,20 @@ export function DataTableHeaderCell<TKey extends string>({
                 : "justify-start"
           } ${
             isActive
-              ? "text-[var(--foreground)]"
-              : "text-[var(--muted)] hover:text-[var(--foreground)]"
+              ? "border-[var(--accent-border)] bg-[var(--accent-soft)] text-[var(--foreground)] shadow-[inset_0_-2px_0_var(--accent)]"
+              : "border-transparent text-[var(--muted)] hover:border-[var(--border-strong)] hover:bg-[var(--panel-elevated)] hover:text-[var(--foreground)]"
           }`}
         >
-          <span>{children}</span>
+          <span className="truncate">{children}</span>
           <span
             aria-hidden="true"
-            className={`min-w-8 text-[9px] ${
+            className={`min-w-7 text-right text-[9px] font-bold ${
               isActive ? "text-[var(--accent)]" : "text-[var(--muted-2)]"
             }`}
           >
             {isActive && sortState
               ? formatDataSortDirection(sortState.direction)
-              : ""}
+              : "SORT"}
           </span>
         </button>
       ) : (
@@ -132,7 +163,7 @@ export function DataTableCell({
 }) {
   return (
     <td
-      className={`h-[var(--table-row-height)] px-2 py-1.5 align-middle text-[11px] text-[var(--muted)] ${alignClass[align]} ${className}`}
+      className={`h-[var(--table-row-height)] max-w-0 px-2 py-1.5 align-middle text-[11px] leading-4 text-[var(--muted)] ${alignClass[align]} ${className}`}
     >
       {truncate ? (
         <div className="truncate" title={title}>

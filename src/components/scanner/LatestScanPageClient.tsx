@@ -3,6 +3,7 @@
 import { useQuery } from "@tanstack/react-query";
 import Link from "next/link";
 import { Fragment, useMemo, useState, type ReactNode } from "react";
+import { PageHeader, PageShell } from "@/components/ui/workspace";
 import {
   formatDateTime,
   formatGroupHint,
@@ -212,27 +213,22 @@ export function LatestScanPageClient({
   const lowQualityExcluded = data?.summary?.lowQualityExcluded ?? 0;
 
   return (
-    <section className="mx-auto flex min-h-[calc(100vh-1px)] max-w-[1800px] flex-col px-2 py-2">
-      <header className="mb-2 border border-[var(--border)] bg-[var(--panel)] px-3 py-2 shadow-[inset_3px_0_0_rgba(96,165,250,0.35)]">
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <div>
-            <h1 className="text-sm font-semibold text-[var(--foreground)]">
-              Latest Scan Results
-            </h1>
-            <p className="mt-1 text-[11px] leading-5 text-[var(--muted)]">
-              Research scanner view based on the latest successful scan run.
-            </p>
-          </div>
+    <PageShell>
+      <PageHeader
+        eyebrow="Scanner"
+        title="Latest Scan Results"
+        description="Research scanner view based on the latest successful scan run."
+        actions={
           <button
             type="button"
             onClick={() => void latestScanQuery.refetch()}
             disabled={latestScanQuery.isFetching}
-            className="h-7 border border-[var(--border)] px-2 text-[11px] font-semibold text-[var(--foreground)] disabled:cursor-not-allowed disabled:opacity-60"
+            className="ui-button h-8 px-3 text-[11px] disabled:cursor-not-allowed disabled:opacity-60"
           >
             {latestScanQuery.isFetching ? "Refreshing" : "Refresh"}
           </button>
-        </div>
-      </header>
+        }
+      />
 
       <div className="grid min-h-0 flex-1 gap-2 xl:grid-cols-[220px_minmax(0,1fr)]">
         <LatestScanControls
@@ -298,7 +294,7 @@ export function LatestScanPageClient({
           )}
         </main>
       </div>
-    </section>
+    </PageShell>
   );
 }
 
@@ -464,7 +460,7 @@ function LatestScanSummaryPanel({
             {summaryText}
           </p>
           {showUniverseWarning && (
-            <p className="mt-1 border border-amber-500/50 bg-[var(--warning-bg)] px-2 py-1 text-[11px] font-semibold text-[var(--warning)]">
+            <p className="mt-1 border border-[var(--warning-border)] bg-[var(--warning-bg)] px-2 py-1 text-[11px] font-semibold text-[var(--warning)]">
               This does not look like a full crypto universe scan.
             </p>
           )}

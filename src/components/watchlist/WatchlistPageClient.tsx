@@ -7,6 +7,7 @@ import { MarketContextPanel } from "@/components/market-context/MarketContextPan
 import { fetchMarketContext } from "@/components/market-context/marketContextUi";
 import { shortResearchDisclaimer } from "@/components/researchCopy";
 import { formatDateTime } from "@/components/scanner/latestScanUi";
+import { PageHeader, PageShell } from "@/components/ui/workspace";
 import {
   MTF_SCREENER_TIMEFRAMES,
   buildMtfScreenerRowsFromResponse,
@@ -217,30 +218,24 @@ export function WatchlistPageClient() {
   };
 
   return (
-    <section className="mx-auto flex min-h-[calc(100vh-1px)] max-w-[1800px] flex-col px-2 py-2">
-      <header className="mb-2 border border-[var(--border)] bg-[var(--panel)] px-3 py-3 shadow-[inset_3px_0_0_rgba(45,212,191,0.35)]">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <h1 className="text-sm font-semibold text-[var(--foreground)]">
-              Watchlist Multi-Timeframe
-            </h1>
-            <p className="mt-1 max-w-3xl text-[11px] leading-5 text-[var(--muted)]">
-              {shortResearchDisclaimer} MTF view for selected Binance USDT
-              crypto symbols. All selected symbols remain visible by default.
-            </p>
-          </div>
+    <PageShell>
+      <PageHeader
+        eyebrow="Watchlist"
+        title="Watchlist Multi-Timeframe"
+        description={`${shortResearchDisclaimer} MTF view for selected Binance USDT crypto symbols. All selected symbols remain visible by default.`}
+        actions={
           <button
             type="button"
             onClick={refreshData}
             disabled={latestQuery.isFetching || marketContextQuery.isFetching}
-            className="h-7 border border-[var(--border)] px-2 text-[11px] font-semibold text-[var(--foreground)] disabled:cursor-not-allowed disabled:opacity-60"
+            className="ui-button h-8 px-3 text-[11px] disabled:cursor-not-allowed disabled:opacity-60"
           >
             {latestQuery.isFetching || marketContextQuery.isFetching
               ? "Refreshing"
               : "Refresh Data"}
           </button>
-        </div>
-      </header>
+        }
+      />
 
       <div className="mb-2">
         <MarketContextPanel
@@ -303,7 +298,7 @@ export function WatchlistPageClient() {
           </footer>
         </main>
       </div>
-    </section>
+    </PageShell>
   );
 }
 
@@ -1043,14 +1038,14 @@ function GroupBadge({
 }) {
   const tone =
     group === "eligible"
-      ? "border-emerald-500/40 bg-[var(--positive-bg)] text-[var(--positive)]"
+      ? "border-[var(--eligible-border)] bg-[var(--eligible-bg)] text-[var(--eligible)]"
       : group === "watch"
-        ? "border-sky-500/40 bg-[var(--info-bg)] text-[var(--info)]"
+        ? "border-[var(--watch-border)] bg-[var(--watch-bg)] text-[var(--watch)]"
         : group === "overheated"
-          ? "border-amber-500/40 bg-[var(--warning-bg)] text-[var(--warning)]"
+          ? "border-[var(--overheated-border)] bg-[var(--overheated-bg)] text-[var(--overheated)]"
           : group === "risk"
-            ? "border-rose-500/40 bg-[var(--danger-bg)] text-[var(--danger)]"
-            : "border-[var(--border)] text-[var(--muted)]";
+            ? "border-[var(--risk-border)] bg-[var(--risk-bg)] text-[var(--risk)]"
+            : "border-[var(--neutral-border)] bg-[var(--neutral-bg)] text-[var(--neutral)]";
 
   return (
     <span className={`inline-flex border px-1.5 py-0.5 text-[11px] ${tone}`}>

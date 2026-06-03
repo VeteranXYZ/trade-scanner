@@ -6,8 +6,8 @@ export function Footer() {
   const { dictionary: t } = useLanguage();
 
   return (
-    <footer className="border-t border-[var(--border)] bg-[var(--panel)]">
-      <div className="mx-auto max-w-[1800px] px-3 py-3 text-xs leading-5 text-[var(--muted)] sm:px-4">
+    <footer className="border-t border-[var(--border)] bg-[var(--panel-elevated)]">
+      <div className="mx-auto max-w-[1800px] px-2 py-3 text-[11px] leading-5 text-[var(--muted)] sm:px-3">
         {t.footer.disclaimer}
       </div>
     </footer>

@@ -28,7 +28,7 @@ export function MarketContextPanel({
   return (
     <section
       className={joinClassNames(
-        "border border-[var(--border)] bg-[var(--panel)] px-3 py-3 shadow-[inset_3px_0_0_rgba(56,189,248,0.28)]",
+        "border border-l-4 border-[var(--border)] border-l-[var(--info)] bg-[var(--panel)] px-3 py-3 shadow-[var(--shadow-panel)]",
         className,
       )}
     >
@@ -132,12 +132,12 @@ function joinClassNames(...values: Array<string | undefined>) {
 function getChipClassName(tone: "constructive" | "risk" | "mixed" | "neutral") {
   switch (tone) {
     case "constructive":
-      return "border-emerald-500/40 bg-[var(--positive-bg)] text-[var(--positive)]";
+      return "border-[var(--positive-border)] bg-[var(--positive-bg)] text-[var(--positive)]";
     case "risk":
-      return "border-rose-500/45 bg-[var(--danger-bg)] text-[var(--danger)]";
+      return "border-[var(--danger-border)] bg-[var(--danger-bg)] text-[var(--danger)]";
     case "mixed":
-      return "border-amber-500/45 bg-[var(--warning-bg)] text-[var(--warning)]";
+      return "border-[var(--warning-border)] bg-[var(--warning-bg)] text-[var(--warning)]";
     case "neutral":
-      return "border-[var(--border)] bg-[var(--panel-2)] text-[var(--muted)]";
+      return "border-[var(--neutral-border)] bg-[var(--neutral-bg)] text-[var(--neutral)]";
   }
 }
