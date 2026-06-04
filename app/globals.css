@@ -109,7 +109,8 @@
   --shadow-elevated: 0 8px 18px rgba(15, 23, 42, 0.08);
 }
 
-body:has(.screener-terminal) {
+body:has(.screener-terminal),
+body:has(.symbol-terminal) {
   color-scheme: dark;
   --app-background: #080d12;
   --page-background: #080d12;
@@ -236,7 +237,9 @@ body {
 }
 
 html:has(.screener-terminal),
-body:has(.screener-terminal) {
+body:has(.screener-terminal),
+html:has(.symbol-terminal),
+body:has(.symbol-terminal) {
   overflow-x: clip;
 }
 

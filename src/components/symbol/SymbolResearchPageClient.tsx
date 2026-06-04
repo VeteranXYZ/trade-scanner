@@ -21,7 +21,6 @@ import {
   isMarketContextResponse,
   type MarketContextResponse,
 } from "@/components/market-context/marketContextUi";
-import { longResearchDisclaimer } from "@/components/researchCopy";
 import {
   buildBehaviorReadout,
   buildBehaviorSampleQuality,
@@ -92,12 +91,21 @@ type BuildSignalEvaluationUrlParams = {
   tradeApiBaseUrl?: string | null;
 };
 
+export type SymbolResearchVisualCheckData = {
+  data: SymbolResearchSuccessResponse;
+  marketContext?: MarketContextResponse | null;
+  signalEvaluation?: SignalEvaluationResponse | null;
+  apiOriginLabel?: string;
+  scannerReturnHref?: string;
+};
+
 type SymbolResearchPageClientProps = {
   exchange: string;
   symbol: string;
+  visualCheckData?: SymbolResearchVisualCheckData;
 };
 
-type SymbolResearchRun = {
+export type SymbolResearchRun = {
   id: string;
   status: string;
   timeframe: string;
@@ -107,7 +115,7 @@ type SymbolResearchRun = {
   finishedAt: string | null;
 };
 
-type SymbolResearchSignal = {
+export type SymbolResearchSignal = {
   id: string;
   scanRunId?: string;
   symbolId?: number;
@@ -185,7 +193,7 @@ type SymbolResearchSymbolCoverage = {
   lastOpenTime?: string | null;
 };
 
-type SymbolResearchSuccessResponse = {
+export type SymbolResearchSuccessResponse = {
   ok: true;
   timeframe?: string;
   symbol: {
@@ -278,13 +286,35 @@ const defaultCandleLimit = 120;
 const defaultTimeframe = DEFAULT_SYMBOL_RESEARCH_TIMEFRAME;
 const symbolResearchTimeframes = ["4h", "1d", "1w", "1h"] as const;
 const symbolResearchMarketContextAssetClass = "crypto";
+const symbolResearchMainClass =
+  "symbol-terminal w-full max-w-none bg-[var(--workspace-background)] px-1.5 py-1.5 text-[var(--foreground)] sm:px-2";
+
+type SymbolTerminalTone =
+  | "accent"
+  | "eligible"
+  | "watch"
+  | "repair"
+  | "risk"
+  | "warning"
+  | "complete"
+  | "neutral"
+  | "missing";
+
+type SymbolTerminalStat = {
+  label: string;
+  value: string;
+  tone: SymbolTerminalTone;
+  title?: string;
+};
 
 export function SymbolResearchPageClient({
   exchange,
   symbol,
+  visualCheckData,
 }: SymbolResearchPageClientProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const isVisualCheck = Boolean(visualCheckData);
   const market = searchParams.get("market")?.trim() || "spot";
   const timeframeSelection = getSymbolResearchTimeframeSelection(
     searchParams.get("timeframe"),
@@ -293,11 +323,15 @@ export function SymbolResearchPageClient({
   const assetClass = searchParams.get("assetClass")?.trim() || "crypto";
   const normalizedSymbol = symbol.toUpperCase();
   const tradeApiBaseUrl = getTradeApiBaseUrl();
-  const apiOrigin = getSymbolResearchApiOriginLabel(tradeApiBaseUrl);
-  const scannerReturnHref = buildScannerReturnHref(searchParams, {
-    timeframe,
-    assetClass,
-  });
+  const apiOrigin =
+    visualCheckData?.apiOriginLabel ??
+    getSymbolResearchApiOriginLabel(tradeApiBaseUrl);
+  const scannerReturnHref =
+    visualCheckData?.scannerReturnHref ??
+    buildScannerReturnHref(searchParams, {
+      timeframe,
+      assetClass,
+    });
   const queryParams = useMemo(
     () => ({
       exchange,
@@ -313,6 +347,7 @@ export function SymbolResearchPageClient({
   const query = useQuery({
     queryKey: ["symbol-research", queryParams],
     queryFn: ({ signal }) => fetchSymbolResearch({ ...queryParams, signal }),
+    enabled: !isVisualCheck,
     staleTime: 60_000,
   });
   const marketContextQuery = useQuery({
@@ -323,17 +358,26 @@ export function SymbolResearchPageClient({
         signal,
         tradeApiBaseUrl,
       }),
+    enabled: !isVisualCheck,
     staleTime: 60_000,
   });
+  const effectiveResearchData = visualCheckData?.data ?? query.data;
   const signalEvaluationParams = useMemo(
-    () => buildSignalEvaluationParams(query.data, {
+    () => buildSignalEvaluationParams(effectiveResearchData, {
       exchange,
       market,
       fallbackTimeframe: timeframe,
       fallbackAssetClass: assetClass,
       tradeApiBaseUrl,
     }),
-    [assetClass, exchange, market, query.data, timeframe, tradeApiBaseUrl],
+    [
+      assetClass,
+      effectiveResearchData,
+      exchange,
+      market,
+      timeframe,
+      tradeApiBaseUrl,
+    ],
   );
   const signalEvaluationQuery = useQuery({
     queryKey: ["signal-evaluation", signalEvaluationParams],
@@ -341,11 +385,36 @@ export function SymbolResearchPageClient({
       signalEvaluationParams
         ? fetchSignalEvaluation({ ...signalEvaluationParams, signal })
         : Promise.resolve(null),
-    enabled: Boolean(signalEvaluationParams),
+    enabled: !isVisualCheck && Boolean(signalEvaluationParams),
     staleTime: 60_000,
   });
+  const isFetching = isVisualCheck ? false : query.isFetching;
+  const handleRefresh = isVisualCheck ? () => undefined : () => void query.refetch();
+  const marketContextData = isVisualCheck
+    ? visualCheckData?.marketContext
+    : marketContextQuery.data;
+  const marketContextIsLoading = isVisualCheck
+    ? false
+    : marketContextQuery.isLoading;
+  const marketContextIsError = isVisualCheck ? false : marketContextQuery.isError;
+  const signalEvaluationData = isVisualCheck
+    ? visualCheckData?.signalEvaluation
+    : signalEvaluationQuery.data;
+  const signalEvaluationIsLoading = isVisualCheck
+    ? false
+    : signalEvaluationQuery.isLoading;
+  const signalEvaluationIsFetching = isVisualCheck
+    ? false
+    : signalEvaluationQuery.isFetching;
+  const signalEvaluationIsError = isVisualCheck
+    ? false
+    : signalEvaluationQuery.isError;
 
   const handleSymbolSubmit = (inputValue: string) => {
+    if (isVisualCheck) {
+      return;
+    }
+
     const nextSymbol = normalizeSymbolResearchInputSymbol(inputValue);
 
     if (!nextSymbol) {
@@ -362,9 +431,9 @@ export function SymbolResearchPageClient({
     );
   };
 
-  if (query.isLoading) {
+  if (!isVisualCheck && query.isLoading) {
     return (
-      <main className="mx-auto w-full max-w-[1760px] bg-[var(--workspace-background)] px-2 py-2 text-[var(--foreground)] sm:px-3">
+      <main className={symbolResearchMainClass}>
         <SymbolResearchNavigation
           key={normalizedSymbol}
           exchange={exchange}
@@ -374,9 +443,9 @@ export function SymbolResearchPageClient({
           assetClass={assetClass}
           scannerReturnHref={scannerReturnHref}
           searchParams={searchParams}
-          isFetching={query.isFetching}
+          isFetching={isFetching}
           onSymbolSubmit={handleSymbolSubmit}
-          onRefresh={() => void query.refetch()}
+          onRefresh={handleRefresh}
         />
         <ResearchState
           title={normalizedSymbol}
@@ -389,11 +458,11 @@ export function SymbolResearchPageClient({
     );
   }
 
-  if (query.isError) {
+  if (!isVisualCheck && query.isError) {
     const errorMessage = getSymbolResearchErrorDisplayMessage(query.error);
 
     return (
-      <main className="mx-auto w-full max-w-[1760px] bg-[var(--workspace-background)] px-2 py-2 text-[var(--foreground)] sm:px-3">
+      <main className={symbolResearchMainClass}>
         <SymbolResearchNavigation
           key={normalizedSymbol}
           exchange={exchange}
@@ -403,9 +472,9 @@ export function SymbolResearchPageClient({
           assetClass={assetClass}
           scannerReturnHref={scannerReturnHref}
           searchParams={searchParams}
-          isFetching={query.isFetching}
+          isFetching={isFetching}
           onSymbolSubmit={handleSymbolSubmit}
-          onRefresh={() => void query.refetch()}
+          onRefresh={handleRefresh}
         />
         <ResearchState
           title={normalizedSymbol}
@@ -417,11 +486,11 @@ export function SymbolResearchPageClient({
     );
   }
 
-  const data = query.data;
+  const data = effectiveResearchData;
 
   if (!data) {
     return (
-      <main className="mx-auto w-full max-w-[1760px] bg-[var(--workspace-background)] px-2 py-2 text-[var(--foreground)] sm:px-3">
+      <main className={symbolResearchMainClass}>
         <SymbolResearchNavigation
           key={normalizedSymbol}
           exchange={exchange}
@@ -431,9 +500,9 @@ export function SymbolResearchPageClient({
           assetClass={assetClass}
           scannerReturnHref={scannerReturnHref}
           searchParams={searchParams}
-          isFetching={query.isFetching}
+          isFetching={isFetching}
           onSymbolSubmit={handleSymbolSubmit}
-          onRefresh={() => void query.refetch()}
+          onRefresh={handleRefresh}
         />
         <ResearchState
           title={normalizedSymbol}
@@ -471,7 +540,7 @@ export function SymbolResearchPageClient({
     });
 
     return (
-      <main className="mx-auto w-full max-w-[1760px] bg-[var(--workspace-background)] px-2 py-2 text-[var(--foreground)] sm:px-3">
+      <main className={symbolResearchMainClass}>
         <SymbolResearchNavigation
           key={unavailableSymbol}
           exchange={exchange}
@@ -481,9 +550,9 @@ export function SymbolResearchPageClient({
           assetClass={data.symbol?.assetClass ?? assetClass}
           scannerReturnHref={scannerReturnHref}
           searchParams={searchParams}
-          isFetching={query.isFetching}
+          isFetching={isFetching}
           onSymbolSubmit={handleSymbolSubmit}
-          onRefresh={() => void query.refetch()}
+          onRefresh={handleRefresh}
           availabilityRows={timeframeAvailability ?? undefined}
         />
         {timeframeAvailability ? (
@@ -511,7 +580,7 @@ export function SymbolResearchPageClient({
 
   if (!latestSignal) {
     return (
-      <main className="mx-auto w-full max-w-[1760px] bg-[var(--workspace-background)] px-2 py-2 text-[var(--foreground)] sm:px-3">
+      <main className={symbolResearchMainClass}>
         <SymbolResearchNavigation
           key={normalizedSymbol}
           exchange={exchange}
@@ -521,9 +590,9 @@ export function SymbolResearchPageClient({
           assetClass={data.symbol.assetClass}
           scannerReturnHref={scannerReturnHref}
           searchParams={searchParams}
-          isFetching={query.isFetching}
+          isFetching={isFetching}
           onSymbolSubmit={handleSymbolSubmit}
-          onRefresh={() => void query.refetch()}
+          onRefresh={handleRefresh}
         />
         <ResearchState
           title={data.symbol.symbol}
@@ -591,7 +660,7 @@ export function SymbolResearchPageClient({
     sampleQuality: behaviorSampleQuality,
   });
   const signalEvaluationReadout = buildSignalEvaluationReadout(
-    signalEvaluationQuery.data,
+    signalEvaluationData,
     {
       currentGroup: latestSignal.resultGroup,
       currentSignalLabel: latestSignal.signalLabel,
@@ -599,8 +668,8 @@ export function SymbolResearchPageClient({
     },
   );
   const marketContextImplication = buildSymbolMarketContextImplication({
-    data: marketContextQuery.data,
-    isError: marketContextQuery.isError,
+    data: marketContextData,
+    isError: marketContextIsError,
     selectedGroup: latestSignal.resultGroup ?? interpretation.group,
     selectedTimeframe,
     timeframeSnapshots,
@@ -608,7 +677,7 @@ export function SymbolResearchPageClient({
   const candleRowsNotice = getCandleRowsNotice(candles);
 
   return (
-    <main className="mx-auto w-full max-w-[1760px] bg-[var(--workspace-background)] px-2 py-2 text-[var(--foreground)] sm:px-3">
+    <main className={symbolResearchMainClass}>
       <SymbolResearchNavigation
         key={data.symbol.symbol}
         exchange={exchange}
@@ -618,46 +687,24 @@ export function SymbolResearchPageClient({
         assetClass={data.symbol.assetClass}
         scannerReturnHref={scannerReturnHref}
         searchParams={searchParams}
-        isFetching={query.isFetching}
+        isFetching={isFetching}
         onSymbolSubmit={handleSymbolSubmit}
-        onRefresh={() => void query.refetch()}
+        onRefresh={handleRefresh}
         availabilityRows={timeframeAvailability}
+        extraStats={[
+          {
+            label: "Quality",
+            value: toTitleCase(data.symbol.qualityTier),
+            tone: data.symbol.isLowQuality ? "warning" : "complete",
+          },
+          {
+            label: "Latest scan",
+            value: formatSymbolResearchDateTime(data.latest?.scanRun?.finishedAt),
+            tone: "neutral",
+          },
+        ]}
+        watchlistSymbol={data.symbol.symbol}
       />
-
-      <header className="mb-2 border border-l-4 border-[var(--border)] border-l-[var(--accent)] bg-[var(--panel)] px-3 py-2.5 shadow-[var(--shadow-panel)]">
-        <div className="flex flex-wrap items-start justify-between gap-3">
-          <div>
-            <p className="text-[10px] font-semibold uppercase tracking-normal text-[var(--muted)]">
-              Symbol Research
-            </p>
-            <h1 className="mt-0.5 text-lg font-semibold leading-6">
-              {data.symbol.symbol}
-            </h1>
-            <p className="mt-1 text-xs text-[var(--muted)]">
-              {data.symbol.exchange} · {data.symbol.market} · {selectedTimeframe} ·{" "}
-              {toTitleCase(data.symbol.assetClass)}
-            </p>
-            <p className="mt-2 max-w-3xl text-xs leading-5 text-[var(--muted)]">
-              {longResearchDisclaimer}
-            </p>
-          </div>
-          <div className="text-left text-xs text-[var(--muted)] md:text-right">
-            <SymbolWatchlistControl symbol={data.symbol.symbol} />
-            <div>
-              Quality:{" "}
-              <span className="font-semibold text-[var(--foreground)]">
-                {toTitleCase(data.symbol.qualityTier)}
-              </span>
-            </div>
-            <div>
-              Latest scan:{" "}
-              <span className="text-[var(--foreground)]">
-                {formatSymbolResearchDateTime(data.latest?.scanRun?.finishedAt)}
-              </span>
-            </div>
-          </div>
-        </div>
-      </header>
 
       <CurrentPostureStrip
         symbol={data.symbol.symbol}
@@ -665,11 +712,13 @@ export function SymbolResearchPageClient({
         interpretation={interpretation}
         latestSignal={latestSignal}
         scoreBreakdown={scoreBreakdown}
+        qualityTier={data.symbol.qualityTier}
+        latestScanTime={data.latest?.scanRun?.finishedAt}
       />
 
       <ResearchWorkflowSection
         title="Research Focus"
-        description="Current posture, chart, and evidence for the selected timeframe."
+        description="Chart and signal evidence for the selected timeframe."
         className="mt-0"
       >
         <div className="grid gap-3 xl:grid-cols-[minmax(0,1.2fr)_minmax(360px,0.8fr)]">
@@ -744,9 +793,9 @@ export function SymbolResearchPageClient({
 
           <MarketContextPanel
             variant="compact"
-            data={marketContextQuery.data}
-            isLoading={marketContextQuery.isLoading}
-            isError={marketContextQuery.isError}
+            data={marketContextData}
+            isLoading={marketContextIsLoading}
+            isError={marketContextIsError}
             implication={marketContextImplication}
           />
         </div>
@@ -761,10 +810,10 @@ export function SymbolResearchPageClient({
         <SignalEvaluationPanel
           readout={signalEvaluationReadout}
           isLoading={
-            signalEvaluationQuery.isLoading ||
-            (signalEvaluationQuery.isFetching && !signalEvaluationQuery.data)
+            signalEvaluationIsLoading ||
+            (signalEvaluationIsFetching && !signalEvaluationData)
           }
-          isError={signalEvaluationQuery.isError}
+          isError={signalEvaluationIsError}
         />
 
         <SymbolBehaviorPanel
@@ -780,92 +829,110 @@ export function SymbolResearchPageClient({
         />
       </ResearchWorkflowSection>
 
-      <ResearchWorkflowSection
-        title="Details"
-        description="Snapshots, candle coverage, source data, and raw fields."
-      >
+      <details className="mt-4 border-t border-[var(--border)] pt-3">
+        <summary className="cursor-pointer list-none border border-[var(--border)] bg-[var(--panel-2)] px-3 py-2 text-[11px] font-semibold uppercase text-[var(--muted)] transition hover:border-[var(--border-medium)] hover:text-[var(--foreground)]">
+          Details
+          <span className="ml-2 font-normal normal-case text-[var(--muted-2)]">
+            snapshots, candle coverage, source data, and raw fields
+          </span>
+        </summary>
+        <div className="mt-3 space-y-3">
+          <Panel title={timeframeSnapshotTitle}>
+            {timeframeSnapshotNote ? (
+              <p className="mb-3 text-xs text-[var(--muted)]">
+                {timeframeSnapshotNote}
+              </p>
+            ) : null}
+            <ResponsiveTable
+              headers={[
+                "Timeframe",
+                "Group",
+                "Action",
+                "Rank",
+                "Scan Time",
+                "Run Context",
+              ]}
+              rows={timeframeSnapshots.map((item) => [
+                formatSelectedTimeframeLabel(item.timeframe, selectedTimeframe),
+                formatSymbolResearchGroup(item.resultGroup),
+                formatSymbolResearchAction(item.actionBias ?? item.statusNote),
+                formatSymbolResearchScore(item.rankScore),
+                formatSymbolResearchDateTime(item.scanTime),
+                formatSymbolResearchRunContext(item),
+              ])}
+              emptyText="No timeframe snapshots available."
+            />
+          </Panel>
 
-        <Panel title={timeframeSnapshotTitle}>
-          {timeframeSnapshotNote ? (
-            <p className="mb-3 text-xs text-[var(--muted)]">{timeframeSnapshotNote}</p>
-          ) : null}
-          <ResponsiveTable
-            headers={["Timeframe", "Group", "Action", "Rank", "Scan Time", "Run Context"]}
-            rows={timeframeSnapshots.map((item) => [
-              formatSelectedTimeframeLabel(item.timeframe, selectedTimeframe),
-              formatSymbolResearchGroup(item.resultGroup),
-              formatSymbolResearchAction(item.actionBias ?? item.statusNote),
-              formatSymbolResearchScore(item.rankScore),
-              formatSymbolResearchDateTime(item.scanTime),
-              formatSymbolResearchRunContext(item),
-            ])}
-            emptyText="No timeframe snapshots available."
-          />
-        </Panel>
-
-        <Panel title="Recent Candles Summary">
-          {candleRowsNotice ? (
-            <p className="mb-3 text-xs text-[var(--muted)]">{candleRowsNotice}</p>
-          ) : null}
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            <Fact label="Candles" value={String(candles.count)} />
-            <Fact
-              label="First Open"
-              value={formatSymbolResearchDateTime(candles.firstOpenTime)}
-            />
-            <Fact
-              label="Last Open"
-              value={formatSymbolResearchDateTime(candles.lastOpenTime)}
-            />
-            <Fact
-              label="Latest Close"
-              value={formatSymbolResearchPrice(candleSummary.latestClose)}
-            />
-            <Fact
-              label="Recent High"
-              value={formatSymbolResearchPrice(candleSummary.recentHigh)}
-            />
-            <Fact
-              label="Recent Low"
-              value={formatSymbolResearchPrice(candleSummary.recentLow)}
-            />
-          </div>
-        </Panel>
-
-        <Panel title="Data Source">
-          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-            {diagnostics.rows.map((row) => (
-              <Fact key={row.label} label={row.label} value={row.value} />
-            ))}
-            <Fact label="API Origin" value={apiOrigin} />
-          </div>
-          <p
-            className={`mt-3 border border-l-4 px-3 py-2 text-xs ${
-              diagnostics.hasWarning
-                ? "border-[var(--warning-border)] border-l-[var(--warning)] bg-[var(--panel)] text-[var(--warning)]"
-                : "border-[var(--border)] border-l-[var(--neutral)] bg-[var(--panel)] text-[var(--muted)]"
-            }`}
-          >
-            {diagnostics.notice}
-          </p>
-        </Panel>
-
-        <Panel title="Raw Details">
-          <details>
-            <summary className="cursor-pointer text-sm font-semibold text-[var(--info)]">
-              Show selected details
-            </summary>
-            <div className="mt-3 grid gap-3 md:grid-cols-2">
-              <TextList title="Secondary Structures" values={secondaryStructures} />
-              <TextList title="Detected Risks" values={riskTypes} />
-              <JsonBlock title="Next Confirmation" value={latestSignal.nextConfirmation} />
-              <JsonBlock title="Invalidation" value={latestSignal.invalidation} />
-              <JsonBlock title="Factors" value={latestSignal.factors} />
-              <JsonBlock title="Selected Metrics" value={latestSignal.rawMetrics} />
+          <Panel title="Recent Candles Summary">
+            {candleRowsNotice ? (
+              <p className="mb-3 text-xs text-[var(--muted)]">
+                {candleRowsNotice}
+              </p>
+            ) : null}
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+              <Fact label="Candles" value={String(candles.count)} />
+              <Fact
+                label="First Open"
+                value={formatSymbolResearchDateTime(candles.firstOpenTime)}
+              />
+              <Fact
+                label="Last Open"
+                value={formatSymbolResearchDateTime(candles.lastOpenTime)}
+              />
+              <Fact
+                label="Latest Close"
+                value={formatSymbolResearchPrice(candleSummary.latestClose)}
+              />
+              <Fact
+                label="Recent High"
+                value={formatSymbolResearchPrice(candleSummary.recentHigh)}
+              />
+              <Fact
+                label="Recent Low"
+                value={formatSymbolResearchPrice(candleSummary.recentLow)}
+              />
             </div>
-          </details>
-        </Panel>
-      </ResearchWorkflowSection>
+          </Panel>
+
+          <Panel title="Data Source">
+            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+              {diagnostics.rows.map((row) => (
+                <Fact key={row.label} label={row.label} value={row.value} />
+              ))}
+              <Fact label="API Origin" value={apiOrigin} />
+            </div>
+            <p
+              className={`mt-3 border border-l-4 px-3 py-2 text-xs ${
+                diagnostics.hasWarning
+                  ? "border-[var(--warning-border)] border-l-[var(--warning)] bg-[var(--panel)] text-[var(--warning)]"
+                  : "border-[var(--border)] border-l-[var(--neutral)] bg-[var(--panel)] text-[var(--muted)]"
+              }`}
+            >
+              {diagnostics.notice}
+            </p>
+          </Panel>
+
+          <Panel title="Raw Details">
+            <details>
+              <summary className="cursor-pointer text-sm font-semibold text-[var(--info)]">
+                Show selected details
+              </summary>
+              <div className="mt-3 grid gap-3 md:grid-cols-2">
+                <TextList title="Secondary Structures" values={secondaryStructures} />
+                <TextList title="Detected Risks" values={riskTypes} />
+                <JsonBlock
+                  title="Next Confirmation"
+                  value={latestSignal.nextConfirmation}
+                />
+                <JsonBlock title="Invalidation" value={latestSignal.invalidation} />
+                <JsonBlock title="Factors" value={latestSignal.factors} />
+                <JsonBlock title="Selected Metrics" value={latestSignal.rawMetrics} />
+              </div>
+            </details>
+          </Panel>
+        </div>
+      </details>
     </main>
   );
 }
@@ -1261,6 +1328,8 @@ function SymbolResearchNavigation({
   onSymbolSubmit,
   onRefresh,
   availabilityRows,
+  extraStats = [],
+  watchlistSymbol,
 }: {
   exchange: string;
   symbol: string;
@@ -1273,6 +1342,8 @@ function SymbolResearchNavigation({
   onSymbolSubmit: (value: string) => void;
   onRefresh: () => void;
   availabilityRows?: SymbolResearchTimeframeAvailabilityRow[];
+  extraStats?: SymbolTerminalStat[];
+  watchlistSymbol?: string;
 }) {
   const [symbolInput, setSymbolInput] = useState(symbol);
   const timeframeOptions = buildSymbolResearchTimeframeNavigation({
@@ -1280,115 +1351,188 @@ function SymbolResearchNavigation({
     selectedTimeframe: timeframe,
     availabilityRows,
   });
+  const commandStats: SymbolTerminalStat[] = [
+    {
+      label: "Symbol",
+      value: symbol,
+      tone: "accent",
+    },
+    {
+      label: "Selected timeframe",
+      value: timeframe,
+      tone: timeframeSelection?.fallbackReason === "invalid" ? "warning" : "accent",
+    },
+    {
+      label: "Asset",
+      value: assetClass ? toTitleCase(assetClass) : "Unknown",
+      tone: "neutral",
+    },
+    ...extraStats,
+  ];
   const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     onSymbolSubmit(symbolInput);
   };
 
   return (
-    <section className="mb-2 border border-[var(--border)] bg-[var(--panel)] px-3 py-2">
-      <div className="flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
-        <div className="min-w-0">
-          <div className="flex flex-wrap items-center gap-2">
-            <Link
-              href={scannerReturnHref}
-              className="ui-button h-8 px-3 text-xs"
-            >
-              Back to Scanner
-            </Link>
-            <button
-              type="button"
-              onClick={onRefresh}
-              disabled={isFetching}
-              className="ui-button h-8 px-3 text-xs disabled:cursor-not-allowed disabled:opacity-60"
-            >
-              {isFetching ? "Refreshing" : "Refresh"}
-            </button>
-          </div>
-          <p className="mt-2 text-xs text-[var(--muted)]">
-            {symbol} / Selected timeframe: {timeframe}
-            {assetClass ? ` / ${toTitleCase(assetClass)}` : ""}
-          </p>
-          {timeframeSelection?.fallbackReason === "invalid" ? (
-            <p className="mt-1 text-[11px] text-[var(--muted)]">
-              Fallback timeframe: {timeframe}. Requested timeframe{" "}
-              {timeframeSelection.requestedTimeframe} is not supported.
-            </p>
-          ) : null}
+    <section className="mb-1 overflow-hidden border border-[var(--terminal-bar-border)] bg-[var(--terminal-bar)] text-[var(--terminal-bar-foreground)] shadow-[var(--shadow-panel)]">
+      <div className="flex min-w-0 flex-wrap items-center gap-1 px-2 py-1 text-[10px] font-semibold uppercase text-[var(--terminal-bar-muted)]">
+        <div
+          className="flex h-6 min-w-0 shrink-0 items-center gap-1.5 overflow-hidden border-r border-white/10 pr-2"
+          title={`Symbol Research / ${symbol} / Selected timeframe: ${timeframe}`}
+        >
+          <h1 className="shrink-0 border-b border-[var(--accent)] px-1 text-[11px] leading-5 text-[var(--terminal-bar-foreground)]">
+            Symbol Research
+          </h1>
+          <span className="shrink-0 font-mono text-[10px] text-[var(--terminal-bar-muted)]">
+            {exchange}
+          </span>
+          <span className="shrink-0 text-[9px] font-medium normal-case text-[var(--terminal-bar-muted)] opacity-75">
+            single-symbol workspace
+          </span>
+          <span className="sr-only">Selected timeframe: {timeframe}</span>
         </div>
 
+        <div className="flex min-w-0 flex-1 items-center gap-1 overflow-x-auto [scrollbar-gutter:stable]">
+          {commandStats.map((stat) => (
+            <SymbolTerminalCommandStat
+              key={`${stat.label}-${stat.value}`}
+              stat={stat}
+            />
+          ))}
+        </div>
+
+        <div className="ml-auto flex shrink-0 flex-wrap items-center justify-end gap-1">
+          <Link
+            href={scannerReturnHref}
+            className="inline-flex h-6 items-center justify-center border border-white/20 bg-white/[0.08] px-2 text-[10px] font-semibold text-[var(--terminal-bar-foreground)] transition hover:border-white/35 hover:bg-white/[0.14]"
+          >
+            Back to Scanner
+          </Link>
+          <button
+            type="button"
+            onClick={onRefresh}
+            disabled={isFetching}
+            className="inline-flex h-6 items-center justify-center border border-white/20 bg-white/[0.08] px-2 text-[10px] font-semibold text-[var(--terminal-bar-foreground)] transition hover:border-white/35 hover:bg-white/[0.14] disabled:cursor-not-allowed disabled:opacity-55"
+          >
+            {isFetching ? "Refreshing" : "Refresh"}
+          </button>
+          {watchlistSymbol ? (
+            <SymbolWatchlistControl
+              symbol={watchlistSymbol}
+              className="flex flex-wrap items-center justify-end gap-1"
+              variant="terminal"
+            />
+          ) : null}
+        </div>
+      </div>
+
+      <div className="flex flex-col gap-2 border-t border-white/10 px-2 py-1 sm:flex-row sm:items-center sm:justify-between">
         <form
           onSubmit={handleSubmit}
-          className="flex w-full min-w-0 flex-col gap-2 sm:flex-row lg:max-w-md"
+          className="flex w-full min-w-0 flex-col gap-1.5 sm:max-w-md sm:flex-row"
         >
           <label className="min-w-0 flex-1">
             <span className="sr-only">Symbol</span>
             <input
               value={symbolInput}
               onChange={(event) => setSymbolInput(event.target.value)}
-              className="h-8 w-full border border-[var(--border)] bg-[var(--control)] px-3 text-sm text-[var(--foreground)] outline-none focus:border-[var(--accent)]"
+              className="h-7 w-full border border-white/15 bg-white/[0.05] px-2 font-mono text-xs text-[var(--terminal-bar-foreground)] outline-none placeholder:text-[var(--terminal-bar-muted)] focus:border-[var(--accent)]"
               placeholder="SEIUSDT"
             />
           </label>
           <button
             type="submit"
-            className="ui-button ui-button-primary h-8 px-3 text-xs"
+            className="inline-flex h-7 items-center justify-center border border-[var(--accent-border)] bg-[var(--accent)] px-2 text-[10px] font-semibold text-[var(--accent-foreground)] transition hover:border-[var(--accent-hover)] hover:bg-[var(--accent-hover)]"
           >
             Open Symbol
           </button>
         </form>
-      </div>
 
-      <nav
-        aria-label="Timeframe quick switch"
-        className="mt-2 flex flex-wrap gap-1.5 text-xs"
-      >
-        {timeframeOptions.map((option) => {
-          const className = getTimeframeNavigationClass(option);
+        <nav
+          aria-label="Timeframe quick switch"
+          className="flex min-w-0 flex-wrap gap-1 text-xs sm:justify-end"
+        >
+          {timeframeOptions.map((option) => {
+            const className = getTimeframeNavigationClass(option);
 
-          if (option.isDisabled) {
+            if (option.isDisabled) {
+              return (
+                <span
+                  key={option.timeframe}
+                  aria-disabled="true"
+                  title={option.reason}
+                  className={`${className} cursor-not-allowed`}
+                >
+                  <span>{option.timeframe}</span>
+                  <span className="opacity-80">{option.badgeLabel}</span>
+                </span>
+              );
+            }
+
             return (
-              <span
+              <Link
                 key={option.timeframe}
-                aria-disabled="true"
+                href={buildSymbolResearchTimeframeHref({
+                  exchange,
+                  symbol,
+                  timeframe: option.timeframe,
+                  searchParams,
+                })}
+                aria-current={option.isSelected ? "page" : undefined}
                 title={option.reason}
-                className={`${className} cursor-not-allowed`}
+                className={className}
               >
                 <span>{option.timeframe}</span>
                 <span className="opacity-80">{option.badgeLabel}</span>
-              </span>
+              </Link>
             );
-          }
+          })}
+        </nav>
+      </div>
 
-          return (
-            <Link
-              key={option.timeframe}
-              href={buildSymbolResearchTimeframeHref({
-                exchange,
-                symbol,
-                timeframe: option.timeframe,
-                searchParams,
-              })}
-              aria-current={option.isSelected ? "page" : undefined}
-              title={option.reason}
-              className={className}
-            >
-              <span>{option.timeframe}</span>
-              <span className="opacity-80">{option.badgeLabel}</span>
-            </Link>
-          );
-        })}
-      </nav>
+      {timeframeSelection?.fallbackReason === "invalid" ? (
+        <p className="border-t border-white/10 px-2 py-1 text-[11px] text-[var(--terminal-bar-muted)]">
+          Fallback timeframe: {timeframe}. Requested timeframe{" "}
+          {timeframeSelection.requestedTimeframe} is not supported.
+        </p>
+      ) : null}
     </section>
+  );
+}
+
+function SymbolTerminalCommandStat({ stat }: { stat: SymbolTerminalStat }) {
+  return (
+    <div
+      title={stat.title ?? `${stat.label}: ${stat.value}`}
+      className={`inline-flex h-6 max-w-[220px] shrink-0 items-center gap-1.5 overflow-hidden border border-l-2 border-white/10 bg-white/[0.04] px-1.5 ${getSymbolTerminalToneBorderClass(
+        stat.tone,
+      )}`}
+    >
+      <span className="shrink-0 text-[9px] font-semibold uppercase text-[var(--terminal-bar-muted)]">
+        {stat.label}
+      </span>
+      <span
+        className={`min-w-0 truncate font-mono text-[10px] font-semibold leading-4 ${getSymbolTerminalToneTextClass(
+          stat.tone,
+        )}`}
+      >
+        {stat.value}
+      </span>
+    </div>
   );
 }
 
 export function SymbolWatchlistControl({
   symbol,
   storage,
+  className = "mb-2 flex flex-wrap items-center gap-2 md:justify-end",
+  variant = "default",
 }: {
   symbol: string;
   storage?: WatchlistStorage | null;
+  className?: string;
+  variant?: "default" | "terminal";
 }) {
   const normalizedSymbol = normalizeWatchlistSymbol(symbol) ?? symbol.toUpperCase();
   const initialStorage = storage === undefined ? null : storage;
@@ -1397,6 +1541,16 @@ export function SymbolWatchlistControl({
   );
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const inWatchlist = isSymbolInWatchlist(watchlistSymbols, normalizedSymbol);
+  const isTerminal = variant === "terminal";
+  const actionClassName = isTerminal
+    ? "inline-flex h-6 items-center justify-center border border-white/20 bg-white/[0.08] px-2 text-[10px] font-semibold text-[var(--terminal-bar-foreground)] transition hover:border-white/35 hover:bg-white/[0.14]"
+    : "ui-button h-7 px-2 text-[11px]";
+  const savedClassName = isTerminal
+    ? "inline-flex h-6 items-center border border-[var(--positive-border)] bg-[var(--positive-bg)] px-2 text-[10px] font-semibold text-[var(--positive)]"
+    : "border border-[var(--positive-border)] bg-[var(--positive-bg)] px-2 py-1 text-[11px] font-semibold text-[var(--positive)]";
+  const statusClassName = isTerminal
+    ? "basis-full text-[11px] text-[var(--terminal-bar-muted)] md:text-right"
+    : "basis-full text-[11px] text-[var(--muted)] md:text-right";
 
   useEffect(() => {
     const loadedSymbols = loadWatchlistSymbols(
@@ -1430,28 +1584,28 @@ export function SymbolWatchlistControl({
   };
 
   return (
-    <div className="mb-2 flex flex-wrap items-center gap-2 md:justify-end">
+    <div className={className}>
       {inWatchlist ? (
-        <span className="border border-[var(--positive-border)] bg-[var(--positive-bg)] px-2 py-1 text-[11px] font-semibold text-[var(--positive)]">
+        <span className={savedClassName}>
           In Watchlist
         </span>
       ) : (
         <button
           type="button"
           onClick={addToWatchlist}
-          className="ui-button h-7 px-2 text-[11px]"
+          className={actionClassName}
         >
           Add to Watchlist
         </button>
       )}
       <Link
         href="/watchlist"
-        className="ui-button h-7 px-2 text-[11px]"
+        className={actionClassName}
       >
         Open Watchlist
       </Link>
       {statusMessage ? (
-        <span className="basis-full text-[11px] text-[var(--muted)] md:text-right">
+        <span className={statusClassName}>
           {statusMessage}
         </span>
       ) : null}
@@ -1513,25 +1667,69 @@ function TimeframeAvailabilityPanel({
 
 function getTimeframeNavigationClass(option: SymbolResearchTimeframeNavigationOption) {
   const base =
-    "inline-flex items-center gap-1.5 border px-2.5 py-1 font-semibold";
+    "inline-flex h-6 items-center gap-1.5 border px-2 text-[10px] font-semibold";
 
   if (option.status === "planned") {
-    return `${base} border-[var(--border)] bg-[var(--panel)] text-[var(--muted)] opacity-70`;
+    return `${base} border-white/10 bg-white/[0.03] text-[var(--terminal-bar-muted)] opacity-70`;
   }
 
   if (option.status === "selected_unavailable") {
-    return `${base} border-[var(--warning-border)] bg-[var(--warning-bg)] text-[var(--warning)] hover:border-[var(--border-strong)]`;
+    return `${base} border-[var(--warning-border)] bg-[var(--warning-bg)] text-[var(--warning)] hover:border-[var(--warning)]`;
   }
 
   if (option.status === "unavailable") {
-    return `${base} border-[var(--border)] bg-[var(--panel)] text-[var(--muted)] hover:border-[var(--warning-border)] hover:text-[var(--foreground)]`;
+    return `${base} border-white/10 bg-white/[0.03] text-[var(--terminal-bar-muted)] hover:border-[var(--warning-border)] hover:text-[var(--terminal-bar-foreground)]`;
   }
 
   if (option.isSelected) {
-    return `${base} border-[var(--accent)] bg-[var(--panel)] text-[var(--accent)] shadow-[inset_0_-2px_0_var(--accent)]`;
+    return `${base} border-[var(--accent-border)] bg-white/[0.08] text-[var(--accent)] shadow-[inset_0_-2px_0_var(--accent)]`;
   }
 
-  return `${base} border-[var(--border)] text-[var(--muted)] hover:border-[var(--info)] hover:text-[var(--foreground)]`;
+  return `${base} border-white/10 bg-white/[0.03] text-[var(--terminal-bar-muted)] hover:border-[var(--accent-border)] hover:text-[var(--terminal-bar-foreground)]`;
+}
+
+function getSymbolTerminalToneBorderClass(tone: SymbolTerminalTone) {
+  switch (tone) {
+    case "eligible":
+    case "complete":
+      return "border-l-[var(--eligible)]";
+    case "watch":
+      return "border-l-[var(--watch)]";
+    case "repair":
+      return "border-l-[var(--repair)]";
+    case "risk":
+      return "border-l-[var(--risk)]";
+    case "warning":
+      return "border-l-[var(--overheated)]";
+    case "accent":
+      return "border-l-[var(--accent)]";
+    case "missing":
+      return "border-l-[var(--missing)]";
+    default:
+      return "border-l-[var(--neutral)]";
+  }
+}
+
+function getSymbolTerminalToneTextClass(tone: SymbolTerminalTone) {
+  switch (tone) {
+    case "eligible":
+    case "complete":
+      return "text-[var(--eligible)]";
+    case "watch":
+      return "text-[var(--watch)]";
+    case "repair":
+      return "text-[var(--repair)]";
+    case "risk":
+      return "text-[var(--risk)]";
+    case "warning":
+      return "text-[var(--overheated)]";
+    case "accent":
+      return "text-[var(--accent)]";
+    case "missing":
+      return "text-[var(--missing)]";
+    default:
+      return "text-[var(--terminal-bar-muted)]";
+  }
 }
 
 function ResearchState({
@@ -1548,14 +1746,14 @@ function ResearchState({
   loading?: boolean;
 }) {
   return (
-    <section className="border border-l-4 border-[var(--border)] border-l-[var(--accent)] bg-[var(--panel)] px-4 py-6">
+    <section className="border border-l-4 border-[var(--border)] border-l-[var(--accent)] bg-[var(--panel)] px-4 py-6 shadow-[var(--shadow-panel)]">
       <h1 className="text-xl font-semibold">{title}</h1>
       <p className="mt-2 text-sm text-[var(--muted)]">{message}</p>
       {loading ? (
         <div className="mt-5 grid gap-2 sm:grid-cols-3">
-          <div className="h-12 border border-[var(--border)] bg-[var(--panel)]" />
-          <div className="h-12 border border-[var(--border)] bg-[var(--panel)]" />
-          <div className="h-12 border border-[var(--border)] bg-[var(--panel)]" />
+          <div className="h-12 border border-[var(--border)] bg-[var(--panel-2)]" />
+          <div className="h-12 border border-[var(--border)] bg-[var(--panel-2)]" />
+          <div className="h-12 border border-[var(--border)] bg-[var(--panel-2)]" />
         </div>
       ) : null}
       {apiOrigin ? (
@@ -1581,7 +1779,7 @@ function SymbolResearchUnavailableState({
   apiOrigin?: string;
 }) {
   return (
-    <section className="border border-l-4 border-[var(--border)] border-l-[var(--warning)] bg-[var(--panel)] px-4 py-5">
+    <section className="border border-l-4 border-[var(--border)] border-l-[var(--warning)] bg-[var(--panel)] px-4 py-5 shadow-[var(--shadow-panel)]">
       <p className="text-xs uppercase tracking-wide text-[var(--muted)]">
         Symbol Research
       </p>
@@ -1613,17 +1811,21 @@ function CurrentPostureStrip({
   interpretation,
   latestSignal,
   scoreBreakdown,
+  qualityTier,
+  latestScanTime,
 }: {
   symbol: string;
   selectedTimeframe: string;
   interpretation: ReturnType<typeof getSymbolResearchInterpretation>;
   latestSignal: SymbolResearchSignal;
   scoreBreakdown: ReturnType<typeof getSymbolResearchScoreBreakdown>;
+  qualityTier?: string | null;
+  latestScanTime?: string | null;
 }) {
   const groupToneClass = getSymbolPostureToneClass(interpretation.group);
 
   return (
-    <section className={`mb-2 border border-l-4 bg-[var(--panel)] px-3 py-2 ${groupToneClass}`}>
+    <section className={`mb-2 border border-l-4 bg-[var(--panel)] px-3 py-3 shadow-[var(--shadow-panel)] ${groupToneClass}`}>
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="min-w-0">
           <div className="text-[10px] font-semibold uppercase tracking-normal text-[var(--muted)]">
@@ -1636,7 +1838,7 @@ function CurrentPostureStrip({
             <span className="text-xs font-semibold text-[var(--muted)]">
               {selectedTimeframe}
             </span>
-            <span className="text-sm font-semibold text-[var(--foreground)]">
+            <span className="text-base font-semibold text-[var(--foreground)]">
               {formatSymbolResearchGroup(interpretation.group)}
             </span>
             <span className="text-xs text-[var(--muted)]">
@@ -1662,6 +1864,18 @@ function CurrentPostureStrip({
             label="Risk"
             value={latestSignal.cautionLevel || "No extra risk flag"}
           />
+          {qualityTier ? (
+            <PostureStat
+              label="Quality"
+              value={toTitleCase(qualityTier)}
+            />
+          ) : null}
+          {latestScanTime ? (
+            <PostureStat
+              label="Latest"
+              value={formatSymbolResearchDateTime(latestScanTime)}
+            />
+          ) : null}
         </div>
       </div>
     </section>
@@ -1685,19 +1899,19 @@ function getSymbolPostureToneClass(group: string | null | undefined) {
   const normalized = normalizeSymbolMarketContextGroup(group);
 
   if (normalized === "eligible") {
-    return "border-[var(--positive-border)] border-l-[var(--positive)]";
+    return "border-[var(--eligible-border)] border-l-[var(--eligible)]";
   }
 
   if (normalized === "watch") {
-    return "border-[var(--info-border)] border-l-[var(--info)]";
+    return "border-[var(--watch-border)] border-l-[var(--watch)]";
   }
 
   if (normalized === "risk") {
-    return "border-[var(--danger-border)] border-l-[var(--danger)]";
+    return "border-[var(--risk-border)] border-l-[var(--risk)]";
   }
 
   if (normalized === "overheated") {
-    return "border-[var(--warning-border)] border-l-[var(--warning)]";
+    return "border-[var(--overheated-border)] border-l-[var(--overheated)]";
   }
 
   return "border-[var(--border)] border-l-[var(--neutral)]";
@@ -1717,11 +1931,11 @@ function ResearchWorkflowSection({
   return (
     <section className={className || "mt-4"}>
       <div className="mb-2 border-t border-[var(--border)] pt-3">
-        <h2 className="text-[11px] font-semibold uppercase tracking-normal text-[var(--muted)]">
+        <h2 className="inline-flex border-b border-[var(--accent)] pb-0.5 text-[11px] font-semibold uppercase tracking-normal text-[var(--foreground)]">
           {title}
         </h2>
         {description ? (
-          <p className="mt-1 max-w-5xl text-xs leading-5 text-[var(--muted)]">
+          <p className="mt-1 max-w-5xl text-[11px] leading-5 text-[var(--muted)]">
             {description}
           </p>
         ) : null}
@@ -1749,8 +1963,7 @@ function ResearchDecisionSummaryPanel({
             {summary.summaryLabel}
           </div>
           <p className="mt-2 text-sm text-[var(--muted)]">
-            Use as a review summary alongside scanner classification and
-            historical context.
+            Secondary readout; current symbol signal remains primary.
           </p>
         </div>
         <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
@@ -1870,9 +2083,9 @@ function Panel({
 }) {
   return (
     <section
-      className={`min-w-0 border border-[var(--border)] bg-[var(--panel)] px-3 py-3 ${className}`}
+      className={`min-w-0 border border-[var(--border)] bg-[var(--panel)] px-3 py-3 shadow-[var(--shadow-panel)] ${className}`}
     >
-      <h2 className="mb-2 text-sm font-semibold">{title}</h2>
+      <h2 className="mb-2 border-b border-[var(--border)] pb-1.5 text-sm font-semibold">{title}</h2>
       {children}
     </section>
   );
@@ -1880,7 +2093,7 @@ function Panel({
 
 function Fact({ label, value }: { label: string; value: string }) {
   return (
-    <div className="min-w-0 border-l-2 border-l-[var(--border-medium)] py-0.5 pl-2">
+    <div className="min-w-0 border border-[var(--border)] bg-[var(--panel-2)] px-2 py-2">
       <div className="text-[11px] uppercase text-[var(--muted)]">{label}</div>
       <div className="mt-1 break-words text-sm text-[var(--foreground)]">{value}</div>
     </div>

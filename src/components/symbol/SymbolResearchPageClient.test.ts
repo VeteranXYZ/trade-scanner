@@ -36,6 +36,7 @@ import {
 } from "./symbolResearchLinks";
 import type { MarketContextResponse } from "@/components/market-context/marketContextUi";
 import type { WatchlistStorage } from "@/components/watchlist/watchlistUi";
+import { buildSymbolResearchVisualCheckData } from "./symbolResearchPreviewData";
 
 const ORIGINAL_ENV = { ...process.env };
 
@@ -725,6 +726,45 @@ describe("SymbolResearchPageClient success state", () => {
       signalLabel: "breakdown_risk",
     });
     expect(signalEvaluationCall?.[0].queryKey[1]).not.toHaveProperty("symbol");
+  });
+
+  it("renders populated visual-check success data without enabling live queries", () => {
+    const visualCheckData = buildSymbolResearchVisualCheckData();
+
+    useQueryMock.mockReturnValue({
+      isLoading: false,
+      isError: false,
+      isFetching: false,
+      refetch: vi.fn(),
+      data: undefined,
+    });
+
+    const html = renderToStaticMarkup(
+      createElement(SymbolResearchPageClient, {
+        exchange: "binance",
+        symbol: "BTCUSDT",
+        visualCheckData,
+      }),
+    );
+
+    expect(html).toContain("BTCUSDT");
+    expect(html).toContain("Current posture");
+    expect(html).toContain("Research Chart");
+    expect(html).toContain("Signal Summary");
+    expect(html).toContain("What to Check");
+    expect(html).toContain("Multi-Timeframe Snapshot");
+    expect(html).toContain("Market Backdrop");
+    expect(html).toContain("Constructive backdrop");
+    expect(html).toContain("Historical Behavior");
+    expect(html).toContain("Signal History");
+    expect(html).toContain("Details");
+    expect(html).toContain("visual-check mock");
+    expect(html).not.toContain("Loading symbol research");
+
+    expect(useQueryMock).toHaveBeenCalledTimes(3);
+    expect(
+      useQueryMock.mock.calls.every(([options]) => options.enabled === false),
+    ).toBe(true);
   });
 });
 

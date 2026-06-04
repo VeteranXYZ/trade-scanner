@@ -64,7 +64,7 @@ export function SymbolBehaviorPanel({
 
   return (
     <section
-      className={`min-w-0 border border-[var(--border)] bg-[var(--panel)] px-4 py-4 ${className}`}
+      className={`min-w-0 border border-[var(--border)] bg-[var(--panel)] px-3 py-3 shadow-[var(--shadow-panel)] ${className}`}
     >
       <div className="mb-3 flex flex-wrap items-start justify-between gap-3">
         <div>
@@ -134,14 +134,14 @@ function EmptyBehaviorState({
   coverage?: SymbolBehaviorCoverage | null;
 }) {
   return (
-    <div className="border border-[var(--border)] bg-[var(--panel-2)] px-3 py-3">
-      <p className="text-sm font-semibold text-[var(--foreground)]">
+    <details className="border border-[var(--border)] bg-[var(--panel-2)] px-3 py-3">
+      <summary className="cursor-pointer text-sm font-semibold text-[var(--foreground)]">
         {getBehaviorDiagnosticsTitle(diagnostics)}
-      </p>
+      </summary>
       <p className="mt-1 text-sm text-[var(--muted)]">
         {getBehaviorUnavailableMessage({ diagnostics, coverage })}
       </p>
-    </div>
+    </details>
   );
 }
 
@@ -163,7 +163,7 @@ function BehaviorReadoutCard({
   const caveats = getReadoutDisplayCaveats(readout, sampleQuality);
 
   return (
-    <div className={`mb-3 border px-3 py-3 ${toneClass}`}>
+    <div className={`mb-3 border px-3 py-3 shadow-[var(--shadow-panel)] ${toneClass}`}>
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <div className="text-[10px] uppercase tracking-normal text-[var(--muted-2)]">
@@ -396,7 +396,10 @@ function BehaviorHorizons({ horizons }: { horizons: SymbolBehaviorHorizonRow[] }
           </thead>
           <tbody>
             {horizons.map((horizon) => (
-              <tr key={horizon.horizon} className="border-t border-[var(--border)]">
+              <tr
+                key={horizon.horizon}
+                className="border-t border-[var(--border)] odd:bg-[var(--panel-data)] even:bg-[var(--panel-muted)]"
+              >
                 <td className="px-2 py-2 font-semibold text-[var(--foreground)]">
                   {horizon.label}
                 </td>
@@ -486,7 +489,7 @@ function RecentBehaviorOutcomes({
               {visibleOutcomes.map((outcome, index) => (
                 <tr
                   key={`${outcome.scanTime ?? "unknown"}-${outcome.signalLabel ?? "unknown"}-${index}`}
-                  className="border-t border-[var(--border)]"
+                  className="border-t border-[var(--border)] odd:bg-[var(--panel-data)] even:bg-[var(--panel-muted)]"
                 >
                   <td className="px-2 py-2">
                     {formatRecentOutcomeDate(outcome.scanTime)}
@@ -531,9 +534,9 @@ function PercentCell({ value }: { value: unknown }) {
   const numeric = typeof value === "string" ? Number(value) : Number(value);
   const tone =
     Number.isFinite(numeric) && numeric > 0
-      ? "text-emerald-100"
+      ? "text-[var(--positive)]"
       : Number.isFinite(numeric) && numeric < 0
-        ? "text-rose-100"
+        ? "text-[var(--negative)]"
         : "text-[var(--foreground)]";
 
   return (

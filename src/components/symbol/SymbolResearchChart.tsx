@@ -68,46 +68,46 @@ export function SymbolResearchChart({
       autoSize: true,
       height: 320,
       layout: {
-        background: { type: ColorType.Solid, color: "#ffffff" },
-        textColor: "#475569",
+        background: { type: ColorType.Solid, color: "#10161d" },
+        textColor: "#a9b5c3",
         attributionLogo: true,
       },
       grid: {
-        vertLines: { color: "#e5eaf0" },
-        horzLines: { color: "#e5eaf0" },
+        vertLines: { color: "rgba(148, 163, 184, 0.16)" },
+        horzLines: { color: "rgba(148, 163, 184, 0.16)" },
       },
       rightPriceScale: {
-        borderColor: "#cbd5e1",
+        borderColor: "rgba(148, 163, 184, 0.3)",
       },
       timeScale: {
-        borderColor: "#cbd5e1",
+        borderColor: "rgba(148, 163, 184, 0.3)",
         timeVisible: true,
         secondsVisible: false,
       },
       crosshair: {
-        vertLine: { color: "#64748b" },
-        horzLine: { color: "#64748b" },
+        vertLine: { color: "#7f8b99" },
+        horzLine: { color: "#7f8b99" },
       },
       localization: {
         priceFormatter: formatChartPrice,
       },
     });
     const candlestickSeries = chart.addSeries(CandlestickSeries, {
-      upColor: "#047857",
-      downColor: "#dc2626",
-      borderUpColor: "#047857",
-      borderDownColor: "#dc2626",
-      wickUpColor: "#047857",
-      wickDownColor: "#dc2626",
+      upColor: "#5ac46f",
+      downColor: "#ff625d",
+      borderUpColor: "#5ac46f",
+      borderDownColor: "#ff625d",
+      wickUpColor: "#5ac46f",
+      wickDownColor: "#ff625d",
     });
     const ma20Series = chart.addSeries(LineSeries, {
-      color: "#b45309",
+      color: "#e1b249",
       lineWidth: 1,
       priceLineVisible: false,
       lastValueVisible: false,
     });
     const ma50Series = chart.addSeries(LineSeries, {
-      color: "#2563eb",
+      color: "#67a8ff",
       lineWidth: 1,
       priceLineVisible: false,
       lastValueVisible: false,
@@ -150,13 +150,13 @@ export function SymbolResearchChart({
 
   return (
     <section
-      className={`min-w-0 border border-[var(--border)] bg-[var(--panel)] px-4 py-4 ${className}`}
+      className={`min-w-0 border border-[var(--border)] bg-[var(--panel)] px-3 py-3 shadow-[var(--shadow-panel)] ${className}`}
     >
       <div className="mb-3 flex flex-wrap items-start justify-between gap-3">
         <div>
           <h2 className="text-sm font-semibold">Research Chart</h2>
           <p className="mt-1 text-xs text-[var(--muted)]">
-            Recent candles with simple moving averages for manual review.
+            Candles, MA20/MA50, and latest signal marker.
           </p>
         </div>
         <div className="grid w-full grid-cols-2 gap-x-4 gap-y-1 text-xs text-[var(--muted)] sm:w-auto sm:grid-cols-3 lg:text-right">
@@ -184,10 +184,10 @@ export function SymbolResearchChart({
       {hasCandles ? (
         <div
           ref={containerRef}
-          className="h-[280px] min-w-0 overflow-hidden border border-[var(--border)] bg-[var(--panel)] sm:h-[340px]"
+          className="h-[300px] min-w-0 overflow-hidden border border-[var(--border-medium)] bg-[var(--panel-data)] sm:h-[360px]"
         />
       ) : (
-        <div className="flex h-[220px] items-center justify-center border border-[var(--border)] bg-[var(--panel)] px-4 text-center text-sm text-[var(--muted)]">
+        <div className="flex h-[260px] items-center justify-center border border-[var(--border-medium)] bg-[var(--panel-data)] px-4 text-center text-sm text-[var(--muted)]">
           {emptyMessage}
         </div>
       )}

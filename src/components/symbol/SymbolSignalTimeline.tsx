@@ -28,7 +28,7 @@ export function SymbolSignalTimeline({
 
   return (
     <section
-      className={`min-w-0 border border-[var(--border)] bg-[var(--panel)] px-4 py-4 ${className}`}
+      className={`min-w-0 border border-[var(--border)] bg-[var(--panel)] px-3 py-3 shadow-[var(--shadow-panel)] ${className}`}
     >
       <div className="mb-3">
         <h2 className="text-sm font-semibold">Signal History</h2>
