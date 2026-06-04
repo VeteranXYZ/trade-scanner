@@ -127,7 +127,7 @@ describe("marketContextUi", () => {
     const view = buildMarketContextPanelView({ isError: true });
 
     expect(view.title).toBe("Market context unavailable");
-    expect(view.description).toContain("Screener and watchlist data are still shown");
+    expect(view.description).toContain("Page data remains available");
     expect(view.unavailable).toBe(true);
   });
 

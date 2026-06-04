@@ -7,13 +7,13 @@ import {
   buildMtfLatestScanUrl,
   getMtfScreenerTableSortValue,
   MtfScreenerExportControls,
-  MtfScreenerSourcePanel,
   MtfResearchBucketsPanel,
   MtfScreenerTable,
 } from "./MultiTimeframeScreenerPageClient";
 import {
   buildMtfScreenerRows,
   type MtfLatestScanResponse,
+  type MtfLatestScreenerResponse,
 } from "./multiTimeframeScreenerUi";
 
 describe("MultiTimeframeScreenerTable", () => {
@@ -57,14 +57,16 @@ describe("MultiTimeframeScreenerTable", () => {
     );
 
     expect(html).toContain("Research Buckets");
-    expect(html).toContain("research starting points");
-    expect(html).toContain("Research-only. Not financial advice.");
+    expect(html).toContain("Full-dataset counts");
+    expect(html).toContain("Eligible");
+    expect(html).toContain("stronger candidates");
     expect(html).toContain("Full Table");
-    expect(html).toContain("3 joined symbols");
+    expect(html).toContain("3 symbols");
     expect(html).toContain("Short-term Repair");
     expect(html).toContain("MTF Strength");
     expect(html).toContain("Higher-TF Watchlist");
-    expect(html).toContain("matching symbols");
+    expect(html).toContain("symbols");
+    expect(html).not.toContain("Research-only");
     expect(html).toContain(">2</span>");
     expect(html).not.toContain("Best");
     expect(html).not.toContain("Opportunity");
@@ -171,22 +173,33 @@ describe("MultiTimeframeScreenerTable", () => {
     expect(html).toContain('aria-sort="descending"');
   });
 
-  it("renders compact export controls in the source panel", () => {
+  it("renders row count, freshness, and exports in the table workspace", () => {
+    const rows = buildMtfScreenerRows({
+      "4h": makeResponse("4h", [
+        makeItem({ symbol: "AAAUSDT", timeframe: "4h", rankScore: 80 }),
+        makeItem({ symbol: "BBBUSDT", timeframe: "4h", rankScore: 60 }),
+      ]),
+    });
     const html = renderToStaticMarkup(
-      createElement(MtfScreenerSourcePanel, {
-        data: undefined,
-        totalRows: 12,
-        filteredRows: 3,
+      createElement(MtfScreenerTable, {
+        rows: rows.slice(0, 1),
+        sourceData: makeScreenerResponse(),
+        totalRows: 2,
+        filteredRows: 1,
         onExportVisible: noop,
         onExportAll: noop,
       }),
     );
 
-    expect(html).toContain("Data Source / Run Freshness");
-    expect(html).toContain("Showing 3 of 12 joined symbols");
+    expect(html).toContain("Joined Symbol Table");
+    expect(html).toContain("Showing 1 of 2 symbols");
+    expect(html).toContain("Showing 1 of 2 joined symbols");
+    expect(html).toContain("4h");
+    expect(html).toContain("8 signals, 0 missing");
     expect(html).toContain("Export Visible Rows");
     expect(html).toContain("Export All Joined Rows");
     expect(html).not.toContain("Show More");
+    expect(html).not.toContain("top-100");
     expect(html).not.toContain("Pagination");
   });
 
@@ -261,8 +274,9 @@ describe("MultiTimeframeScreenerTable", () => {
       expect(html).toContain(`${symbol}USDT`);
     }
 
-    expect(html).toContain("8 research rows");
+    expect(html).toContain("Showing 8 of 8 symbols");
     expect(html).not.toContain("Show More");
+    expect(html).not.toContain("top-100");
     expect(html).not.toContain("show more");
     expect(html).not.toContain("Pagination");
   });
@@ -289,7 +303,7 @@ describe("MultiTimeframeScreenerTable", () => {
 
     expect(html).toContain("Market context unavailable");
     expect(html).toContain("BTCUSDT");
-    expect(html).toContain("Matching Symbols");
+    expect(html).toContain("Joined Symbol Table");
   });
 });
 
@@ -319,6 +333,49 @@ function makeResponse(
     summary: null,
     count: items.length,
     items,
+  };
+}
+
+function makeScreenerResponse(): MtfLatestScreenerResponse {
+  return {
+    ok: true,
+    assetClass: "crypto",
+    timeframes: ["1h", "4h", "1d", "1w"],
+    runs: {
+      "1h": null,
+      "4h": makeRun("4h"),
+      "1d": null,
+      "1w": null,
+    },
+    signalCounts: {
+      "1h": 0,
+      "4h": 8,
+      "1d": 0,
+      "1w": 0,
+    },
+    missingCounts: {
+      "1h": 0,
+      "4h": 0,
+      "1d": 0,
+      "1w": 0,
+    },
+    count: 2,
+    rows: [],
+  };
+}
+
+function makeRun(timeframe: "1h" | "4h" | "1d" | "1w") {
+  return {
+    id: `run-${timeframe}`,
+    timeframe,
+    status: "success",
+    symbolsTotal: 12,
+    symbolsScanned: 12,
+    signalsCreated: 8,
+    symbolsSkipped: 0,
+    startedAt: "2026-06-03T12:00:00.000Z",
+    finishedAt: "2026-06-03T12:04:00.000Z",
+    isLikelyFullUniverse: true,
   };
 }
 

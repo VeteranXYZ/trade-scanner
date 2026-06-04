@@ -111,13 +111,13 @@ export function DataTableHeaderCell<TKey extends string>({
       colSpan={colSpan}
       rowSpan={rowSpan}
       aria-sort={ariaSort}
-      className={`h-8 border-b border-[var(--border-medium)] bg-[var(--table-header)] px-2 py-1.5 text-[10px] font-semibold uppercase tracking-normal text-[var(--muted)] ${alignClass[align]} ${className}`}
+      className={`h-7 border-b border-[var(--border-medium)] bg-[var(--table-header)] px-2 py-1 text-[10px] font-semibold uppercase tracking-normal text-[var(--muted)] ${alignClass[align]} ${className}`}
     >
       {isSortable && sortKey ? (
         <button
           type="button"
           onClick={() => onSortChange?.(sortKey, defaultDirection)}
-          className={`inline-flex min-h-6 w-full items-center gap-1 rounded-sm border px-1 text-[10px] font-semibold uppercase transition ${
+          className={`inline-flex min-h-5 w-full items-center gap-1 rounded-sm border px-1 py-0.5 text-[10px] font-semibold uppercase transition ${
             align === "right"
               ? "justify-end"
               : align === "center"

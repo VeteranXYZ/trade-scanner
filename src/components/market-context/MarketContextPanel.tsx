@@ -42,16 +42,18 @@ export function MarketContextPanel({
           </h2>
           <p className="mt-1 max-w-4xl text-[11px] leading-5 text-[var(--muted)]">
             {isCompact
-              ? "BTC/ETH proxy context for research-only interpretation. Context only; does not alter this symbol's scanner classification."
-              : "BTC/ETH regime backdrop for research-only interpretation. This is not a scanner signal and does not change rankings or classifications."}
+              ? "BTC/ETH backdrop for interpreting scanner context; symbol classifications stay unchanged."
+              : "BTC/ETH regime backdrop. This context does not change scanner rankings or classifications."}
           </p>
         </div>
         <div className="flex flex-wrap gap-1.5 text-[10px] font-semibold uppercase text-[var(--muted)]">
+          {!isCompact ? (
+            <span className="border border-[var(--border)] px-1.5 py-0.5">
+              Research-only
+            </span>
+          ) : null}
           <span className="border border-[var(--border)] px-1.5 py-0.5">
-            Research-only
-          </span>
-          <span className="border border-[var(--border)] px-1.5 py-0.5">
-            Backdrop, not signal
+            Context only
           </span>
         </div>
       </div>
@@ -111,15 +113,15 @@ export function MarketContextPanel({
 
 function getCompactDescription(unavailable: boolean) {
   if (unavailable) {
-    return "Market context is unavailable. Symbol research data is still shown normally.";
+    return "Market context is unavailable. Page data remains available.";
   }
 
-  return "Broader regime context is shown as a backdrop only. Symbol-level signal remains primary.";
+  return "Broader regime backdrop. Symbol-level signal remains primary.";
 }
 
 function getDefaultImplication(contextNote: string, isCompact: boolean) {
   if (isCompact && contextNote.includes("informational")) {
-    return "Does not alter this symbol's scanner classification.";
+    return "Scanner classification unchanged.";
   }
 
   return contextNote;

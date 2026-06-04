@@ -129,9 +129,9 @@ export function buildMarketContextPanelView({
   if (!data) {
     if (isLoading) {
       return {
-        title: "Loading market context",
-        description:
-          "Loading broader BTC/ETH research backdrop. Screener and watchlist data are still shown normally.",
+      title: "Loading market context",
+      description:
+        "Loading BTC/ETH backdrop. Page data remains available.",
         contextNote:
           "Market context is loading as a backdrop only; symbol-level data remains visible.",
         keyPoints: [],
@@ -200,7 +200,7 @@ export function buildUnavailableMarketContextView(): MarketContextPanelView {
   return {
     title: "Market context unavailable",
     description:
-      "The market context API could not be loaded. Screener and watchlist data are still shown normally.",
+      "The market context API could not be loaded. Page data remains available.",
     contextNote:
       "This context is informational and does not alter symbol-level classifications.",
     keyPoints: [],

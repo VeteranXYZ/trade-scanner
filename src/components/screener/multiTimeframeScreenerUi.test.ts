@@ -290,7 +290,7 @@ describe("multi-timeframe screener helpers", () => {
       "Short-term Repair",
       "MTF Strength",
       "Higher-TF Watchlist",
-      "Overheated Caution",
+      "Overheated",
       "Breakdown Risk",
     ]);
 
@@ -410,7 +410,7 @@ describe("multi-timeframe screener helpers", () => {
 
   it("returns active preset explanation text", () => {
     expect(getMtfPresetDescription("mtf_strength")).toBe(
-      "1h eligible, 4h and 1d constructive, 1w not risk.",
+      "Aligned constructive structure across timeframes.",
     );
     expect(getMtfPresetDescription("custom")).toBeNull();
   });

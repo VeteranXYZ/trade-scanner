@@ -289,7 +289,7 @@ describe("symbol market context implication copy", () => {
         selectedTimeframe: "4h",
       }),
     ).toContain(
-      "selected 4h symbol is already classified as risk, so repair should require stronger confirmation",
+      "Risk-oriented backdrop reinforces this 4h risk classification",
     );
 
     expect(
@@ -316,7 +316,7 @@ describe("symbol market context implication copy", () => {
         selectedTimeframe: "1d",
       }),
     ).toBe(
-      "Broader context is more supportive, but symbol-level confirmation and invalidation rules still remain primary.",
+      "Supportive backdrop; symbol confirmation still leads.",
     );
 
     expect(
@@ -326,7 +326,7 @@ describe("symbol market context implication copy", () => {
         selectedGroup: "eligible",
         selectedTimeframe: "4h",
       }),
-    ).toBe("Market context is unavailable. Symbol research data is still shown normally.");
+    ).toBe("Market context unavailable; symbol data remains available.");
   });
 });
 
@@ -449,33 +449,32 @@ describe("SymbolResearchPageClient success state", () => {
       }),
     );
 
-    expect(html).toContain("Research Overview");
+    expect(html).toContain("Current posture");
     expect(html).toContain("Selected timeframe: 4h");
-    expect(html).toContain("Current Signal Structure");
+    expect(html).toContain("Research Focus");
+    expect(html).toContain("Signal Summary");
+    expect(html).toContain("Market Backdrop");
     expect(html).toContain("Historical Context");
-    expect(html).toContain("Manual Review");
     expect(html).toContain("Details");
-    expect(html.indexOf("Research Overview")).toBeLessThan(
-      html.indexOf("Current Signal Structure"),
+    expect(html.indexOf("Current posture")).toBeLessThan(
+      html.indexOf("Research Focus"),
     );
-    expect(html.indexOf("Current Signal Structure")).toBeLessThan(
+    expect(html.indexOf("Research Focus")).toBeLessThan(
+      html.indexOf("Market Backdrop"),
+    );
+    expect(html.indexOf("Market Backdrop")).toBeLessThan(
       html.indexOf("Historical Context"),
     );
-    expect(html.indexOf("Historical Context")).toBeLessThan(
-      html.indexOf("Manual Review"),
-    );
-    expect(html.indexOf("Manual Review")).toBeLessThan(html.indexOf("Details"));
+    expect(html.indexOf("Historical Context")).toBeLessThan(html.indexOf("Details"));
     expect(html).toContain("Timeframe Availability");
-    expect(html).toContain("Market Backdrop");
     expect(html).toContain("Research Decision Summary");
     expect(html).toContain("Constructive research context");
     expect(html).toContain("Research Posture");
     expect(html).toContain("Deeper research context");
-    expect(html).toContain("Current Classification");
     expect(html).toContain("Score Breakdown");
-    expect(html).toContain("Research Summary");
+    expect(html).toContain("What to Check");
     expect(html).toContain("Next Confirmation");
-    expect(html).toContain("Invalidation / Caution");
+    expect(html).toContain("Invalidation");
     expect(html).toContain("Data Source");
     expect(html).toContain("Signal Evaluation");
     expect(html).toContain("Across the broader market");
@@ -530,15 +529,15 @@ describe("SymbolResearchPageClient success state", () => {
 
     expect(html).toContain("Market Backdrop");
     expect(html).toContain("Risk-oriented transition");
-    expect(html).toContain("Broader regime context is shown as a backdrop only");
-    expect(html).toContain("does not alter this symbol");
+    expect(html).toContain("Broader regime backdrop");
+    expect(html).toContain("symbol classifications stay unchanged");
     expect(html).toContain("Broad regime");
     expect(html).toContain("BTC structural layer");
     expect(html).toContain("BTC market layer");
     expect(html).toContain("BTC tactical layer");
     expect(html).toContain("ETH confirmation");
     expect(html).toContain("Confidence");
-    expect(html).toContain("repair candidate");
+    expect(html).toContain("repair read");
     expect(html).toContain("Research Decision Summary");
     expect(marketContextCall?.[0].queryKey).toEqual(["market-context", "crypto"]);
     expect(JSON.stringify(marketContextCall?.[0].queryKey)).not.toContain("SEIUSDT");
@@ -568,9 +567,9 @@ describe("SymbolResearchPageClient success state", () => {
     );
 
     expect(html).toContain("Market context unavailable");
-    expect(html).toContain("Symbol research data is still shown normally");
+    expect(html).toContain("Page data remains available");
     expect(html).toContain("Research Decision Summary");
-    expect(html).toContain("Current Classification");
+    expect(html).toContain("Signal Summary");
   });
 
   it("keeps symbol research request shape unchanged while adding layout sections", () => {

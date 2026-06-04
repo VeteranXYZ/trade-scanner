@@ -186,36 +186,36 @@ export const mtfScreenerPresets: MtfScreenerPreset[] = [
   {
     id: "short_term_repair",
     label: "Short-term Repair",
-    description: "1h improving while 4h is still watch/risk and higher timeframes are not risk.",
+    description: "1h improving; higher timeframes not risk.",
   },
   {
     id: "mtf_strength",
     label: "MTF Strength",
-    description: "1h eligible, 4h and 1d constructive, 1w not risk.",
+    description: "Aligned constructive structure across timeframes.",
   },
   {
     id: "higher_timeframe_safe_watchlist",
     label: "Higher-TF Watchlist",
-    description: "4h constructive with 1d and 1w not in risk.",
+    description: "4h constructive; 1d and 1w not risk.",
   },
   {
     id: "overheated_caution",
-    label: "Overheated Caution",
-    description: "1h or 4h is overheated.",
+    label: "Overheated",
+    description: "1h or 4h is extended/crowded.",
   },
   {
     id: "breakdown_risk",
     label: "Breakdown Risk",
-    description: "1h or 4h is in the risk group.",
+    description: "1h or 4h needs risk-first review.",
   },
 ];
 
 const mtfResearchBucketImplications: Record<MtfResearchBucketId, string> = {
-  short_term_repair: "Review group for short-term repair context before deeper research.",
-  mtf_strength: "Research set for aligned MTF structure, not a recommendation.",
-  higher_timeframe_safe_watchlist: "Triage group for higher-timeframe review context.",
-  overheated_caution: "Caution review group for stretched near-term conditions.",
-  breakdown_risk: "Risk triage group for defensive review.",
+  short_term_repair: "Repair context",
+  mtf_strength: "Stronger candidates",
+  higher_timeframe_safe_watchlist: "Needs confirmation",
+  overheated_caution: "Extended/crowded",
+  breakdown_risk: "Risk-first review",
 };
 
 export const mtfResearchBuckets: MtfResearchBucket[] = mtfScreenerPresets.map(

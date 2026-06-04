@@ -24,8 +24,8 @@ describe("MarketContextPanel", () => {
     expect(html).toContain("Layer notes");
     expect(html).toContain("BTC 1w structural context: Long-term mixed.");
     expect(html).toContain("Research implication");
-    expect(html).toContain("Backdrop, not signal");
-    expect(html).toContain("does not change rankings");
+    expect(html).toContain("Context only");
+    expect(html).toContain("does not change scanner rankings");
     expect(html).toContain("does not alter symbol-level classifications");
   });
 
@@ -35,21 +35,21 @@ describe("MarketContextPanel", () => {
         variant: "compact",
         data: makeMarketContextResponse(),
         implication:
-          "Broader context is risk-oriented, so this 4h symbol's constructive setup should be treated as a repair candidate rather than a clean standalone trend signal.",
+          "Risk-oriented backdrop makes this 4h setup a repair read, not clean trend context.",
       }),
     );
 
     expect(html).toContain("Market Backdrop");
     expect(html).toContain("Risk-oriented transition");
-    expect(html).toContain("Broader regime context is shown as a backdrop only");
-    expect(html).toContain("does not alter this symbol&#x27;s scanner classification");
+    expect(html).toContain("Broader regime backdrop");
+    expect(html).toContain("symbol classifications stay unchanged");
     expect(html).toContain("Broad regime");
     expect(html).toContain("BTC structural layer");
     expect(html).toContain("BTC market layer");
     expect(html).toContain("BTC tactical layer");
     expect(html).toContain("ETH confirmation");
     expect(html).toContain("Confidence");
-    expect(html).toContain("repair candidate");
+    expect(html).toContain("repair read");
     expect(html).not.toContain("Layer notes");
     expect(html).not.toContain("BTC 1w structural context: Long-term mixed.");
   });
@@ -101,7 +101,7 @@ describe("MarketContextPanel", () => {
     );
 
     expect(html).toContain("Market context unavailable");
-    expect(html).toContain("Screener and watchlist data are still shown normally");
+    expect(html).toContain("Page data remains available");
     expect(html).toContain("Unavailable");
   });
 

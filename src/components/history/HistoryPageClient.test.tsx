@@ -192,13 +192,12 @@ describe("HistoryPageClient display formatting", () => {
     );
 
     expect(html).toContain("Historical Research");
-    expect(html).toContain("Research-only. Not financial advice.");
-    expect(html).toContain("Historical observations are not predictions.");
-    expect(html).toContain("History Research Workflow");
-    expect(html).toContain("selected snapshot first, mature observation context second");
+    expect(html).toContain("Research-only; not financial advice or predictions.");
+    expect(html).toContain("History Reading Path");
+    expect(html).toContain("Forward Observation may use a different mature run");
     expect(html).toContain("Selected Snapshot");
-    expect(html).toContain("This is the scanner snapshot you selected");
-    expect(html).toContain("Snapshot Rows below come from this run");
+    expect(html).toContain("Stored scanner run selected from the rail");
+    expect(html).toContain("Snapshot Rows below use this run");
   });
 
   it("formats dates deterministically without browser locale text", () => {
@@ -238,16 +237,13 @@ describe("HistoryPageClient display formatting", () => {
 
     expect(html).toContain("Snapshot Rows");
     expect(html).toContain(
-      "Snapshot Rows are the scanner output from the selected stored run",
+      "Scanner output from the selected stored run",
     );
     expect(html).toContain(
-      "They are not necessarily the same run used for Forward Observation",
+      "Observation filters do not affect this table",
     );
     expect(html).toContain(
-      "Snapshot Rows are not affected by Observation Rows filters",
-    );
-    expect(html).toContain(
-      "Current Symbol Research links open the current Symbol Research view, not a historical point-in-time research view",
+      "Current research links open the live Symbol Research view",
     );
     expect(html).toContain("2 rows");
     expect(html).toContain("Overheated caution");
@@ -293,10 +289,10 @@ describe("HistoryPageClient display formatting", () => {
     const html = renderObservationRowsTable();
 
     expect(html).toContain("Observation Rows");
-    expect(html).toContain("Historical outcome rows from the observation run shown above");
+    expect(html).toContain("Outcome rows from the observation run above");
     expect(html).toContain("Showing 4 of 4 observation rows.");
     expect(html).toContain(
-      "Filters only change the Observation Rows table view. They do not change summary metrics.",
+      "Filters affect this table only; summary metrics stay unchanged.",
     );
     expect(html).toContain("COMPLETEELIGIBLEUSDT");
     expect(html).toContain("COMPLETEWATCHUSDT");
@@ -465,10 +461,7 @@ describe("HistoryPageClient display formatting", () => {
 
     expect(html).toContain('data-testid="recent-runs-panel"');
     expect(html).toContain('data-testid="recent-runs-scroll-container"');
-    expect(html).toContain("Choose the stored 4h scanner snapshot to review");
-    expect(html).toContain(
-      "Selection controls the Selected Snapshot section and Snapshot Rows",
-    );
+    expect(html).toContain("Select the stored 4h snapshot to review");
     expect(html).toContain("xl:sticky");
     expect(html).toContain("xl:max-h-[calc(100vh-2rem)]");
     expect(html).toContain("xl:overflow-y-auto");
@@ -517,7 +510,7 @@ describe("HistoryPageClient display formatting", () => {
 
     expect(html).toContain("Forward Observation");
     expect(html).toContain(
-      "Observation source and historical metrics. Research-only, not predictions.",
+      "Observation source, maturity, and historical outcome metrics.",
     );
     expect(html).toContain("Mode: Using selected run");
     expect(html).toContain("1 candle");
@@ -537,25 +530,17 @@ describe("HistoryPageClient display formatting", () => {
     expect(html).toContain("Limited (33.33%)");
     expect(html).toContain("Group distribution");
     expect(html).toContain("Notable historical examples");
+    expect(html).toContain("Data status:");
+    expect(html).toContain("complete has the selected future window");
+    expect(html).toContain("partial has fewer future candles");
+    expect(html).toContain("missing has no usable future window yet");
     expect(html).toContain(
-      "If the selected stored run is not mature yet, this section may use the latest mature full-universe run",
+      "Metrics use the observation run shown above",
     );
-    expect(html).toContain(
-      "Observation Summary, Research Takeaways, and Observation Rows use this observation run",
-    );
-    expect(html).toContain("Snapshot Rows remain tied to the selected snapshot");
-    expect(html).toContain("Complete means enough future candles exist");
-    expect(html).toContain("Partial means fewer future candles are available");
-    expect(html).toContain("Missing means required future candles are unavailable");
-    expect(html).toContain(
-      "Metrics appear first; interpretation and research context follow below",
-    );
-    expect(html).toContain("historical observations, not predictions or financial advice");
-    expect(html).toContain("not predictions or financial advice");
-    expect(html).toContain("It is not a prediction and does not describe future outcomes");
+    expect(html).toContain("Coverage shows how many rows have enough future candles");
     expect(html).toContain("Observation Rows");
     expect(html).toContain(
-      "Historical outcome rows from the observation run shown above",
+      "Outcome rows from the observation run above",
     );
     expect(html).toContain("Observed Change");
     expect(html).toContain("Max Drawdown");
@@ -646,23 +631,16 @@ describe("HistoryPageClient display formatting", () => {
 
     expect(uiState.status).toBe("observation_ready");
     expect(html).toContain("Mode: Using mature observation run");
-    expect(html).toContain("Selected stored run: selected, status: Waiting for future candles");
-    expect(html).toContain("Observation run: mature-r, status: Ready");
-    expect(html).toContain(
-      "Mature run used for forward observation metrics",
-    );
-    expect(html).toContain(
-      "Observation Summary, Research Takeaways, and Observation Rows use this observation run",
-    );
-    expect(html).toContain("Snapshot Rows remain tied to the selected snapshot");
+    expect(html).toContain("selected · Waiting for future candles");
+    expect(html).toContain("mature-r · Ready");
     expect(html).toContain("Observation Summary");
     expect(html).toContain("Research Takeaways");
     expect(html).toContain(
-      "This observation window has enough complete rows for group-level historical review",
+      "Enough complete rows for group-level historical review",
     );
     expect(html).toContain("Group metrics use complete rows only");
     expect(html).toContain(
-      "Notable examples may include outliers and should not be treated as predictions",
+      "Notable examples may include outliers",
     );
     expect(html).not.toContain("Loading observation readiness");
     expect(html).not.toContain("Forward observation unavailable");
@@ -708,11 +686,8 @@ describe("HistoryPageClient display formatting", () => {
 
     expect(uiState.status).toBe("loading_observation_rows");
     expect(html).toContain("Mode: Using mature observation run");
-    expect(html).toContain("Selected stored run: selected, status: Waiting for future candles");
-    expect(html).toContain("Observation run: mature-r, status: Ready");
-    expect(html).toContain(
-      "Mature run used for forward observation metrics",
-    );
+    expect(html).toContain("selected · Waiting for future candles");
+    expect(html).toContain("mature-r · Ready");
     expect(html).toContain("Loading observation rows");
     expect(html).not.toContain("Loading observation readiness");
     expect(html).not.toContain("Dominant Reason");
@@ -906,13 +881,11 @@ describe("HistoryPageClient display formatting", () => {
     expect(html).toContain("Observation Summary");
     expect(html).toContain("Research Takeaways");
     expect(html).toContain(
-      "This observation window does not have enough complete rows for group-level conclusions",
+      "Not enough complete rows for group-level conclusions",
     );
-    expect(html).toContain("Partial rows are shown for research context only");
-    expect(html).toContain("Wait for more future candles before comparing groups");
-    expect(html).toContain("Partial observations are available");
+    expect(html).toContain("Partial and missing rows reflect incomplete future candle coverage");
+    expect(html).toContain("Partial rows do not cover the full selected window");
     expect(html).toContain("Complete-row distribution metrics stay empty");
-    expect(html).toContain("Partial rows are shown in the table for research context only");
     expect(html.match(/Not enough complete rows/g)?.length ?? 0).toBeGreaterThan(3);
     expect(html).toContain("PARTIALUPUSDT");
     expect(html).toContain("PARTIALDOWNUSDT");
@@ -1131,11 +1104,8 @@ describe("HistoryPageClient display formatting", () => {
       readinessError: null,
     })).toBe(recommendedRun.runId);
     expect(html).toContain("Mode: Using mature observation run");
-    expect(html).toContain("Selected stored run: 11111111, status: Market data appears stale");
-    expect(html).toContain("Observation run: 22222222, status: Ready");
-    expect(html).toContain(
-      "Mature run used for forward observation metrics",
-    );
+    expect(html).toContain("11111111 · Market data appears stale");
+    expect(html).toContain("22222222 · Ready");
     expect(html).toContain("Observation finished 2026-06-02 02:52");
     expect(html).toContain("Selected stored run has stale market data coverage");
     expect(html).toContain("Observed Change");
@@ -1192,11 +1162,8 @@ describe("HistoryPageClient display formatting", () => {
     expect(html).toContain(
       "Selected stored run is still waiting for future candles. Showing the most recent mature full-universe run instead.",
     );
-    expect(html).toContain("Selected stored run: 11111111, status: Waiting for future candles");
-    expect(html).toContain("Observation run: 22222222, status: Ready");
-    expect(html).toContain(
-      "Mature run used for forward observation metrics",
-    );
+    expect(html).toContain("11111111 · Waiting for future candles");
+    expect(html).toContain("22222222 · Ready");
     expect(html).toContain("Observed Change");
     expect(html).toContain("Mode: Using mature observation run");
     expect(html).not.toContain("Loading observation readiness");
@@ -1233,9 +1200,6 @@ describe("HistoryPageClient display formatting", () => {
     expect(html).toContain("Forward observation is not available for this run yet");
     expect(html).toContain(
       "The selected run can still be reviewed as a scanner snapshot",
-    );
-    expect(html).toContain(
-      "Historical observations are research context only, not predictions or financial advice",
     );
     expect(html).toContain(
       "Forward Observation readiness could not be determined",
@@ -1326,10 +1290,7 @@ describe("HistoryPageClient display formatting", () => {
       readinessError: null,
     })).toBe(selectedRun.runId);
     expect(html).toContain("Mode: Using selected run");
-    expect(html).toContain("Observation run: 11111111, status: Ready");
-    expect(html).toContain(
-      "Mature run used for forward observation metrics",
-    );
+    expect(html).toContain("11111111 · Ready");
     expect(html).toContain("Observed Change");
   });
 

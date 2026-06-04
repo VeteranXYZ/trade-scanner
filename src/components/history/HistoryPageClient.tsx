@@ -49,7 +49,7 @@ const assetClass = "crypto";
 const snapshotsLimit = 25;
 const maxObservationProbeRuns = 12;
 const historyDisclaimer =
-  "Research-only. Not financial advice. Historical observations are not predictions.";
+  "Review selected scanner snapshots against mature forward observations. Research-only; not financial advice or predictions.";
 const emptyHistoricalSnapshotRuns: HistoricalSnapshotRun[] = [];
 const emptyHistoricalObservationRows: HistoricalSnapshotObservationRow[] = [];
 const historySnapshotsQueryName = "history-snapshots";
@@ -69,23 +69,23 @@ const unsafePrimarySignalLabelMap: Record<string, string> = {
 const historyWorkflowSteps = [
   {
     label: "1. Runs",
-    description: "Choose a recent stored scanner snapshot.",
+    description: "Choose a stored snapshot.",
   },
   {
     label: "2. Selected snapshot",
-    description: "Review metadata and Snapshot Rows from the selected run.",
+    description: "Metadata and Snapshot Rows use that run.",
   },
   {
     label: "3. Forward observation",
-    description: "Use the mature observation run shown for historical metrics.",
+    description: "Metrics use the mature run shown.",
   },
   {
     label: "4. Observation rows",
-    description: "Inspect loaded historical outcome rows with local filters.",
+    description: "Inspect outcomes with local filters.",
   },
   {
     label: "5. Snapshot rows",
-    description: "Compare the selected scanner output separately.",
+    description: "Selected scanner output stays separate.",
   },
 ] as const;
 
@@ -651,7 +651,7 @@ export function HistoryPageClient() {
         <div className="space-y-3">
           <PageSection
             title="Selected Snapshot"
-            description="This is the scanner snapshot you selected. Snapshot Rows below come from this run."
+            description="Stored scanner run selected from the rail. Snapshot Rows below use this run."
             tone="selected"
             actions={
               snapshotQuery.data ? (
@@ -661,10 +661,6 @@ export function HistoryPageClient() {
               ) : null
             }
           >
-            <ResearchNotice tone="info" className="mb-2">
-              Forward Observation may use a different mature observation run.
-              Snapshot Rows remain tied to this selected snapshot.
-            </ResearchNotice>
             {snapshotQuery.isError ? (
               <StatePanel
                 title="Snapshot unavailable"
@@ -710,11 +706,10 @@ function ResearchWorkflowSummary() {
     <section className="mb-2 border border-l-4 border-[var(--border)] border-l-[var(--section-observation)] bg-[var(--panel)] px-3 py-2">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h2 className="text-[13px] font-semibold">History Research Workflow</h2>
+          <h2 className="text-[13px] font-semibold">History Reading Path</h2>
           <p className="mt-1 max-w-5xl text-[11px] leading-5 text-[var(--muted)]">
-            Read the page as selected snapshot first, mature observation context
-            second. Observation metrics and Observation Rows use the Forward
-            Observation run; Snapshot Rows stay tied to the selected run.
+            Selected Snapshot and Snapshot Rows use the chosen stored run.
+            Forward Observation may use a different mature run for outcome rows.
           </p>
         </div>
       </div>
@@ -772,8 +767,7 @@ export function RecentSuccessfulRunsPanel({
           <StatusBadge tone="accent">{timeframe}</StatusBadge>
         </div>
         <p className="mt-1 text-[11px] leading-4 text-[var(--muted)]">
-          Choose the stored {timeframe} scanner snapshot to review. Selection
-          controls the Selected Snapshot section and Snapshot Rows.
+          Select the stored {timeframe} snapshot to review.
         </p>
       </div>
       {isError ? (
@@ -966,10 +960,10 @@ export function ForwardObservationSection({
   const observationMetadata = [
     selectedReadinessRun
       ? {
-          label: "Selected stored run",
-          value: `Selected stored run: ${shortRunId(
+          label: "Selected snapshot",
+          value: `${shortRunId(
             selectedReadinessRun.runId,
-          )}, status: ${formatReadinessRunStatus(
+          )} · ${formatReadinessRunStatus(
             selectedReadiness,
           )}`,
           tone: "accent" as const,
@@ -987,11 +981,11 @@ export function ForwardObservationSection({
     observationRun
       ? {
           label: "Observation run",
-          value: `Observation run: ${shortRunId(
+          value: `${shortRunId(
             observationRun.runId,
-          )}, status: ${formatReadinessRunStatus(
+          )} · ${formatReadinessRunStatus(
             observationReadiness,
-          )}. Mature run used for forward observation metrics.`,
+          )}`,
           tone: "complete" as const,
         }
       : null,
@@ -1019,7 +1013,7 @@ export function ForwardObservationSection({
   return (
     <PageSection
       title="Forward Observation"
-      description="Observation source and historical metrics. Research-only, not predictions. If the selected stored run is not mature yet, this section may use the latest mature full-universe run for observation metrics."
+      description="Observation source, maturity, and historical outcome metrics."
       tone="observation"
       actions={
         <div className="flex border border-[var(--border)] bg-[var(--panel)] p-1">
@@ -1054,20 +1048,10 @@ export function ForwardObservationSection({
         >
           {formatForwardObservationUiStatusLabel(uiState)}
         </StatusBadge>
-        <span className="text-[11px] text-[var(--muted)]">
-          Research-only historical observations, not predictions.
-        </span>
       </div>
 
       {summary || observationRun || selectedReadinessRun || readiness ? (
         <MetadataStrip items={observationMetadata} className="mb-2" />
-      ) : null}
-
-      {observationRun ? (
-        <ResearchNotice tone="info" className="mb-2">
-          Observation Summary, Research Takeaways, and Observation Rows use this
-          observation run. Snapshot Rows remain tied to the selected snapshot.
-        </ResearchNotice>
       ) : null}
 
       {readyContextNote ? (
@@ -1162,7 +1146,7 @@ export function ObservationRowsTable({
         <div>
           <h3 className="text-sm font-semibold">Observation Rows</h3>
           <p className="mt-1 text-xs text-[var(--muted)]">
-            Historical outcome rows from the observation run shown above.
+            Outcome rows from the observation run above.
           </p>
         </div>
         <StatusBadge tone={visibleRows.length === rows.length ? "complete" : "info"}>
@@ -1193,10 +1177,7 @@ export function ObservationRowsTable({
             visibleCount: visibleRows.length,
             totalCount: rows.length,
           })}
-        </p>
-        <p className="mt-0.5 text-[11px] leading-5 text-[var(--muted)]">
-          Filters only change the Observation Rows table view. They do not
-          change summary metrics.
+          {" "}Filters affect this table only; summary metrics stay unchanged.
         </p>
       </div>
 
@@ -1691,16 +1672,10 @@ function ForwardObservationStatePanel({
 
 function ObservationDataStatusLegend() {
   return (
-    <div className="mb-3 border border-l-4 border-[var(--border)] border-l-[var(--section-rows)] bg-[var(--panel)] px-3 py-2 text-xs leading-5 text-[var(--muted)]">
-      <p className="font-semibold text-[var(--foreground)]">Data status</p>
-      <p className="mt-1">
-        Complete means enough future candles exist for the selected forward
-        observation window. Partial means fewer future candles are available than
-        the selected window. Missing means required future candles are
-        unavailable, often because of market data coverage, listing history, or
-        sync gaps. These statuses are research context, not scanner algorithm
-        failures or predictions.
-      </p>
+    <div className="mb-3 border border-[var(--border)] bg-[var(--panel)] px-3 py-2 text-xs leading-5 text-[var(--muted)]">
+      <span className="font-semibold text-[var(--foreground)]">Data status:</span>{" "}
+      complete has the selected future window, partial has fewer future candles,
+      missing has no usable future window yet.
     </div>
   );
 }
@@ -1720,10 +1695,7 @@ function ObservationSummarySection({
       <div className="mb-3">
         <h3 className="text-sm font-semibold">Observation Summary</h3>
         <p className="mt-1 max-w-3xl text-xs leading-5 text-[var(--muted)]">
-          Observation metrics are calculated from the observation run shown in
-          Forward Observation. Metrics appear first; interpretation and research
-          context follow below. These are historical observations, not
-          predictions or financial advice.
+          Metrics use the observation run shown above; interpretation follows.
         </p>
       </div>
 
@@ -1769,17 +1741,14 @@ function ObservationSummarySection({
       </div>
 
       <p className="mt-3 max-w-3xl text-xs leading-5 text-[var(--muted)]">
-        Observation coverage describes how many rows have enough future candles
-        for the selected window. It is not a prediction and does not describe
-        future outcomes.
+        Coverage shows how many rows have enough future candles for the selected
+        window.
       </p>
 
       {summary.hasPartialOnlyCoverage ? (
         <p className="mt-3 max-w-3xl text-xs leading-5 text-[var(--muted)]">
-          Partial observations are available, but they do not cover the full
-          selected forward window. Complete-row distribution metrics stay empty
-          until enough full-window observations are available. Partial rows are
-          shown in the table for research context only.
+          Partial rows do not cover the full selected window. Complete-row
+          distribution metrics stay empty until full-window observations exist.
         </p>
       ) : null}
 
@@ -1813,42 +1782,42 @@ function buildResearchTakeaways({
   if (summary) {
     if (summary.completeCount > 0 && summary.coverageLabel === "Strong") {
       return [
-        "This observation window has enough complete rows for group-level historical review.",
+        "Enough complete rows for group-level historical review.",
         "Group metrics use complete rows only.",
-        "Notable examples may include outliers and should not be treated as predictions.",
+        "Notable examples may include outliers.",
       ];
     }
 
     if (summary.completeCount === 0) {
       if (summary.partialCount > 0 && summary.missingCount > 0) {
         return [
-          "This observation window does not have enough complete rows for group-level conclusions.",
-          "Partial rows are shown for research context only while missing rows may reflect unavailable future candles, listing history, market data coverage, or sync gaps.",
-          "Wait for more future candles before comparing groups; the selected scanner snapshot can still be reviewed separately.",
+          "Not enough complete rows for group-level conclusions.",
+          "Partial and missing rows reflect incomplete future candle coverage.",
+          "Review the selected scanner snapshot separately.",
         ];
       }
 
       if (summary.partialCount > 0) {
         return [
-          "This observation window does not have enough complete rows for group-level conclusions.",
-          "Partial rows are shown for research context only.",
+          "Not enough complete rows for group-level conclusions.",
+          "Partial rows have incomplete future candle coverage.",
           "Wait for more future candles before comparing groups.",
         ];
       }
 
       if (summary.missingCount > 0) {
         return [
-          "This observation window does not have enough complete rows for group-level conclusions.",
-          "Missing rows usually reflect unavailable future candles, listing history, market data coverage, or sync gaps.",
-          "The selected scanner snapshot can still be reviewed separately.",
+          "Not enough complete rows for group-level conclusions.",
+          "Missing rows usually reflect data coverage, listing history, or sync gaps.",
+          "Review the selected scanner snapshot separately.",
         ];
       }
     }
 
     return [
-      "This observation window has some complete rows, but complete-row metrics are not stable enough for broad group comparison.",
+      "Some complete rows are available, but broad group comparison is still thin.",
       "Group metrics use complete rows only.",
-      "Notable examples may include outliers and should not be treated as predictions.",
+      "Notable examples may include outliers.",
     ];
   }
 
@@ -1859,7 +1828,6 @@ function buildResearchTakeaways({
   return [
     "Forward observation is not available for this run yet.",
     "The selected run can still be reviewed as a scanner snapshot.",
-    "Historical observations are research context only, not predictions or financial advice.",
   ];
 }
 
@@ -1885,8 +1853,7 @@ function GroupDistributionTable({
     <div className="mt-4">
       <h4 className="text-sm font-semibold">Group distribution</h4>
       <p className="mt-1 max-w-3xl text-xs leading-5 text-[var(--muted)]">
-        Group metrics use complete rows only so partial and missing observations
-        do not get counted as zero.
+        Complete rows only; partial and missing rows are counted separately.
       </p>
       {groups.length === 0 ? (
         <p className="mt-3 text-sm text-[var(--muted)]">
@@ -1966,8 +1933,7 @@ function NotableHistoricalExamples({
     <div className="mt-4">
       <h4 className="text-sm font-semibold">Notable historical examples</h4>
       <p className="mt-1 max-w-3xl text-xs leading-5 text-[var(--muted)]">
-        These examples are historical observations for the selected window, not
-        predictions or trade recommendations.
+        Largest observed moves and drawdowns from complete rows.
       </p>
       <div className="mt-3 grid gap-3 lg:grid-cols-3">
         <NotableExampleList
@@ -2255,7 +2221,7 @@ export function SnapshotTable({
   return (
     <PageSection
       title="Snapshot Rows"
-      description="Snapshot Rows are the scanner output from the selected stored run. They are not necessarily the same run used for Forward Observation. Snapshot Rows are not affected by Observation Rows filters."
+      description="Scanner output from the selected stored run. Observation filters do not affect this table."
       tone="snapshot"
       actions={
         <StatusBadge tone={isLoading ? "partial" : "accent"}>
@@ -2265,10 +2231,9 @@ export function SnapshotTable({
       className="overflow-hidden"
       bodyClassName="px-3 py-2"
     >
-      <ResearchNotice tone="neutral" className="mb-3">
-        Current Symbol Research links open the current Symbol Research view, not a
-        historical point-in-time research view.
-      </ResearchNotice>
+      <p className="mb-3 text-[11px] leading-5 text-[var(--muted)]">
+        Current research links open the live Symbol Research view.
+      </p>
       {rows.length === 0 ? (
         <StatePanel
           title="No rows"

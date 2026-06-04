@@ -121,20 +121,20 @@ export function PageHeader({
 }) {
   return (
     <header
-      className={`mb-2 border border-l-4 border-[var(--border)] bg-[var(--panel-elevated)] px-3 py-2.5 shadow-[var(--shadow-panel)] ${sectionToneClass[tone]} ${className}`}
+      className={`mb-2 border border-l-4 border-[var(--border)] bg-[var(--panel-elevated)] px-3 py-2 shadow-[var(--shadow-panel)] ${sectionToneClass[tone]} ${className}`}
     >
-      <div className="flex flex-wrap items-start justify-between gap-3">
+      <div className="flex flex-wrap items-start justify-between gap-2">
         <div className="min-w-0">
           {eyebrow ? (
             <p className="text-[10px] font-semibold uppercase tracking-normal text-[var(--accent)]">
               {eyebrow}
             </p>
           ) : null}
-          <h1 className="text-[15px] font-semibold leading-6 text-[var(--foreground)]">
+          <h1 className="text-[14px] font-semibold leading-5 text-[var(--foreground)]">
             {title}
           </h1>
           {description ? (
-            <p className="mt-0.5 max-w-4xl text-[11px] leading-5 text-[var(--muted)]">
+            <p className="mt-0.5 max-w-3xl text-[11px] leading-4 text-[var(--muted)]">
               {description}
             </p>
           ) : null}
@@ -194,7 +194,7 @@ export function SectionHeader({
 }) {
   return (
     <div
-      className={`flex flex-wrap items-start justify-between gap-2 border-b border-[var(--border)] px-3 py-2 ${className}`}
+      className={`flex flex-wrap items-start justify-between gap-2 border-b border-[var(--border)] px-3 py-1.5 ${className}`}
     >
       <div className="min-w-0">
         {title ? (
@@ -203,7 +203,7 @@ export function SectionHeader({
           </h2>
         ) : null}
         {description ? (
-          <p className="mt-1 max-w-4xl text-[11px] leading-5 text-[var(--muted)]">
+          <p className="mt-0.5 max-w-3xl text-[11px] leading-4 text-[var(--muted)]">
             {description}
           </p>
         ) : null}
@@ -259,7 +259,7 @@ export function MetadataStrip({
 }) {
   return (
     <dl
-      className={`flex flex-wrap gap-x-4 gap-y-1.5 border-t border-[var(--border)] pt-2 text-[11px] ${className}`}
+      className={`flex flex-wrap gap-x-3 gap-y-1 border-t border-[var(--border)] pt-1.5 text-[11px] ${className}`}
     >
       {items.map((item) => (
         <div key={item.label} className="min-w-0 max-w-full">

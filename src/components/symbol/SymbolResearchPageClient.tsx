@@ -659,120 +659,104 @@ export function SymbolResearchPageClient({
         </div>
       </header>
 
+      <CurrentPostureStrip
+        symbol={data.symbol.symbol}
+        selectedTimeframe={selectedTimeframe}
+        interpretation={interpretation}
+        latestSignal={latestSignal}
+        scoreBreakdown={scoreBreakdown}
+      />
+
       <ResearchWorkflowSection
-        title="Research Overview"
-        description="Start with timeframe availability, the broader BTC/ETH backdrop, and the current research posture before reviewing detailed structure."
+        title="Research Focus"
+        description="Current posture, chart, and evidence for the selected timeframe."
         className="mt-0"
       >
-        <TimeframeAvailabilityPanel rows={timeframeAvailability} />
+        <div className="grid gap-3 xl:grid-cols-[minmax(0,1.2fr)_minmax(360px,0.8fr)]">
+          <SymbolResearchChart
+            symbol={data.symbol.symbol}
+            timeframe={selectedTimeframe}
+            candles={candles.rows}
+            candleCount={candles.count}
+            className=""
+            latestSignal={{
+              candleOpenTime: latestSignal.candleOpenTime,
+              resultGroup: latestSignal.resultGroup,
+              statusNote: latestSignal.statusNote,
+            }}
+          />
 
-        <MarketContextPanel
-          variant="compact"
-          data={marketContextQuery.data}
-          isLoading={marketContextQuery.isLoading}
-          isError={marketContextQuery.isError}
-          implication={marketContextImplication}
-        />
-
-        <ResearchDecisionSummaryPanel summary={decisionSummary} />
-      </ResearchWorkflowSection>
-
-      <ResearchWorkflowSection
-        title="Current Signal Structure"
-        description="Current scanner classification, score components, confirmation areas, caution points, and selected run context."
-      >
-        <div className="grid gap-3 xl:grid-cols-[minmax(0,1.05fr)_minmax(320px,0.95fr)]">
-          <Panel title="Current Classification">
-            <div className="grid gap-2 sm:grid-cols-2">
-              <Fact label="Group" value={formatSymbolResearchGroup(interpretation.group)} />
-              <Fact label="Signal" value={interpretation.label} />
-              <Fact
-                label="Action"
-                value={formatSymbolResearchAction(interpretation.action)}
-              />
-              <Fact
-                label="Setup Type"
-                value={formatSymbolResearchSetup(interpretation.setupType)}
-              />
-              <Fact label="Status Note" value={interpretation.statusNote} />
-              <Fact
-                label="Price"
-                value={formatSymbolResearchPrice(latestSignal.priceAtSignal)}
-              />
-            </div>
-            <TextList title="Status Reasons" values={interpretation.reasons} />
-          </Panel>
-
-          <Panel title="Score Breakdown">
-            <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
-              {getSymbolResearchScoreRows(scoreBreakdown).map((row) => (
-                <div
-                  key={row.label}
-                  className="border-l-2 border-l-[var(--accent)] bg-[var(--panel)] px-2.5 py-1.5"
-                >
-                  <div className="text-[11px] uppercase text-[var(--muted)]">
-                    {row.label}
-                  </div>
-                  <div className="mt-1 font-mono text-sm tabular-nums">
-                    {row.value}
-                  </div>
-                </div>
-              ))}
-            </div>
-          </Panel>
-        </div>
-
-        <div className="grid gap-3 xl:grid-cols-[minmax(0,1.35fr)_minmax(320px,0.65fr)]">
-          <Panel title="Research Summary">
-            <div className="grid gap-3 lg:grid-cols-[minmax(0,0.8fr)_minmax(0,1.2fr)]">
-              <div>
-                <div className="text-[11px] uppercase text-[var(--muted)]">
-                  Current Stance
-                </div>
-                <div className="mt-1 text-lg font-semibold text-[var(--foreground)]">
-                  {researchSummary.stance}
-                </div>
-                <p className="mt-2 text-sm text-[var(--muted)]">
-                  {researchSummary.runBasis}
-                </p>
+          <div className="space-y-3">
+            <Panel title="Signal Summary">
+              <div className="grid gap-2 sm:grid-cols-2">
+                <Fact label="Group" value={formatSymbolResearchGroup(interpretation.group)} />
+                <Fact label="Signal" value={interpretation.label} />
+                <Fact
+                  label="Action"
+                  value={formatSymbolResearchAction(interpretation.action)}
+                />
+                <Fact
+                  label="Setup Type"
+                  value={formatSymbolResearchSetup(interpretation.setupType)}
+                />
+                <Fact label="Status Note" value={interpretation.statusNote} />
+                <Fact
+                  label="Price"
+                  value={formatSymbolResearchPrice(latestSignal.priceAtSignal)}
+                />
               </div>
-              <div className="grid gap-3 md:grid-cols-3">
+              <TextList title="Status Reasons" values={interpretation.reasons} />
+              <CompactScoreStrip scoreBreakdown={scoreBreakdown} />
+            </Panel>
+
+            <Panel title="What to Check">
+              <div className="text-[11px] uppercase text-[var(--muted)]">
+                Current Stance
+              </div>
+              <div className="mt-1 text-lg font-semibold text-[var(--foreground)]">
+                {researchSummary.stance}
+              </div>
+              <p className="mt-2 text-sm text-[var(--muted)]">
+                {researchSummary.runBasis}
+              </p>
+              <div className="mt-3 grid gap-3 md:grid-cols-3 xl:grid-cols-1">
                 <SummaryList title="Why" values={researchSummary.why} />
                 <SummaryList
                   title="Next Confirmation"
                   values={researchSummary.nextConfirmation}
                 />
                 <SummaryList
-                  title="Invalidation / Caution"
+                  title="Invalidation"
                   values={researchSummary.invalidation}
                 />
               </div>
-            </div>
-          </Panel>
-
-          <Panel title="Data Source">
-            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-1">
-              {diagnostics.rows.map((row) => (
-                <Fact key={row.label} label={row.label} value={row.value} />
-              ))}
-              <Fact label="API Origin" value={apiOrigin} />
-            </div>
-            <p
-              className={`mt-3 border border-l-4 px-3 py-2 text-xs ${
-                diagnostics.hasWarning
-                  ? "border-[var(--warning-border)] border-l-[var(--warning)] bg-[var(--panel)] text-[var(--warning)]"
-                  : "border-[var(--border)] border-l-[var(--neutral)] bg-[var(--panel)] text-[var(--muted)]"
-              }`}
-            >
-              {diagnostics.notice}
-            </p>
-          </Panel>
+            </Panel>
+          </div>
         </div>
       </ResearchWorkflowSection>
 
       <ResearchWorkflowSection
+        title="Market Backdrop"
+        description="BTC/ETH context and timeframe availability."
+      >
+        <div className="grid gap-3 xl:grid-cols-[minmax(0,0.85fr)_minmax(420px,1.15fr)]">
+          <TimeframeAvailabilityPanel rows={timeframeAvailability} />
+
+          <MarketContextPanel
+            variant="compact"
+            data={marketContextQuery.data}
+            isLoading={marketContextQuery.isLoading}
+            isError={marketContextQuery.isError}
+            implication={marketContextImplication}
+          />
+        </div>
+
+        <ResearchDecisionSummaryPanel summary={decisionSummary} />
+      </ResearchWorkflowSection>
+
+      <ResearchWorkflowSection
         title="Historical Context"
-        description="Broad-market signal evaluation and same-symbol behavior are shown separately; they are not merged into one score."
+        description="Broader signal behavior, same-symbol history, and recent signal timeline."
       >
         <SignalEvaluationPanel
           readout={signalEvaluationReadout}
@@ -788,30 +772,18 @@ export function SymbolResearchPageClient({
           diagnostics={data.behaviorDiagnostics}
           signalHistory={history}
         />
-      </ResearchWorkflowSection>
-
-      <ResearchWorkflowSection
-        title="Manual Review"
-        description="Chart, signal timeline, and multi-timeframe snapshots for follow-up review."
-      >
-        <SymbolResearchChart
-          symbol={data.symbol.symbol}
-          timeframe={selectedTimeframe}
-          candles={candles.rows}
-          candleCount={candles.count}
-          className=""
-          latestSignal={{
-            candleOpenTime: latestSignal.candleOpenTime,
-            resultGroup: latestSignal.resultGroup,
-            statusNote: latestSignal.statusNote,
-          }}
-        />
 
         <SymbolSignalTimeline
           history={history}
           showSelectionNotice={showHistorySelectionNotice}
           className=""
         />
+      </ResearchWorkflowSection>
+
+      <ResearchWorkflowSection
+        title="Details"
+        description="Snapshots, candle coverage, source data, and raw fields."
+      >
 
         <Panel title={timeframeSnapshotTitle}>
           {timeframeSnapshotNote ? (
@@ -830,12 +802,7 @@ export function SymbolResearchPageClient({
             emptyText="No timeframe snapshots available."
           />
         </Panel>
-      </ResearchWorkflowSection>
 
-      <ResearchWorkflowSection
-        title="Details"
-        description="Recent candle coverage and selected raw fields for deeper inspection."
-      >
         <Panel title="Recent Candles Summary">
           {candleRowsNotice ? (
             <p className="mb-3 text-xs text-[var(--muted)]">{candleRowsNotice}</p>
@@ -863,6 +830,24 @@ export function SymbolResearchPageClient({
               value={formatSymbolResearchPrice(candleSummary.recentLow)}
             />
           </div>
+        </Panel>
+
+        <Panel title="Data Source">
+          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+            {diagnostics.rows.map((row) => (
+              <Fact key={row.label} label={row.label} value={row.value} />
+            ))}
+            <Fact label="API Origin" value={apiOrigin} />
+          </div>
+          <p
+            className={`mt-3 border border-l-4 px-3 py-2 text-xs ${
+              diagnostics.hasWarning
+                ? "border-[var(--warning-border)] border-l-[var(--warning)] bg-[var(--panel)] text-[var(--warning)]"
+                : "border-[var(--border)] border-l-[var(--neutral)] bg-[var(--panel)] text-[var(--muted)]"
+            }`}
+          >
+            {diagnostics.notice}
+          </p>
         </Panel>
 
         <Panel title="Raw Details">
@@ -1023,7 +1008,7 @@ export function buildSymbolMarketContextImplication({
   }> | null;
 }) {
   if (isError || !isMarketContextResponse(data)) {
-    return "Market context is unavailable. Symbol research data is still shown normally.";
+    return "Market context unavailable; symbol data remains available.";
   }
 
   const group = normalizeSymbolMarketContextGroup(selectedGroup);
@@ -1037,29 +1022,29 @@ export function buildSymbolMarketContextImplication({
 
   if (isRiskOrientedSymbolMarketContext(data)) {
     if (group === "risk") {
-      return `Broader context reinforces caution. The selected ${timeframe} symbol is already classified as risk, so repair should require stronger confirmation.${higherTimeframeRiskNote}`;
+      return `Risk-oriented backdrop reinforces this ${timeframe} risk classification.${higherTimeframeRiskNote}`;
     }
 
     if (group === "eligible" || group === "watch") {
-      return `Broader context is risk-oriented, so this ${timeframe} symbol's constructive setup should be treated as a repair candidate rather than a clean standalone trend signal.${higherTimeframeRiskNote}`;
+      return `Risk-oriented backdrop makes this ${timeframe} setup a repair read, not clean trend context.${higherTimeframeRiskNote}`;
     }
 
-    return `Broader context is risk-oriented. Use it as a backdrop only; symbol-level structure remains the primary research input.${higherTimeframeRiskNote}`;
+    return `Risk-oriented backdrop; symbol structure stays primary.${higherTimeframeRiskNote}`;
   }
 
   if (isConstructiveSymbolMarketContext(data)) {
     if (group === "eligible") {
-      return `Broader context is more supportive, but symbol-level confirmation and invalidation rules still remain primary.${higherTimeframeRiskNote}`;
+      return `Supportive backdrop; symbol confirmation still leads.${higherTimeframeRiskNote}`;
     }
 
-    return `Broader context is more supportive. Use it as context only; symbol-level signal remains primary.${higherTimeframeRiskNote}`;
+    return `Supportive backdrop; symbol signal remains primary.${higherTimeframeRiskNote}`;
   }
 
   if (isMixedSymbolMarketContext(data)) {
-    return `Broader context is mixed. Use it as a backdrop only; symbol-level structure remains the primary research input.${higherTimeframeRiskNote}`;
+    return `Mixed backdrop; symbol structure stays primary.${higherTimeframeRiskNote}`;
   }
 
-  return `BTC/ETH proxy context is available for the ${timeframe} review. Symbol-level signal remains primary.${higherTimeframeRiskNote}`;
+  return `BTC/ETH backdrop available for the ${timeframe} review.${higherTimeframeRiskNote}`;
 }
 
 export function getTradeApiBaseUrl(
@@ -1622,6 +1607,102 @@ function SymbolResearchUnavailableState({
   );
 }
 
+function CurrentPostureStrip({
+  symbol,
+  selectedTimeframe,
+  interpretation,
+  latestSignal,
+  scoreBreakdown,
+}: {
+  symbol: string;
+  selectedTimeframe: string;
+  interpretation: ReturnType<typeof getSymbolResearchInterpretation>;
+  latestSignal: SymbolResearchSignal;
+  scoreBreakdown: ReturnType<typeof getSymbolResearchScoreBreakdown>;
+}) {
+  const groupToneClass = getSymbolPostureToneClass(interpretation.group);
+
+  return (
+    <section className={`mb-2 border border-l-4 bg-[var(--panel)] px-3 py-2 ${groupToneClass}`}>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="min-w-0">
+          <div className="text-[10px] font-semibold uppercase tracking-normal text-[var(--muted)]">
+            Current posture
+          </div>
+          <div className="mt-0.5 flex flex-wrap items-baseline gap-x-2 gap-y-1">
+            <span className="font-mono text-base font-semibold text-[var(--foreground)]">
+              {symbol}
+            </span>
+            <span className="text-xs font-semibold text-[var(--muted)]">
+              {selectedTimeframe}
+            </span>
+            <span className="text-sm font-semibold text-[var(--foreground)]">
+              {formatSymbolResearchGroup(interpretation.group)}
+            </span>
+            <span className="text-xs text-[var(--muted)]">
+              {formatSymbolResearchAction(interpretation.action)}
+            </span>
+          </div>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px]">
+          <PostureStat
+            label="Rank"
+            value={formatSymbolResearchScore(scoreBreakdown.rankScore)}
+          />
+          <PostureStat
+            label="Signal"
+            value={interpretation.label}
+          />
+          <PostureStat
+            label="Reason"
+            value={interpretation.statusNote}
+          />
+          <PostureStat
+            label="Risk"
+            value={latestSignal.cautionLevel || "No extra risk flag"}
+          />
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function PostureStat({ label, value }: { label: string; value: string }) {
+  return (
+    <span className="inline-flex items-baseline gap-1">
+      <span className="text-[10px] font-semibold uppercase text-[var(--muted)]">
+        {label}
+      </span>
+      <span className="max-w-[220px] truncate font-semibold text-[var(--foreground)]" title={value}>
+        {value}
+      </span>
+    </span>
+  );
+}
+
+function getSymbolPostureToneClass(group: string | null | undefined) {
+  const normalized = normalizeSymbolMarketContextGroup(group);
+
+  if (normalized === "eligible") {
+    return "border-[var(--positive-border)] border-l-[var(--positive)]";
+  }
+
+  if (normalized === "watch") {
+    return "border-[var(--info-border)] border-l-[var(--info)]";
+  }
+
+  if (normalized === "risk") {
+    return "border-[var(--danger-border)] border-l-[var(--danger)]";
+  }
+
+  if (normalized === "overheated") {
+    return "border-[var(--warning-border)] border-l-[var(--warning)]";
+  }
+
+  return "border-[var(--border)] border-l-[var(--neutral)]";
+}
+
 function ResearchWorkflowSection({
   title,
   description,
@@ -1688,6 +1769,32 @@ function ResearchDecisionSummaryPanel({
         </div>
       </div>
     </Panel>
+  );
+}
+
+function CompactScoreStrip({
+  scoreBreakdown,
+}: {
+  scoreBreakdown: ReturnType<typeof getSymbolResearchScoreBreakdown>;
+}) {
+  return (
+    <div className="mt-3 border-t border-[var(--border)] pt-2">
+      <h3 className="text-[11px] font-semibold uppercase text-[var(--muted)]">
+        Score Breakdown
+      </h3>
+      <div className="mt-2 grid grid-cols-2 gap-x-3 gap-y-1 sm:grid-cols-3">
+        {getSymbolResearchScoreRows(scoreBreakdown).map((row) => (
+          <div key={row.label} className="flex items-baseline justify-between gap-2">
+            <span className="truncate text-[11px] text-[var(--muted)]">
+              {row.label}
+            </span>
+            <span className="font-mono text-[12px] font-semibold tabular-nums text-[var(--foreground)]">
+              {row.value}
+            </span>
+          </div>
+        ))}
+      </div>
+    </div>
   );
 }
 

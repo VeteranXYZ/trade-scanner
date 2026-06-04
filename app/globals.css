@@ -2,20 +2,20 @@
 
 :root {
   color-scheme: light;
-  --app-background: #f5f7f9;
-  --page-background: #fbfcfd;
-  --workspace-background: #fbfcfd;
+  --app-background: #f7f9fb;
+  --page-background: #ffffff;
+  --workspace-background: #f7f9fb;
   --panel-background: #ffffff;
   --panel-elevated: #ffffff;
-  --panel-muted: #f7f9fb;
+  --panel-muted: #fafbfc;
   --panel-tinted: #ffffff;
   --panel-data: #ffffff;
-  --table-header-background: #f2f5f8;
-  --row-hover-background: #f3fafb;
-  --row-selected-background: #e4f3f5;
-  --border-subtle: rgba(38, 51, 71, 0.12);
-  --border-medium: rgba(38, 51, 71, 0.18);
-  --border-strong: rgba(38, 51, 71, 0.3);
+  --table-header-background: #eef3f6;
+  --row-hover-background: #eefaf8;
+  --row-selected-background: #d9f0ee;
+  --border-subtle: rgba(32, 46, 61, 0.13);
+  --border-medium: rgba(32, 46, 61, 0.22);
+  --border-strong: rgba(32, 46, 61, 0.34);
   --text-primary: #172033;
   --text-secondary: #405064;
   --text-muted: #6c7a8d;
@@ -81,7 +81,7 @@
   --muted-2: var(--text-muted);
   --panel: var(--panel-background);
   --panel-2: var(--panel-muted);
-  --panel-strong: #eef2f5;
+  --panel-strong: #f1f5f8;
   --header-bg: rgba(253, 254, 254, 0.97);
   --control: var(--panel-background);
   --control-hover: #f3fafb;
@@ -93,8 +93,8 @@
   --radius-md: 6px;
   --space-panel: 12px;
   --button-height: 32px;
-  --table-row-height: 36px;
-  --shadow-panel: 0 1px 1px rgba(15, 23, 42, 0.035);
+  --table-row-height: 34px;
+  --shadow-panel: 0 1px 2px rgba(15, 23, 42, 0.045);
   --shadow-elevated: 0 8px 18px rgba(15, 23, 42, 0.07);
 }
 
