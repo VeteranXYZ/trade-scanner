@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 import {
   formatTimelineDate,
   getCompactSignalHistory,
@@ -13,159 +13,196 @@ type SymbolSignalTimelineProps = {
   history: RawSymbolTimelineSignal[];
   showSelectionNotice?: boolean;
   className?: string;
+  variant?: "default" | "rail";
+  maxItems?: number;
 };
 
 export function SymbolSignalTimeline({
   history,
   showSelectionNotice = false,
   className = "mt-4",
+  variant = "default",
+  maxItems = variant === "rail" ? 3 : 8,
 }: SymbolSignalTimelineProps) {
-  const [showAll, setShowAll] = useState(false);
   const items = useMemo(() => normalizeSignalHistory(history), [history]);
-  const compactHistory = useMemo(() => getCompactSignalHistory(items), [items]);
-  const visibleItems = showAll ? items : compactHistory.items;
-  const canToggle = compactHistory.hiddenCount > 0;
+  const compactHistory = useMemo(
+    () => getCompactSignalHistory(items, maxItems),
+    [items, maxItems],
+  );
+  const visibleItems = compactHistory.items;
+  const isRail = variant === "rail";
 
   return (
     <section
-      className={`min-w-0 border border-[var(--border)] bg-[var(--panel)] px-3 py-3 shadow-[var(--shadow-panel)] ${className}`}
+      className={`min-w-0 border border-[var(--border)] bg-[var(--panel)] shadow-[var(--shadow-panel)] ${
+        isRail ? "px-2.5 py-2" : "px-3 py-3"
+      } ${className}`}
     >
-      <div className="mb-3">
-        <h2 className="text-sm font-semibold">Signal History</h2>
-        <p className="mt-1 text-xs text-[var(--muted)]">
-          Recent scanner classifications for this symbol.
-        </p>
+      <div className={isRail ? "mb-2 border-b border-[var(--border)] pb-1" : "mb-3"}>
+        <h2
+          className={
+            isRail
+              ? "text-[11px] font-semibold uppercase text-[var(--foreground)]"
+              : "text-sm font-semibold"
+          }
+        >
+          {isRail ? "Timeline" : "Signal Timeline"}
+        </h2>
       </div>
 
       {items.length === 0 ? (
-        <p className="text-sm text-[var(--muted)]">
-          No recent signal history is available for this symbol.
+        <p className={isRail ? "text-[12px] text-[var(--muted)]" : "text-sm text-[var(--muted)]"}>
+          No recent signal timeline is available for this symbol.
         </p>
       ) : (
         <>
           {items.length === 1 ? (
-            <p className="mb-3 border border-[var(--border)] bg-[var(--panel-2)] px-3 py-2 text-xs text-[var(--muted)]">
+            <p
+              className={
+                isRail
+                  ? "mb-2 border border-[var(--border)] bg-[var(--panel-2)] px-2 py-1.5 text-[11px] text-[var(--muted)]"
+                  : "mb-3 border border-[var(--border)] bg-[var(--panel-2)] px-3 py-2 text-xs text-[var(--muted)]"
+              }
+            >
               Only the latest signal is available. More history will appear after future
               scans.
             </p>
           ) : null}
 
           {showSelectionNotice ? (
-            <p className="mb-3 border border-[var(--warning-border)] bg-[var(--warning-bg)] px-3 py-2 text-xs text-[var(--warning)]">
-              Some newer history rows may come from non-preferred or smaller runs.
-              Current classification uses the selected full-universe scan run.
+            <p
+              className={
+                isRail
+                  ? "mb-2 border-l border-[var(--warning-border)] pl-2 text-[10px] leading-4 text-[var(--muted)]"
+                  : "mb-3 border border-[var(--warning-border)] bg-[var(--warning-bg)] px-3 py-2 text-xs text-[var(--warning)]"
+              }
+            >
+              {isRail
+                ? "Newer secondary rows exist."
+                : "Some newer history rows may come from non-preferred or smaller runs. Current classification uses the selected full-universe scan run."}
             </p>
           ) : null}
 
-          <ol className="relative space-y-3 border-l border-[var(--border)] pl-3 sm:pl-4">
-            {visibleItems.map((item) => (
-              <li key={item.key} className="relative">
-                <span
-                  className={`absolute -left-[21px] top-4 h-2.5 w-2.5 border ${getDotClassName(item)}`}
-                />
-                <article className={`min-w-0 border px-3 py-3 ${getArticleClassName(item)}`}>
-                  <div className="flex flex-wrap items-start justify-between gap-2">
-                    <div>
-                      <div className="flex flex-wrap items-center gap-2">
+          {isRail ? (
+            <ul className="space-y-1 text-[11px]">
+              {visibleItems.map((item) => (
+                <li
+                  key={item.key}
+                  className={`border bg-[var(--panel-data)] px-2 py-1.5 ${getGroupClassName(
+                    item.group,
+                  )} ${getRowClassName(item)}`}
+                >
+                  <div className="flex min-w-0 items-center gap-1.5">
+                    <span className="shrink-0 text-[10px] font-semibold uppercase">
+                      {item.groupLabel}
+                    </span>
+                    <span className="font-mono text-[11px] font-semibold">
+                      {item.rankScore}
+                    </span>
+                    {item.timelineTone !== "default" ? (
+                      <span className="ml-auto shrink-0 text-[9px] font-semibold uppercase text-[var(--muted)]">
+                        {item.timelineTone === "selected" ? "Current" : "Alt"}
+                      </span>
+                    ) : null}
+                  </div>
+                  <div className="mt-1 truncate font-semibold text-[var(--foreground)]">
+                    {item.signalLabel}
+                  </div>
+                  <div className="mt-0.5 truncate font-mono text-[10px] text-[var(--muted)]">
+                    {formatTimelineDate(item.scanTime)}
+                  </div>
+                  <div className="mt-0.5 truncate text-[10px] text-[var(--muted)]">
+                    {getRailRunContextText(item)}
+                  </div>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <div className="overflow-x-auto bg-[var(--panel-data)]">
+              <table className="w-full min-w-[760px] border-collapse text-left text-xs">
+                <thead className="bg-[var(--table-header)] text-[10px] uppercase text-[var(--muted)]">
+                  <tr>
+                    <th className="border-b border-[var(--border-medium)] px-2 py-1.5">
+                      Time
+                    </th>
+                    <th className="border-b border-[var(--border-medium)] px-2 py-1.5">
+                      State
+                    </th>
+                    <th className="border-b border-[var(--border-medium)] px-2 py-1.5">
+                      Signal
+                    </th>
+                    <th className="border-b border-[var(--border-medium)] px-2 py-1.5 text-right">
+                      Rank
+                    </th>
+                    <th className="border-b border-[var(--border-medium)] px-2 py-1.5">
+                      Run Context
+                    </th>
+                    <th className="border-b border-[var(--border-medium)] px-2 py-1.5">
+                      Marker
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {visibleItems.map((item) => (
+                    <tr
+                      key={item.key}
+                      className={`border-t border-[var(--border)] odd:bg-[var(--panel-data)] even:bg-[var(--panel-muted)] hover:bg-[var(--row-hover)] ${getRowClassName(
+                        item,
+                      )}`}
+                    >
+                      <td className="whitespace-nowrap px-2 py-2 font-mono text-[11px] text-[var(--muted)]">
+                        {formatTimelineDate(item.scanTime)}
+                      </td>
+                      <td className="px-2 py-2">
                         <span
                           className={`border px-2 py-0.5 text-[10px] font-semibold uppercase ${getGroupClassName(item.group)}`}
                         >
                           {item.groupLabel}
                         </span>
-                        <span className="text-sm font-semibold text-[var(--foreground)]">
-                          {item.signalLabel}
-                        </span>
+                      </td>
+                      <td className="max-w-[220px] truncate px-2 py-2 font-semibold text-[var(--foreground)]">
+                        {item.signalLabel}
+                      </td>
+                      <td className="px-2 py-2 text-right font-mono text-[var(--foreground)]">
+                        {item.rankScore}
+                      </td>
+                      <td className="max-w-[220px] truncate px-2 py-2 text-[var(--muted)]">
+                        {item.runContextText}
+                      </td>
+                      <td className="px-2 py-2">
                         {item.timelineTone !== "default" ? (
                           <span className="border border-[var(--border)] px-2 py-0.5 text-[10px] uppercase text-[var(--muted)]">
                             {item.timelineTone === "selected"
                               ? "Selected current"
                               : "Secondary run"}
                           </span>
-                        ) : null}
-                      </div>
-                      <p className="mt-1 text-xs text-[var(--muted)]">
-                        {item.groupDescription}
-                      </p>
-                    </div>
-                    <div className="text-left text-xs text-[var(--muted)] sm:text-right">
-                      <div>{formatTimelineDate(item.scanTime)}</div>
-                      <div>Signal candle: {formatTimelineDate(item.candleOpenTime)}</div>
-                    </div>
-                  </div>
+                        ) : (
+                          <span className="text-[11px] text-[var(--muted-2)]">-</span>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
 
-                  <div className="mt-3 grid gap-2 text-xs sm:grid-cols-2 lg:grid-cols-4">
-                    <TimelineFact label="Action" value={item.actionText} />
-                    <TimelineFact label="Setup" value={item.setupText} />
-                    <TimelineFact label="Rank" value={item.rankScore} />
-                    <TimelineFact label="Setup Score" value={item.opportunityScore} />
-                    <TimelineFact label="Confirmation" value={item.confirmationScore} />
-                    <TimelineFact label="Risk" value={item.riskScore} />
-                    <TimelineFact label="Run Context" value={item.runContextText} />
-                    <TimelineFact label="Risks Noted" value={item.riskText} wide />
-                    <TimelineFact label="Status" value={item.statusText} wide />
-                  </div>
-                </article>
-              </li>
-            ))}
-          </ol>
-
-          {canToggle ? (
-            <button
-              type="button"
-              aria-expanded={showAll}
-              onClick={() => setShowAll((value) => !value)}
-              className="mt-3 border border-[var(--border)] px-3 py-1.5 text-xs text-[var(--foreground)] hover:border-[var(--info)]"
-            >
-              {showAll
-                ? "Show less history"
-                : `Show more history (${compactHistory.hiddenCount} hidden)`}
-            </button>
-          ) : null}
         </>
       )}
     </section>
   );
 }
 
-function getArticleClassName(item: NormalizedSymbolTimelineSignal) {
+function getRowClassName(item: NormalizedSymbolTimelineSignal) {
   if (item.timelineTone === "selected") {
-    return "border-[var(--info)] bg-[var(--info-bg)]";
+    return "shadow-[inset_2px_0_0_var(--info)]";
   }
 
   if (item.timelineTone === "secondary") {
-    return "border-dashed border-[var(--border)] bg-[var(--panel-2)] opacity-85";
+    return "opacity-85";
   }
 
-  return "border-[var(--border)] bg-[var(--panel-2)]";
-}
-
-function getDotClassName(item: NormalizedSymbolTimelineSignal) {
-  if (item.timelineTone === "selected") {
-    return "border-[var(--info)] bg-[var(--info)]";
-  }
-
-  if (item.timelineTone === "secondary") {
-    return "border-[var(--border)] bg-[var(--panel-2)]";
-  }
-
-  return "border-[var(--border)] bg-[var(--panel)]";
-}
-
-function TimelineFact({
-  label,
-  value,
-  wide = false,
-}: {
-  label: string;
-  value: string;
-  wide?: boolean;
-}) {
-  return (
-    <div className={wide ? "sm:col-span-2" : ""}>
-      <div className="text-[10px] uppercase text-[var(--muted-2)]">{label}</div>
-      <div className="mt-1 break-words text-[var(--foreground)]">{value}</div>
-    </div>
-  );
+  return "";
 }
 
 function getGroupClassName(group: string) {
@@ -183,4 +220,20 @@ function getGroupClassName(group: string) {
     default:
       return "border-[var(--neutral-border)] bg-[var(--neutral-bg)] text-[var(--neutral)]";
   }
+}
+
+function getRailRunContextText(item: NormalizedSymbolTimelineSignal) {
+  if (item.timelineTone === "selected") {
+    return "Current run";
+  }
+
+  if (item.timelineTone === "secondary") {
+    return "Secondary row";
+  }
+
+  if (item.runContextText.includes("Full-universe")) {
+    return "Full run";
+  }
+
+  return item.runContextText;
 }

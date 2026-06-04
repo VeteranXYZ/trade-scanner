@@ -39,17 +39,20 @@ describe("MarketContextPanel", () => {
       }),
     );
 
-    expect(html).toContain("Market Backdrop");
+    expect(html).toContain("Backdrop");
     expect(html).toContain("Risk-oriented transition");
-    expect(html).toContain("Broader regime backdrop");
-    expect(html).toContain("symbol classifications stay unchanged");
+    expect(html).toContain(
+      "BTC/ETH context only; symbol data leads.",
+    );
+    expect(html).toContain("Read");
     expect(html).toContain("Broad regime");
-    expect(html).toContain("BTC structural layer");
-    expect(html).toContain("BTC market layer");
-    expect(html).toContain("BTC tactical layer");
     expect(html).toContain("ETH confirmation");
     expect(html).toContain("Confidence");
     expect(html).toContain("repair read");
+    expect(html).not.toContain("BTC structural layer");
+    expect(html).not.toContain("BTC market layer");
+    expect(html).not.toContain("BTC tactical layer");
+    expect(html).not.toContain("Context only");
     expect(html).not.toContain("Layer notes");
     expect(html).not.toContain("BTC 1w structural context: Long-term mixed.");
   });

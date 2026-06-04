@@ -411,7 +411,7 @@ describe("SymbolResearchPageClient unavailable state", () => {
     );
     expect(html).toContain("Back to Scanner");
     expect(html).toContain("Refresh");
-    expect(html).toContain("Open Symbol");
+    expect(html).toContain(">Open</button>");
     expect(html).toContain('href="/scanner?timeframe=1w&amp;assetClass=crypto');
     expect(html).toContain('href="/symbol/binance/SEIUSDT?timeframe=4h');
     expect(html).toContain('href="/symbol/binance/SEIUSDT?timeframe=1d');
@@ -450,31 +450,54 @@ describe("SymbolResearchPageClient success state", () => {
       }),
     );
 
-    expect(html).toContain("Current posture");
+    expect(html).toContain("Decision");
+    expect(html).toContain("Primary");
     expect(html).toContain("Selected timeframe: 4h");
-    expect(html).toContain("Research Focus");
-    expect(html).toContain("Signal Summary");
-    expect(html).toContain("Market Backdrop");
-    expect(html).toContain("Historical Context");
-    expect(html).toContain("Details");
-    expect(html.indexOf("Current posture")).toBeLessThan(
-      html.indexOf("Research Focus"),
+    expect(html).toContain("Why");
+    expect(html).toContain("Positive");
+    expect(html).toContain("Limits");
+    expect(html).toContain("Check next");
+    expect(html).toContain("Chart");
+    expect(html).toContain("MTF");
+    expect(html).toContain("Backdrop");
+    expect(html).toContain("History");
+    expect(html).toContain("Timeline");
+    expect(html).toContain("Details / Raw Diagnostics");
+    expect(html.indexOf("Decision")).toBeLessThan(
+      html.indexOf("MTF"),
     );
-    expect(html.indexOf("Research Focus")).toBeLessThan(
-      html.indexOf("Market Backdrop"),
+    expect(html.indexOf("MTF")).toBeLessThan(
+      html.indexOf("Chart"),
     );
-    expect(html.indexOf("Market Backdrop")).toBeLessThan(
-      html.indexOf("Historical Context"),
+    expect(html.indexOf("Chart")).toBeLessThan(
+      html.indexOf("Why"),
     );
-    expect(html.indexOf("Historical Context")).toBeLessThan(html.indexOf("Details"));
+    expect(html.indexOf("Why")).toBeLessThan(
+      html.indexOf("Check next"),
+    );
+    expect(html.indexOf("Check next")).toBeLessThan(
+      html.indexOf("History"),
+    );
+    expect(html.indexOf("History")).toBeLessThan(
+      html.indexOf("Backdrop"),
+    );
+    expect(html.indexOf("Backdrop")).toBeLessThan(
+      html.indexOf("Timeline"),
+    );
+    expect(html.indexOf("Timeline")).toBeLessThan(
+      html.indexOf("Details / Raw Diagnostics"),
+    );
+    expect(html).not.toContain("Research stance");
+    expect(html).not.toContain("Primary reason");
+    expect(html).not.toContain("Why This State");
+    expect(html).not.toContain("What to Check Next");
+    expect(html).not.toContain("Chart + MTF Context");
+    expect(html).not.toContain("Market Backdrop");
+    expect(html).not.toContain("Historical Evidence");
+    expect(html).not.toContain("Compact Signal Timeline");
     expect(html).toContain("Timeframe Availability");
-    expect(html).toContain("Research Decision Summary");
-    expect(html).toContain("Constructive research context");
-    expect(html).toContain("Research Posture");
-    expect(html).toContain("Deeper research context");
-    expect(html).toContain("Score Breakdown");
-    expect(html).toContain("What to Check");
-    expect(html).toContain("Next Confirmation");
+    expect(html).toContain("Constructive, manual review required");
+    expect(html).toContain("Price stays above MA20 / MA50 context");
     expect(html).toContain("Invalidation");
     expect(html).toContain("Data Source");
     expect(html).toContain("Signal Evaluation");
@@ -487,8 +510,7 @@ describe("SymbolResearchPageClient success state", () => {
     expect(html).toContain("Current context");
     expect(html).toContain("Recent outcomes");
     expect(html).toContain("Most recent prior observations with available forward returns.");
-    expect(html).toContain("Research Chart");
-    expect(html).toContain("Signal History");
+    expect(html).toContain("Timeline");
     expect(html).toMatch(/Timeframe Snapshot|Multi-Timeframe Snapshot/);
     expect(html).toContain("Recent Candles Summary");
     expect(html).toContain("Raw Details");
@@ -528,23 +550,24 @@ describe("SymbolResearchPageClient success state", () => {
       ([options]) => options.queryKey[0] === "market-context",
     );
 
-    expect(html).toContain("Market Backdrop");
+    expect(html).toContain("Backdrop");
     expect(html).toContain("Risk-oriented transition");
-    expect(html).toContain("Broader regime backdrop");
-    expect(html).toContain("symbol classifications stay unchanged");
+    expect(html).toContain(
+      "BTC/ETH context only; symbol data leads.",
+    );
     expect(html).toContain("Broad regime");
-    expect(html).toContain("BTC structural layer");
-    expect(html).toContain("BTC market layer");
-    expect(html).toContain("BTC tactical layer");
     expect(html).toContain("ETH confirmation");
     expect(html).toContain("Confidence");
+    expect(html).not.toContain("BTC structural layer");
+    expect(html).not.toContain("BTC market layer");
+    expect(html).not.toContain("BTC tactical layer");
     expect(html).toContain("repair read");
-    expect(html).toContain("Research Decision Summary");
+    expect(html).toContain("Chart");
     expect(marketContextCall?.[0].queryKey).toEqual(["market-context", "crypto"]);
     expect(JSON.stringify(marketContextCall?.[0].queryKey)).not.toContain("SEIUSDT");
   });
 
-  it("keeps decision summary and current classification visible when market context fails", () => {
+  it("keeps decision header and current classification visible when market context fails", () => {
     useQueryMock.mockImplementation(
       ({ queryKey }: { queryKey: [string, unknown] }) => ({
         isLoading: false,
@@ -568,9 +591,9 @@ describe("SymbolResearchPageClient success state", () => {
     );
 
     expect(html).toContain("Market context unavailable");
-    expect(html).toContain("Page data remains available");
-    expect(html).toContain("Research Decision Summary");
-    expect(html).toContain("Signal Summary");
+    expect(html).toContain("symbol data remains available");
+    expect(html).toContain("Decision");
+    expect(html).toContain("Why");
   });
 
   it("keeps symbol research request shape unchanged while adding layout sections", () => {
@@ -748,16 +771,17 @@ describe("SymbolResearchPageClient success state", () => {
     );
 
     expect(html).toContain("BTCUSDT");
-    expect(html).toContain("Current posture");
-    expect(html).toContain("Research Chart");
-    expect(html).toContain("Signal Summary");
-    expect(html).toContain("What to Check");
+    expect(html).toContain("Decision");
+    expect(html).toContain("Chart");
+    expect(html).toContain("Why");
+    expect(html).toContain("Check next");
     expect(html).toContain("Multi-Timeframe Snapshot");
-    expect(html).toContain("Market Backdrop");
+    expect(html).toContain("Backdrop");
     expect(html).toContain("Constructive backdrop");
+    expect(html).toContain("History");
     expect(html).toContain("Historical Behavior");
-    expect(html).toContain("Signal History");
-    expect(html).toContain("Details");
+    expect(html).toContain("Timeline");
+    expect(html).toContain("Details / Raw Diagnostics");
     expect(html).toContain("visual-check mock");
     expect(html).not.toContain("Loading symbol research");
 

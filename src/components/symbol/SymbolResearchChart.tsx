@@ -25,6 +25,7 @@ type SymbolResearchChartProps = {
   candles: RawSymbolChartCandle[];
   candleCount: number;
   className?: string;
+  density?: "normal" | "compact";
   latestSignal?: {
     candleOpenTime?: string | null;
     resultGroup?: string | null;
@@ -38,6 +39,7 @@ export function SymbolResearchChart({
   candles,
   candleCount,
   className = "mt-4",
+  density = "normal",
   latestSignal,
 }: SymbolResearchChartProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -147,21 +149,28 @@ export function SymbolResearchChart({
       : candleCount > 0
         ? "Candle metadata exists, but no candle rows were returned."
         : "No candle rows available for this symbol/timeframe yet.";
+  const isCompact = density === "compact";
 
   return (
     <section
-      className={`min-w-0 border border-[var(--border)] bg-[var(--panel)] px-3 py-3 shadow-[var(--shadow-panel)] ${className}`}
+      className={`min-w-0 border border-[var(--border)] bg-[var(--panel)] shadow-[var(--shadow-panel)] ${isCompact ? "flex flex-col px-2 py-2" : "px-3 py-3"} ${className}`}
     >
-      <div className="mb-3 flex flex-wrap items-start justify-between gap-3">
+      <div className={`${isCompact ? "mb-2" : "mb-3"} flex flex-wrap items-start justify-between gap-2`}>
         <div>
-          <h2 className="text-sm font-semibold">Research Chart</h2>
-          <p className="mt-1 text-xs text-[var(--muted)]">
-            Candles, MA20/MA50, and latest signal marker.
-          </p>
+          <h2 className="text-sm font-semibold">{isCompact ? "Chart" : "Research Chart"}</h2>
+          {!isCompact ? (
+            <p className="mt-1 text-xs text-[var(--muted)]">
+              Candles, MA20/MA50, and latest signal marker.
+            </p>
+          ) : null}
         </div>
-        <div className="grid w-full grid-cols-2 gap-x-4 gap-y-1 text-xs text-[var(--muted)] sm:w-auto sm:grid-cols-3 lg:text-right">
-          <LegendValue label="Symbol" value={symbol} />
-          <LegendValue label="Timeframe" value={timeframe} />
+        <div className={`grid w-full grid-cols-2 gap-x-3 gap-y-1 text-xs text-[var(--muted)] sm:w-auto ${isCompact ? "sm:grid-cols-4 lg:text-right" : "sm:grid-cols-3 lg:text-right"}`}>
+          {!isCompact ? (
+            <>
+              <LegendValue label="Symbol" value={symbol} />
+              <LegendValue label="Timeframe" value={timeframe} />
+            </>
+          ) : null}
           <LegendValue label="Last close" value={formatChartPrice(chartData.latestClose)} />
           <LegendValue
             label="Latest signal"
@@ -184,10 +193,10 @@ export function SymbolResearchChart({
       {hasCandles ? (
         <div
           ref={containerRef}
-          className="h-[300px] min-w-0 overflow-hidden border border-[var(--border-medium)] bg-[var(--panel-data)] sm:h-[360px]"
+          className={`min-w-0 overflow-hidden border border-[var(--border-medium)] bg-[var(--panel-data)] ${isCompact ? "h-[390px] lg:h-[clamp(450px,60vh,640px)]" : "h-[300px] sm:h-[360px]"}`}
         />
       ) : (
-        <div className="flex h-[260px] items-center justify-center border border-[var(--border-medium)] bg-[var(--panel-data)] px-4 text-center text-sm text-[var(--muted)]">
+        <div className={`flex items-center justify-center border border-[var(--border-medium)] bg-[var(--panel-data)] px-4 text-center text-sm text-[var(--muted)] ${isCompact ? "h-[390px] lg:h-[clamp(450px,60vh,640px)]" : "h-[260px]"}`}>
           {emptyMessage}
         </div>
       )}

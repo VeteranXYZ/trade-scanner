@@ -23,8 +23,7 @@ export const dictionaries = {
       btc: "BTCUSDT",
     },
     footer: {
-      disclaimer:
-        "Technical screening and research only. No trading, wallet connection, private exchange keys, or financial advice.",
+      disclaimer: "",
     },
     common: {
       refresh: "Refresh",
@@ -578,8 +577,7 @@ export const dictionaries = {
       btc: "BTCUSDT",
     },
     footer: {
-      disclaimer:
-        "仅用于技术筛选和研究。不提供交易、钱包连接、交易所私钥或财务建议。",
+      disclaimer: "",
     },
     common: {
       refresh: "刷新",

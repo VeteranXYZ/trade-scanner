@@ -19,51 +19,64 @@ export function MarketContextPanel({
 }: MarketContextPanelProps) {
   const view = buildMarketContextPanelView({ data, isLoading, isError });
   const isCompact = variant === "compact";
-  const description = isCompact
+  const headerDescription = isCompact
     ? getCompactDescription(view.unavailable)
-    : view.description;
+    : "BTC/ETH regime backdrop. This context does not change scanner rankings or classifications.";
+  const description = isCompact ? null : view.description;
   const implicationText =
     implication || getDefaultImplication(view.contextNote, isCompact);
+  const compactChips = view.chips.filter((chip) =>
+    ["Broad regime", "ETH confirmation", "Confidence"].includes(chip.label),
+  );
+  const visibleChips = isCompact
+    ? compactChips.length > 0
+      ? compactChips
+      : view.chips.slice(0, 2)
+    : view.chips;
 
   return (
     <section
       className={joinClassNames(
-        "border border-l-4 border-[var(--border)] border-l-[var(--info)] bg-[var(--panel)] px-3 py-2.5 shadow-[var(--shadow-panel)]",
+        isCompact
+          ? "border border-l-4 border-[var(--border)] border-l-[var(--info)] bg-[var(--panel)] px-2.5 py-2 shadow-[var(--shadow-panel)]"
+          : "border border-l-4 border-[var(--border)] border-l-[var(--info)] bg-[var(--panel)] px-3 py-2.5 shadow-[var(--shadow-panel)]",
         className,
       )}
     >
-      <div className="flex flex-wrap items-start justify-between gap-3">
+      <div className="flex flex-wrap items-start justify-between gap-2">
         <div className="min-w-0">
           <div className="text-[10px] font-semibold uppercase tracking-wide text-[var(--muted)]">
-            {isCompact ? "Market Backdrop" : "Market Context"}
+            {isCompact ? "Backdrop" : "Market Context"}
           </div>
           <h2 className="mt-1 text-sm font-semibold text-[var(--foreground)]">
             {view.title}
           </h2>
-          <p className="mt-1 max-w-4xl text-[11px] leading-5 text-[var(--muted)]">
-            {isCompact
-              ? "BTC/ETH backdrop for interpreting scanner context; symbol classifications stay unchanged."
-              : "BTC/ETH regime backdrop. This context does not change scanner rankings or classifications."}
+          <p className="mt-1 max-w-4xl text-[11px] leading-4 text-[var(--muted)]">
+            {headerDescription}
           </p>
         </div>
         <div className="flex flex-wrap gap-1.5 text-[10px] font-semibold uppercase text-[var(--muted)]">
           {!isCompact ? (
-            <span className="border border-[var(--border)] px-1.5 py-0.5">
-              Research-only
-            </span>
+            <>
+              <span className="border border-[var(--border)] px-1.5 py-0.5">
+                Research-only
+              </span>
+              <span className="border border-[var(--border)] px-1.5 py-0.5">
+                Context only
+              </span>
+            </>
           ) : null}
-          <span className="border border-[var(--border)] px-1.5 py-0.5">
-            Context only
-          </span>
         </div>
       </div>
 
-      <p className="mt-2 max-w-5xl text-xs leading-5 text-[var(--foreground)]">
-        {description}
-      </p>
+      {description ? (
+        <p className="mt-2 max-w-5xl text-xs leading-5 text-[var(--foreground)]">
+          {description}
+        </p>
+      ) : null}
 
       <div className="mt-2 flex flex-wrap gap-1.5">
-        {view.chips.map((chip) => (
+        {visibleChips.map((chip) => (
           <span
             key={`${chip.label}-${chip.value}`}
             className={`inline-flex items-center gap-1 border px-1.5 py-0.5 text-[11px] ${getChipClassName(
@@ -98,7 +111,7 @@ export function MarketContextPanel({
 
       <div className="mt-2 border-t border-[var(--border)] pt-2">
         <div className="text-[10px] font-semibold uppercase text-[var(--muted)]">
-          Research implication
+          {isCompact ? "Read" : "Research implication"}
         </div>
         <p className="mt-1 text-[11px] leading-4 text-[var(--muted)]">
           {implicationText}
@@ -113,10 +126,10 @@ export function MarketContextPanel({
 
 function getCompactDescription(unavailable: boolean) {
   if (unavailable) {
-    return "Market context is unavailable. Page data remains available.";
+    return "Unavailable; symbol data remains primary.";
   }
 
-  return "Broader regime backdrop. Symbol-level signal remains primary.";
+  return "BTC/ETH context only; symbol data leads.";
 }
 
 function getDefaultImplication(contextNote: string, isCompact: boolean) {
