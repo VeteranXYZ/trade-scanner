@@ -53,7 +53,7 @@ const chipToneClass: Record<ChipTone, string> = {
 
 export function DataTableScroll({ children }: { children: ReactNode }) {
   return (
-    <div className="overflow-x-auto bg-[var(--panel-data)] [scrollbar-gutter:stable]">
+    <div className="max-w-full overflow-x-auto overflow-y-hidden bg-[var(--panel-data)] [contain:layout_paint] [scrollbar-gutter:stable]">
       {children}
     </div>
   );
@@ -117,7 +117,7 @@ export function DataTableHeaderCell<TKey extends string>({
         <button
           type="button"
           onClick={() => onSortChange?.(sortKey, defaultDirection)}
-          className={`inline-flex min-h-5 w-full items-center gap-1 rounded-sm border px-1 py-0.5 text-[10px] font-semibold uppercase transition ${
+          className={`inline-flex min-h-6 w-full items-center gap-1 rounded-sm border px-1 py-0.5 text-[10px] font-semibold uppercase leading-[1.05] transition ${
             align === "right"
               ? "justify-end"
               : align === "center"
@@ -129,11 +129,15 @@ export function DataTableHeaderCell<TKey extends string>({
               : "border-transparent text-[var(--muted)] hover:border-[var(--border-medium)] hover:bg-[var(--panel)] hover:text-[var(--foreground)]"
           }`}
         >
-          <span className="truncate">{children}</span>
+          <span className="min-w-0 whitespace-normal text-inherit">
+            {children}
+          </span>
           <span
             aria-hidden="true"
             className={`min-w-4 text-right text-[9px] font-bold ${
-              isActive ? "text-[var(--accent)]" : "text-[var(--muted-2)]"
+              isActive
+                ? "text-[var(--accent)]"
+                : "text-[var(--muted-2)] opacity-55"
             }`}
           >
             {isActive && sortState
@@ -190,7 +194,7 @@ export function DataTableChip({
   return (
     <span
       title={title}
-      className={`inline-flex max-w-full items-center whitespace-nowrap rounded-full border px-1.5 py-0.5 text-[10px] font-semibold leading-none ${chipToneClass[tone]} ${className}`}
+      className={`inline-flex min-h-[18px] max-w-full items-center overflow-hidden whitespace-nowrap rounded-full border px-1.5 py-0.5 text-[10px] font-semibold leading-none ${chipToneClass[tone]} ${className}`}
     >
       {children}
     </span>

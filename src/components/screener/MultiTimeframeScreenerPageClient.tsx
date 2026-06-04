@@ -68,6 +68,11 @@ import {
 
 const assetClass = "crypto";
 
+export const mtfScreenerProductionCopy = {
+  title: "Multi-Timeframe Screener",
+  description: "Compare joined scanner signals across 1h, 4h, 1d, and 1w.",
+};
+
 export type MtfScreenerTableSortKey =
   | "symbol"
   | "combined_rank"
@@ -189,12 +194,12 @@ export function MultiTimeframeScreenerPageClient() {
   };
 
   return (
-    <PageShell>
+    <PageShell className="overflow-x-hidden">
       <PageHeader
         eyebrow="Research workspace"
-        title="Multi-Timeframe Screener"
+        title={mtfScreenerProductionCopy.title}
         tone="screener"
-        description="Compare joined Binance USDT rows across 1h, 4h, 1d, and 1w. Default view shows the full joined dataset."
+        description={mtfScreenerProductionCopy.description}
         actions={
           <button
             type="button"
@@ -208,7 +213,7 @@ export function MultiTimeframeScreenerPageClient() {
           </button>
         }
         metadata={[
-          { label: "Dataset", value: "MTF latest joined", tone: "accent" },
+          { label: "Dataset", value: "Latest joined rows", tone: "accent" },
           {
             label: "Visible rows",
             value: `${visibleRows.length} of ${rows.length}`,
@@ -237,7 +242,7 @@ export function MultiTimeframeScreenerPageClient() {
         onClear={clearFilters}
       />
 
-      <div className="grid min-h-0 flex-1 gap-2 xl:grid-cols-[248px_minmax(0,1fr)]">
+      <div className="grid min-h-0 flex-1 gap-2 xl:grid-cols-[224px_minmax(0,1fr)]">
         <MtfScreenerControls
           filters={filters}
           symbolSearch={symbolSearch}
@@ -249,9 +254,10 @@ export function MultiTimeframeScreenerPageClient() {
           marketContextData={marketContextQuery.data}
           marketContextIsLoading={marketContextQuery.isLoading}
           marketContextIsError={marketContextQuery.isError}
+          className="order-2 xl:order-1"
         />
 
-        <main className="min-w-0 space-y-2">
+        <main className="order-1 min-w-0 space-y-2 xl:order-2">
           {latestQuery.isLoading ? (
             <MtfStatePanel message="Loading multi-timeframe latest scan data." />
           ) : latestQuery.isError ? (
@@ -307,7 +313,7 @@ export function MtfScreenerTable({
   return (
     <PageSection
       title="Joined Symbol Table"
-      description="Full joined dataset with local filters and sorting."
+      description="Joined scanner signals with local filters and sorting."
       tone="rows"
       actions={
         <div className="flex flex-wrap items-center justify-end gap-2">
@@ -335,20 +341,18 @@ export function MtfScreenerTable({
         />
       ) : null}
       <DataTableScroll>
-        <DataTable minWidth="min-w-[1320px]" className="table-fixed">
+        <DataTable minWidth="min-w-[1340px]" className="table-fixed">
           <thead className="bg-[var(--table-header)] text-[10px] uppercase tracking-normal text-[var(--muted)]">
             <tr>
               <DataTableHeaderCell
-                rowSpan={2}
                 sortKey="symbol"
                 sortState={sortState}
                 onSortChange={onSortChange}
-                className="sticky left-0 z-20 w-[118px] bg-[var(--table-header)]"
+                className="sticky left-0 z-20 w-[126px] bg-[var(--table-header)]"
               >
                 Symbol
               </DataTableHeaderCell>
               <DataTableHeaderCell
-                rowSpan={2}
                 sortKey="combined_rank"
                 sortState={sortState}
                 defaultDirection="desc"
@@ -359,42 +363,14 @@ export function MtfScreenerTable({
                 Rank
               </DataTableHeaderCell>
               <DataTableHeaderCell
-                rowSpan={2}
                 sortKey="higher_timeframe_safety"
                 sortState={sortState}
                 defaultDirection="desc"
                 onSortChange={onSortChange}
-                className="w-[106px]"
+                className="w-[112px]"
               >
                 Higher TF
               </DataTableHeaderCell>
-              {MTF_SCREENER_TIMEFRAMES.map((timeframe) => (
-                <DataTableHeaderCell
-                  key={`${timeframe}-header`}
-                  colSpan={2}
-                  align="center"
-                  className="border-l border-[var(--border)] text-center text-[var(--foreground)]"
-                >
-                  {timeframe}
-                </DataTableHeaderCell>
-              ))}
-              <DataTableHeaderCell
-                rowSpan={2}
-                sortKey="signal"
-                sortState={sortState}
-                onSortChange={onSortChange}
-                className="w-[156px]"
-              >
-                Signal
-              </DataTableHeaderCell>
-              <DataTableHeaderCell rowSpan={2} className="w-[230px]">
-                Notes
-              </DataTableHeaderCell>
-              <DataTableHeaderCell rowSpan={2} className="w-[104px]">
-                Research
-              </DataTableHeaderCell>
-            </tr>
-            <tr>
               {MTF_SCREENER_TIMEFRAMES.map((timeframe) => (
                 <TimeframeHeaderCells
                   key={timeframe}
@@ -403,6 +379,20 @@ export function MtfScreenerTable({
                   onSortChange={onSortChange}
                 />
               ))}
+              <DataTableHeaderCell
+                sortKey="signal"
+                sortState={sortState}
+                onSortChange={onSortChange}
+                className="w-[156px]"
+              >
+                Signal
+              </DataTableHeaderCell>
+              <DataTableHeaderCell className="w-[190px]">
+                Notes
+              </DataTableHeaderCell>
+              <DataTableHeaderCell className="w-[104px]">
+                Research
+              </DataTableHeaderCell>
             </tr>
           </thead>
           <tbody>
@@ -411,7 +401,7 @@ export function MtfScreenerTable({
                 key={row.symbol}
                 className="group border-t border-[var(--border)] align-top odd:bg-[var(--panel-data)] even:bg-[var(--panel-muted)] hover:bg-[var(--row-hover)]"
               >
-                <DataTableCell className="sticky left-0 z-10 bg-[var(--panel)] group-hover:bg-[var(--row-hover)]">
+                <DataTableCell className="sticky left-0 z-10 bg-inherit group-hover:bg-[var(--row-hover)]">
                   <div className="font-mono text-xs font-semibold text-[var(--foreground)]">
                     {row.symbol}
                   </div>
@@ -525,31 +515,27 @@ export function MtfResearchBucketsPanel({
   return (
     <PageSection
       title="Research Buckets"
-      description="Full-dataset counts before filters."
+      description="Counts before filters."
       className="mb-2 min-w-0"
       tone="screener"
+      bodyClassName="px-2.5 py-1.5"
       actions={
         <button
           type="button"
           onClick={onClear}
           aria-pressed={isFullTableActive}
-          className={`min-h-8 border px-2.5 py-1.5 text-left text-[11px] transition ${
+          className={`inline-flex min-h-7 items-center gap-2 border px-2 py-1 text-left text-[11px] transition ${
             isFullTableActive
               ? "border-[var(--accent)] bg-[var(--panel)] text-[var(--foreground)] shadow-[inset_0_-2px_0_var(--accent)]"
               : "border-[var(--border)] bg-[var(--control)] text-[var(--muted)] hover:border-[var(--border-strong)] hover:text-[var(--foreground)]"
           }`}
         >
-          <span className="block font-semibold">Full Table</span>
-          <span className="block font-mono tabular-nums">
-            {rows.length} symbols
-          </span>
+          <span className="font-semibold">Full Table</span>
+          <span className="font-mono tabular-nums">{rows.length}</span>
         </button>
       }
     >
-
-      <MtfGroupReadingKey />
-
-      <div className="mt-2 grid min-w-0 grid-cols-2 gap-1.5 lg:grid-cols-5">
+      <div className="grid min-w-0 grid-cols-2 gap-1 lg:grid-cols-5">
         {buckets.map((bucket) => {
           const isActive = presetId === bucket.id;
           const tone = getMtfResearchBucketTone(bucket.id);
@@ -563,21 +549,13 @@ export function MtfResearchBucketsPanel({
               aria-pressed={isActive}
               className={getMtfResearchBucketButtonClass(tone, isActive)}
             >
-              <span className="flex items-start justify-between gap-2">
+              <span className="flex items-center justify-between gap-2">
                 <span className="min-w-0 truncate text-[11px] font-semibold text-[var(--foreground)]">
                   {bucket.label}
                 </span>
-                <span className="text-right">
-                  <span className={`block font-mono text-sm tabular-nums ${getMtfResearchBucketValueClass(tone)}`}>
-                    {bucket.count}
-                  </span>
-                  <span className="block text-[10px] leading-3 text-[var(--muted)]">
-                    symbols
-                  </span>
+                <span className={`font-mono text-sm tabular-nums ${getMtfResearchBucketValueClass(tone)}`}>
+                  {bucket.count}
                 </span>
-              </span>
-              <span className="mt-0.5 block truncate text-[10px] leading-4 text-[var(--muted)]">
-                {bucket.implication}
               </span>
             </button>
           );
@@ -587,28 +565,7 @@ export function MtfResearchBucketsPanel({
   );
 }
 
-function MtfGroupReadingKey() {
-  const items = [
-    ["Eligible", "stronger candidates"],
-    ["Watch", "needs confirmation"],
-    ["Risk", "risk-first review"],
-    ["Overheated", "extended/crowded"],
-    ["Neutral", "baseline"],
-  ] as const;
-
-  return (
-    <div className="flex flex-wrap gap-x-3 gap-y-1 text-[10px] leading-4 text-[var(--muted)]">
-      {items.map(([label, description]) => (
-        <span key={label}>
-          <span className="font-semibold text-[var(--foreground)]">{label}</span>{" "}
-          {description}
-        </span>
-      ))}
-    </div>
-  );
-}
-
-function MtfScreenerControls({
+export function MtfScreenerControls({
   filters,
   symbolSearch,
   onSymbolSearchChange,
@@ -619,6 +576,7 @@ function MtfScreenerControls({
   marketContextData,
   marketContextIsLoading = false,
   marketContextIsError = false,
+  className = "",
 }: {
   filters: MtfScreenerFilters;
   symbolSearch: string;
@@ -633,12 +591,13 @@ function MtfScreenerControls({
   marketContextData?: MarketContextResponse | null;
   marketContextIsLoading?: boolean;
   marketContextIsError?: boolean;
+  className?: string;
 }) {
   const activeFilterLabels = getActiveMtfFilterLabels(filters, symbolSearch);
 
   return (
-    <aside className="border border-[var(--border)] bg-[var(--panel)] p-2.5 shadow-[var(--shadow-panel)] xl:h-fit xl:max-h-[calc(100vh-5rem)] xl:overflow-y-auto">
-      <div className="mb-2 flex items-center justify-between gap-2 border-b border-[var(--border)] pb-2">
+    <aside className={`border border-[var(--border)] bg-[var(--panel-muted)] p-2 shadow-none xl:h-fit xl:max-h-[calc(100vh-5rem)] xl:overflow-y-auto ${className}`}>
+      <div className="mb-2 flex items-center justify-between gap-2 border-b border-[var(--border)] pb-1.5">
         <div className="min-w-0">
           <h2 className="text-[13px] font-semibold">Filters</h2>
           <p className="mt-0.5 text-[10px] text-[var(--muted)]">
@@ -672,16 +631,16 @@ function MtfScreenerControls({
       </ControlGroup>
 
       {activeFilterLabels.length > 0 ? (
-        <div className="mt-3 flex flex-wrap gap-1">
+        <div className="mt-2 flex flex-wrap gap-1">
           {activeFilterLabels.map((label) => (
-            <StatusBadge key={label} tone="info">
+            <StatusBadge key={label} tone="info" className="text-[10px]">
               {label}
             </StatusBadge>
           ))}
         </div>
       ) : null}
 
-      <ControlGroup title="Group Filters" className="mt-3">
+      <ControlGroup title="Group Filters" className="mt-2">
         {MTF_SCREENER_TIMEFRAMES.map((timeframe) => (
           <label key={timeframe} className="block">
             <span className="mb-1 block text-[11px] text-[var(--muted)]">
@@ -707,7 +666,7 @@ function MtfScreenerControls({
         ))}
       </ControlGroup>
 
-      <ControlGroup title="Minimum Rank" className="mt-3">
+      <ControlGroup title="Minimum Rank" className="mt-2">
         {MTF_SCREENER_TIMEFRAMES.map((timeframe) => (
           <label key={timeframe} className="block">
             <span className="mb-1 block text-[11px] text-[var(--muted)]">
@@ -726,7 +685,7 @@ function MtfScreenerControls({
         ))}
       </ControlGroup>
 
-      <ControlGroup title="Risk Exclusions" className="mt-3">
+      <ControlGroup title="Risk Exclusions" className="mt-2">
         <label className="flex items-center gap-2 text-xs text-[var(--muted)]">
           <input
             type="checkbox"
@@ -747,7 +706,7 @@ function MtfScreenerControls({
         </label>
       </ControlGroup>
 
-      <details className="mt-3 border-t border-[var(--border)] pt-3">
+      <details className="mt-2 border-t border-[var(--border)] pt-2">
         <summary className="cursor-pointer text-[10px] font-semibold uppercase text-[var(--muted)]">
           Market backdrop
         </summary>
@@ -986,10 +945,9 @@ function TimeframeHeaderCells({
         sortState={sortState}
         defaultDirection="desc"
         onSortChange={onSortChange}
-        className="w-[78px] border-l border-[var(--border)]"
+        className="w-[86px] border-l border-[var(--border)]"
       >
-        Group
-        <span className="sr-only"> for {timeframe}</span>
+        {timeframe} Group
       </DataTableHeaderCell>
       <DataTableHeaderCell
         sortKey={`${timeframe}_rank`}
@@ -997,10 +955,9 @@ function TimeframeHeaderCells({
         defaultDirection="desc"
         onSortChange={onSortChange}
         align="right"
-        className="w-[52px]"
+        className="w-[64px]"
       >
-        Rank
-        <span className="sr-only"> for {timeframe}</span>
+        {timeframe} Rank
       </DataTableHeaderCell>
     </>
   );
@@ -1039,7 +996,7 @@ function GroupBadge({
   return (
     <DataTableChip
       tone={getMtfGroupChipTone(group)}
-      className="min-w-[72px] justify-center"
+      className="min-w-[74px] justify-center"
     >
       {children}
     </DataTableChip>
@@ -1092,7 +1049,7 @@ function getMtfResearchBucketValueClass(tone: StatusTone) {
 
 function getMtfResearchBucketButtonClass(tone: StatusTone, isActive: boolean) {
   const base =
-    "min-h-[54px] min-w-0 border border-l-2 bg-[var(--panel)] px-2.5 py-1.5 text-left transition";
+    "min-h-10 min-w-0 border border-l-2 bg-[var(--panel)] px-2 py-1.5 text-left transition";
   const toneClass = getMtfResearchBucketBorderClass(tone);
 
   return isActive
@@ -1140,29 +1097,32 @@ function HigherTimeframeHealthBadge({ row }: { row: MtfScreenerRow }) {
 }
 
 function RiskNotesCell({ row }: { row: MtfScreenerRow }) {
-  const summary = getMtfRiskNotesSummary(row, 3);
+  const summary = getMtfRiskNotesSummary(row, 2);
 
   if (summary.notes.length === 0) {
     return <span>-</span>;
   }
 
   return (
-    <div className="space-y-1 leading-4">
-      <div className="flex flex-wrap gap-1">
-        {summary.visibleNotes.map((note) => (
-          <DataTableChip key={note} title={note}>
-            {note}
-          </DataTableChip>
-        ))}
-        {summary.hiddenCount > 0 ? (
-          <DataTableChip
-            tone="warning"
-            title={summary.hiddenNotes.join("; ")}
-          >
-            +{summary.hiddenCount} risk notes
-          </DataTableChip>
-        ) : null}
-      </div>
+    <div className="flex min-w-0 items-center gap-1 overflow-hidden leading-4">
+      {summary.visibleNotes.map((note) => (
+        <DataTableChip
+          key={note}
+          title={note}
+          className="max-w-[82px] truncate"
+        >
+          {note}
+        </DataTableChip>
+      ))}
+      {summary.hiddenCount > 0 ? (
+        <DataTableChip
+          tone="warning"
+          title={summary.hiddenNotes.join("; ")}
+          className="shrink-0"
+        >
+          +{summary.hiddenCount}
+        </DataTableChip>
+      ) : null}
     </div>
   );
 }
@@ -1186,7 +1146,7 @@ function getMtfErrorMessage(error: unknown) {
     : "Unable to load multi-timeframe screener data.";
 }
 
-function areMtfScreenerFiltersDefault(filters: MtfScreenerFilters) {
+export function areMtfScreenerFiltersDefault(filters: MtfScreenerFilters) {
   return (
     MTF_SCREENER_TIMEFRAMES.every(
       (timeframe) =>

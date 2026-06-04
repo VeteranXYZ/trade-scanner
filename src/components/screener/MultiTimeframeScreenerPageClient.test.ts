@@ -9,7 +9,9 @@ import {
   MtfScreenerExportControls,
   MtfResearchBucketsPanel,
   MtfScreenerTable,
+  mtfScreenerProductionCopy,
 } from "./MultiTimeframeScreenerPageClient";
+import { MtfScreenerVisualCheckPage } from "./MtfScreenerVisualCheckPage";
 import {
   buildMtfScreenerRows,
   type MtfLatestScanResponse,
@@ -24,6 +26,16 @@ describe("MultiTimeframeScreenerTable", () => {
         tradeApiBaseUrl: "https://api.auere.com/",
       }),
     ).toBe("https://api.auere.com/api/scan/mtf-latest?assetClass=crypto");
+  });
+
+  it("keeps production screener copy product-focused", () => {
+    expect(mtfScreenerProductionCopy.title).toBe("Multi-Timeframe Screener");
+    expect(mtfScreenerProductionCopy.description).toBe(
+      "Compare joined scanner signals across 1h, 4h, 1d, and 1w.",
+    );
+    expect(mtfScreenerProductionCopy.description).not.toMatch(
+      /frontend-only|visual check|mock|preview/i,
+    );
   });
 
   it("renders the research buckets panel with conservative copy and counts", () => {
@@ -57,15 +69,15 @@ describe("MultiTimeframeScreenerTable", () => {
     );
 
     expect(html).toContain("Research Buckets");
-    expect(html).toContain("Full-dataset counts");
-    expect(html).toContain("Eligible");
-    expect(html).toContain("stronger candidates");
+    expect(html).toContain("Counts before filters");
     expect(html).toContain("Full Table");
-    expect(html).toContain("3 symbols");
     expect(html).toContain("Short-term Repair");
     expect(html).toContain("MTF Strength");
     expect(html).toContain("Higher-TF Watchlist");
-    expect(html).toContain("symbols");
+    expect(html).toContain("Overheated");
+    expect(html).toContain("Breakdown Risk");
+    expect(html).not.toContain("stronger candidates");
+    expect(html).not.toContain("symbols");
     expect(html).not.toContain("Research-only");
     expect(html).toContain(">2</span>");
     expect(html).not.toContain("Best");
@@ -109,11 +121,14 @@ describe("MultiTimeframeScreenerTable", () => {
       "Symbol",
       "Rank",
       "Higher TF",
-      "1h",
-      "4h",
-      "1d",
-      "1w",
-      "Group",
+      "1h Group",
+      "1h Rank",
+      "4h Group",
+      "4h Rank",
+      "1d Group",
+      "1d Rank",
+      "1w Group",
+      "1w Rank",
       "Signal",
       "Notes",
       "Research",
@@ -246,9 +261,21 @@ describe("MultiTimeframeScreenerTable", () => {
       createElement(MtfScreenerTable, { rows }),
     );
 
-    expect(html).toContain("+1 risk notes");
+    expect(html).toContain("+2");
+    expect(html).not.toContain("+2 risk notes");
     expect(html).toContain("1w:");
     expect(html).toContain("4h Research");
+  });
+
+  it("renders the populated visual-check page with mock rows", () => {
+    const html = renderToStaticMarkup(createElement(MtfScreenerVisualCheckPage));
+
+    expect(html).toContain("Visual check");
+    expect(html).toContain("Frontend-only populated preview");
+    expect(html).toContain("Mock joined rows");
+    expect(html).toContain("1000PEPEUSDT");
+    expect(html).toContain("Joined Symbol Table");
+    expect(html).toContain("+2");
   });
 
   it("renders all rows without show-more or pagination behavior", () => {

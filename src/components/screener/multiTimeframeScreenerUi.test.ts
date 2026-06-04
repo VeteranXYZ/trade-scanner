@@ -401,11 +401,16 @@ describe("multi-timeframe screener helpers", () => {
         }),
       ]),
     });
-    const summary = getMtfRiskNotesSummary(row, 3);
+    const summary = getMtfRiskNotesSummary(row, 2);
 
-    expect(summary.visibleNotes).toHaveLength(3);
-    expect(summary.hiddenCount).toBe(1);
-    expect(summary.hiddenNotes[0]).toContain("1w:");
+    expect(summary.visibleNotes).toHaveLength(2);
+    expect(summary.visibleNotes[0]).toContain("1w:");
+    expect(summary.visibleNotes[1]).toContain("1h:");
+    expect(summary.hiddenCount).toBe(2);
+    expect(summary.hiddenNotes).toEqual([
+      "1d: Risk group",
+      "4h: Overheated",
+    ]);
   });
 
   it("returns active preset explanation text", () => {

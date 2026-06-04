@@ -140,7 +140,7 @@ export function formatDateTime(value: string | null | undefined) {
     return "Not available";
   }
 
-  return date.toLocaleString([], {
+  return date.toLocaleString("en-US", {
     year: "numeric",
     month: "short",
     day: "2-digit",

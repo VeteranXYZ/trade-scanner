@@ -7,11 +7,11 @@
   --workspace-background: #f7f9fb;
   --panel-background: #ffffff;
   --panel-elevated: #ffffff;
-  --panel-muted: #fafbfc;
+  --panel-muted: #fbfcfd;
   --panel-tinted: #ffffff;
   --panel-data: #ffffff;
-  --table-header-background: #eef3f6;
-  --row-hover-background: #eefaf8;
+  --table-header-background: #edf2f5;
+  --row-hover-background: #f1faf8;
   --row-selected-background: #d9f0ee;
   --border-subtle: rgba(32, 46, 61, 0.13);
   --border-medium: rgba(32, 46, 61, 0.22);
@@ -93,7 +93,7 @@
   --radius-md: 6px;
   --space-panel: 12px;
   --button-height: 32px;
-  --table-row-height: 34px;
+  --table-row-height: 32px;
   --shadow-panel: 0 1px 2px rgba(15, 23, 42, 0.045);
   --shadow-elevated: 0 8px 18px rgba(15, 23, 42, 0.07);
 }
@@ -110,6 +110,12 @@ body {
     Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
     sans-serif;
   font-size: 14px;
+}
+
+html,
+body {
+  max-width: 100%;
+  overflow-x: hidden;
 }
 
 a {

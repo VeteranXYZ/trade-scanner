@@ -1,0 +1,178 @@
+"use client";
+
+import { useMemo, useState } from "react";
+import {
+  getNextDataSortState,
+  sortDataRows,
+  type DataSortDirection,
+  type DataSortState,
+} from "@/components/table/dataTableSorting";
+import { PageHeader, PageShell } from "@/components/ui/workspace";
+import {
+  areMtfScreenerFiltersDefault,
+  getMtfScreenerTableSortValue,
+  MtfResearchBucketsPanel,
+  MtfScreenerControls,
+  MtfScreenerTable,
+  type MtfScreenerTableSortKey,
+} from "./MultiTimeframeScreenerPageClient";
+import {
+  buildMtfScreenerRowsFromResponse,
+  defaultMtfScreenerFilters,
+  filterMtfScreenerRows,
+  filterMtfScreenerRowsBySearch,
+  type MtfScreenerFilters,
+  type MtfScreenerGroupFilter,
+  type MtfScreenerPresetId,
+  type MtfScreenerTimeframe,
+} from "./multiTimeframeScreenerUi";
+import { buildMtfScreenerPreviewResponse } from "./multiTimeframeScreenerPreviewData";
+
+export const mtfScreenerVisualCheckCopy = {
+  eyebrow: "Visual check",
+  title: "Multi-Timeframe Screener",
+  description:
+    "Frontend-only populated preview of joined MTF rows. API and data behavior are unchanged.",
+};
+
+export function MtfScreenerVisualCheckPage() {
+  const previewData = useMemo(() => buildMtfScreenerPreviewResponse(), []);
+  const [filters, setFilters] = useState<MtfScreenerFilters>(
+    defaultMtfScreenerFilters,
+  );
+  const [presetId, setPresetId] = useState<MtfScreenerPresetId | "custom">(
+    "custom",
+  );
+  const [symbolSearch, setSymbolSearch] = useState("");
+  const [tableSortState, setTableSortState] =
+    useState<DataSortState<MtfScreenerTableSortKey> | null>(null);
+  const rows = useMemo(
+    () => buildMtfScreenerRowsFromResponse(previewData),
+    [previewData],
+  );
+  const filteredRows = useMemo(
+    () => filterMtfScreenerRows(rows, filters, presetId),
+    [filters, presetId, rows],
+  );
+  const searchedRows = useMemo(
+    () => filterMtfScreenerRowsBySearch(filteredRows, symbolSearch),
+    [filteredRows, symbolSearch],
+  );
+  const visibleRows = useMemo(
+    () => sortDataRows(searchedRows, tableSortState, getMtfScreenerTableSortValue),
+    [searchedRows, tableSortState],
+  );
+  const isFullTableActive =
+    presetId === "custom" &&
+    symbolSearch.trim() === "" &&
+    areMtfScreenerFiltersDefault(filters) &&
+    tableSortState === null;
+  const updateGroupFilter = (
+    timeframe: MtfScreenerTimeframe,
+    value: MtfScreenerGroupFilter,
+  ) => {
+    setPresetId("custom");
+    setFilters((current) => ({
+      ...current,
+      groups: { ...current.groups, [timeframe]: value },
+    }));
+  };
+  const updateMinRank = (timeframe: MtfScreenerTimeframe, value: string) => {
+    const parsed = Number(value);
+
+    setPresetId("custom");
+    setFilters((current) => ({
+      ...current,
+      minRank: {
+        ...current.minRank,
+        [timeframe]: Number.isFinite(parsed) ? Math.max(0, parsed) : 0,
+      },
+    }));
+  };
+  const updateExcludeRisk = (key: "exclude1dRisk" | "exclude1wRisk") => {
+    setPresetId("custom");
+    setFilters((current) => ({ ...current, [key]: !current[key] }));
+  };
+  const updateTableSort = (
+    key: MtfScreenerTableSortKey,
+    defaultDirection: DataSortDirection,
+  ) => {
+    setTableSortState((current) =>
+      getNextDataSortState({ current, key, defaultDirection }),
+    );
+  };
+  const applyPreset = (nextPresetId: MtfScreenerPresetId) => {
+    setPresetId(nextPresetId);
+    setFilters(defaultMtfScreenerFilters);
+  };
+  const clearFilters = () => {
+    setPresetId("custom");
+    setFilters(defaultMtfScreenerFilters);
+    setSymbolSearch("");
+    setTableSortState(null);
+  };
+
+  return (
+    <PageShell className="overflow-x-hidden">
+      <PageHeader
+        eyebrow={mtfScreenerVisualCheckCopy.eyebrow}
+        title={mtfScreenerVisualCheckCopy.title}
+        tone="screener"
+        description={mtfScreenerVisualCheckCopy.description}
+        metadata={[
+          { label: "Dataset", value: "Mock joined rows", tone: "accent" },
+          {
+            label: "Visible rows",
+            value: `${visibleRows.length} of ${rows.length}`,
+            tone: visibleRows.length === rows.length ? "complete" : "info",
+          },
+          {
+            label: "Sort",
+            value: tableSortState
+              ? `${tableSortState.key} ${tableSortState.direction}`
+              : "Incoming order",
+            tone: tableSortState ? "info" : "neutral",
+          },
+          {
+            label: "Filters",
+            value: isFullTableActive ? "Full table" : "Active",
+            tone: isFullTableActive ? "complete" : "warning",
+          },
+        ]}
+      />
+
+      <MtfResearchBucketsPanel
+        rows={rows}
+        presetId={presetId}
+        isFullTableActive={isFullTableActive}
+        onBucketSelect={applyPreset}
+        onClear={clearFilters}
+      />
+
+      <div className="grid min-h-0 flex-1 gap-2 xl:grid-cols-[224px_minmax(0,1fr)]">
+        <MtfScreenerControls
+          filters={filters}
+          symbolSearch={symbolSearch}
+          onSymbolSearchChange={setSymbolSearch}
+          onGroupChange={updateGroupFilter}
+          onMinRankChange={updateMinRank}
+          onExcludeRiskChange={updateExcludeRisk}
+          onClear={clearFilters}
+          marketContextIsError
+          className="order-2 xl:order-1"
+        />
+
+        <main className="order-1 min-w-0 space-y-2 xl:order-2">
+          <MtfScreenerTable
+            rows={visibleRows}
+            sortState={tableSortState}
+            onSortChange={updateTableSort}
+            sourceData={previewData}
+            totalRows={rows.length}
+            filteredRows={visibleRows.length}
+          />
+        </main>
+      </div>
+    </PageShell>
+  );
+}

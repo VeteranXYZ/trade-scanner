@@ -574,30 +574,60 @@ export function getMtfPrimarySignal(row: MtfScreenerRow) {
 }
 
 export function getMtfRiskNoteItems(row: MtfScreenerRow) {
-  const notes: string[] = [];
+  const noteItems: Array<{
+    note: string;
+    severityRank: number;
+    timeframeRank: number;
+    order: number;
+  }> = [];
 
-  for (const timeframe of MTF_SCREENER_TIMEFRAMES) {
+  MTF_SCREENER_TIMEFRAMES.forEach((timeframe, order) => {
     const snapshot = row.snapshots[timeframe];
 
     if (!snapshot) {
-      continue;
+      return;
     }
 
     const riskLabels = getDetectedRiskTypeLabels(snapshot.detectedRiskTypes);
+    const timeframeRank = getMtfRiskNoteTimeframeRank(timeframe);
 
     if (riskLabels.length > 0) {
-      notes.push(`${timeframe}: ${riskLabels.join(", ")}`);
-      continue;
+      noteItems.push({
+        note: `${timeframe}: ${riskLabels.join(", ")}`,
+        severityRank: 0,
+        timeframeRank,
+        order,
+      });
+      return;
     }
 
     if (snapshot.resultGroup === "risk") {
-      notes.push(`${timeframe}: Risk group`);
+      noteItems.push({
+        note: `${timeframe}: Risk group`,
+        severityRank: 1,
+        timeframeRank,
+        order,
+      });
     } else if (snapshot.resultGroup === "overheated") {
-      notes.push(`${timeframe}: Overheated`);
+      noteItems.push({
+        note: `${timeframe}: Overheated`,
+        severityRank: 2,
+        timeframeRank,
+        order,
+      });
     }
-  }
+  });
 
-  return uniqueStrings(notes);
+  return uniqueStrings(
+    noteItems
+      .sort(
+        (left, right) =>
+          left.severityRank - right.severityRank ||
+          left.timeframeRank - right.timeframeRank ||
+          left.order - right.order,
+      )
+      .map((item) => item.note),
+  );
 }
 
 export function getMtfRiskNotesSummary(
@@ -822,6 +852,19 @@ function getMtfRankWeight(timeframe: MtfScreenerTimeframe) {
     case "1h":
     case "1w":
       return 1;
+  }
+}
+
+function getMtfRiskNoteTimeframeRank(timeframe: MtfScreenerTimeframe) {
+  switch (timeframe) {
+    case "1w":
+      return 0;
+    case "1d":
+      return 1;
+    case "4h":
+      return 2;
+    case "1h":
+      return 3;
   }
 }
 
