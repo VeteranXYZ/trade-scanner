@@ -15,9 +15,11 @@ import {
   getWatchlistSummary,
 } from "./watchlistUi";
 import {
+  buildMtfScreenerRowsFromResponse,
   buildMtfScreenerRows,
   type MtfLatestScanResponse,
 } from "@/components/screener/multiTimeframeScreenerUi";
+import { buildWatchlistVisualCheckData } from "./watchlistPreviewData";
 
 describe("WatchlistPageClient", () => {
   it("uses the full multi-timeframe latest API endpoint", () => {
@@ -49,6 +51,7 @@ describe("WatchlistPageClient", () => {
         null,
         createElement(WatchlistSummaryCards, {
           summary: getWatchlistSummary(rows),
+          researchSummary: buildWatchlistResearchSummary(rows),
         }),
         createElement(WatchlistResearchSummaryPanel, {
           summary: buildWatchlistResearchSummary(rows),
@@ -57,19 +60,19 @@ describe("WatchlistPageClient", () => {
       ),
     );
 
-    expect(html).toContain("Total selected symbols");
-    expect(html).toContain("Watchlist Research Summary");
-    expect(html).toContain("Research-only");
-    expect(html).toContain("Research posture");
-    expect(html).toContain("Manual Review Candidates");
-    expect(html).toContain("Risk-First Review");
+    expect(html).toContain("Selected");
+    expect(html).toContain("Found");
+    expect(html).toContain("Missing");
+    expect(html).toContain("Attention");
+    expect(html).toContain("Watch / Repair");
+    expect(html).toContain("Risk First");
     expect(html).toContain("Data Gaps");
     expect(html).not.toContain("Best Research Candidates");
     expect(html).toContain("Selected Symbols");
     expect(html).toContain("BTCUSDT");
     expect(html).toContain("SEIUSDT");
-    expect(html).toContain("4h Group");
-    expect(html).toContain("4h Rank");
+    expect(html).toContain("State + Rank");
+    expect(html).toContain("4h");
     expect(html).toContain("72.5");
     expect(html).toContain("Not found");
   });
@@ -134,9 +137,10 @@ describe("WatchlistPageClient", () => {
       expect(html).toContain(`${symbol}USDT`);
     }
 
-    expect(html).toContain("8 watchlist rows");
+    expect(html).toContain("Showing 8 of 8");
     expect(html).not.toContain("Show More");
     expect(html).not.toContain("show more");
+    expect(html).not.toContain("+1 more");
     expect(html).not.toContain("Pagination");
   });
 
@@ -192,8 +196,77 @@ describe("WatchlistPageClient", () => {
       }),
     );
 
-    expect(html).toContain("Action");
-    expect(html.match(/Remove/g)).toHaveLength(2);
+    expect(html).toContain("Remove");
+    expect(html.match(/<button[^>]*>Remove<\/button>/g)).toHaveLength(2);
+  });
+
+  it("renders table-header sort controls for data columns", () => {
+    const rows = buildWatchlistRows(
+      ["BTC", "ETH"],
+      buildMtfScreenerRows({
+        "4h": makeResponse("4h", [
+          makeItem({ symbol: "BTCUSDT", timeframe: "4h", rankScore: 75 }),
+          makeItem({ symbol: "ETHUSDT", timeframe: "4h", rankScore: 65 }),
+        ]),
+      }),
+    );
+    const html = renderToStaticMarkup(
+      createElement(WatchlistTable, {
+        rows,
+        sortState: { key: "symbol", direction: "asc" },
+        onSortChange: () => undefined,
+      }),
+    );
+
+    expect(html.match(/<button/g)).toHaveLength(7);
+    expect(html).toContain('aria-sort="ascending"');
+    expect(html).toContain("Symbol");
+    expect(html).toContain("1h");
+    expect(html).toContain("4h");
+    expect(html).toContain("1d");
+    expect(html).toContain("1w");
+    expect(html).toContain("Primary");
+    expect(html).toContain("Attention");
+  });
+
+  it("renders populated visual-check watchlist coverage", () => {
+    const visualCheckData = buildWatchlistVisualCheckData();
+    const rows = buildWatchlistRows(
+      visualCheckData.selectedSymbols,
+      buildMtfScreenerRowsFromResponse(visualCheckData.latestData),
+    );
+    const html = renderToStaticMarkup(
+      createElement(
+        "div",
+        null,
+        createElement(WatchlistSummaryCards, {
+          summary: getWatchlistSummary(rows),
+          researchSummary: buildWatchlistResearchSummary(rows),
+        }),
+        createElement(WatchlistResearchSummaryPanel, {
+          summary: buildWatchlistResearchSummary(rows),
+        }),
+        createElement(WatchlistTable, {
+          rows,
+          sourceData: visualCheckData.latestData,
+          totalRows: rows.length,
+          filteredRows: rows.length,
+        }),
+      ),
+    );
+
+    expect(visualCheckData.selectedSymbols).toContain("MISSINGUSDT");
+    expect(html).toContain("BTCUSDT");
+    expect(html).toContain("DOGEUSDT");
+    expect(html).toContain("MISSINGUSDT");
+    expect(html).toContain("Hot");
+    expect(html).toContain("Risk");
+    expect(html).toContain("Watch");
+    expect(html).toContain("Not found");
+    expect(html).toContain("Not returned");
+    expect(html).toContain("4h Research");
+    expect(html).not.toContain("Show More");
+    expect(html).not.toContain("show more");
   });
 });
 

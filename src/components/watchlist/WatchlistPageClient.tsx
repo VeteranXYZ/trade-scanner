@@ -4,10 +4,21 @@ import { useQuery } from "@tanstack/react-query";
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { MarketContextPanel } from "@/components/market-context/MarketContextPanel";
-import { fetchMarketContext } from "@/components/market-context/marketContextUi";
+import {
+  fetchMarketContext,
+  type MarketContextPanelState,
+} from "@/components/market-context/marketContextUi";
 import { shortResearchDisclaimer } from "@/components/researchCopy";
 import { formatDateTime } from "@/components/scanner/latestScanUi";
-import { PageHeader, PageShell } from "@/components/ui/workspace";
+import {
+  DataTable,
+  DataTableCell,
+  DataTableChip,
+  DataTableHeaderCell,
+  DataTableScroll,
+  type ChipTone,
+} from "@/components/table/DataTable";
+import { PageShell, StatusBadge, type StatusTone } from "@/components/ui/workspace";
 import {
   MTF_SCREENER_TIMEFRAMES,
   buildMtfScreenerRowsFromResponse,
@@ -39,26 +50,34 @@ import {
   saveWatchlistSymbols,
   sortWatchlistRows,
   watchlistPresets,
-  watchlistSortOptions,
   type WatchlistFilters,
   type WatchlistPresetId,
   type WatchlistResearchSummary,
   type WatchlistResearchSummaryItem,
   type WatchlistRow,
-  type WatchlistSortDirection,
   type WatchlistSortField,
   type WatchlistSortState,
   type WatchlistSummary,
 } from "./watchlistUi";
+import type { WatchlistVisualCheckData } from "./watchlistPreviewData";
 
 const assetClass = "crypto";
+type WatchlistTableSortState = {
+  key: WatchlistSortField;
+  direction: WatchlistSortState["direction"];
+};
 
-export function WatchlistPageClient() {
-  const [symbols, setSymbols] = useState<string[]>([
-    ...DEFAULT_WATCHLIST_SYMBOLS,
-  ]);
+export function WatchlistPageClient({
+  visualCheckData,
+}: {
+  visualCheckData?: WatchlistVisualCheckData;
+} = {}) {
+  const isVisualCheck = Boolean(visualCheckData);
+  const initialSymbols =
+    visualCheckData?.selectedSymbols ?? DEFAULT_WATCHLIST_SYMBOLS;
+  const [symbols, setSymbols] = useState<string[]>(() => [...initialSymbols]);
   const [draftInput, setDraftInput] = useState(
-    formatWatchlistInput(DEFAULT_WATCHLIST_SYMBOLS),
+    formatWatchlistInput(initialSymbols),
   );
   const [importInput, setImportInput] = useState("");
   const [importStatus, setImportStatus] = useState<string | null>(null);
@@ -71,6 +90,7 @@ export function WatchlistPageClient() {
   const latestQuery = useQuery({
     queryKey: ["mtf-latest-watchlist", assetClass],
     queryFn: ({ signal }) => fetchWatchlistMtfLatestScans({ signal }),
+    enabled: !isVisualCheck,
     refetchOnWindowFocus: false,
     retry: false,
     staleTime: Number.POSITIVE_INFINITY,
@@ -78,12 +98,17 @@ export function WatchlistPageClient() {
   const marketContextQuery = useQuery({
     queryKey: ["market-context", assetClass],
     queryFn: ({ signal }) => fetchMarketContext({ assetClass, signal }),
+    enabled: !isVisualCheck,
     refetchOnWindowFocus: false,
     retry: false,
     staleTime: 60_000,
   });
 
   useEffect(() => {
+    if (isVisualCheck) {
+      return;
+    }
+
     const loadedSymbols = loadWatchlistSymbols(getBrowserStorage());
     let cancelled = false;
 
@@ -99,11 +124,24 @@ export function WatchlistPageClient() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [isVisualCheck]);
+
+  const latestData = visualCheckData?.latestData ?? latestQuery.data;
+  const latestIsLoading = !isVisualCheck && latestQuery.isLoading;
+  const latestIsError = !isVisualCheck && latestQuery.isError;
+  const latestError = latestIsError ? latestQuery.error : null;
+  const latestIsFetching = !isVisualCheck && latestQuery.isFetching;
+  const marketContextData =
+    visualCheckData?.marketContextData ?? marketContextQuery.data;
+  const marketContextIsLoading =
+    !isVisualCheck && marketContextQuery.isLoading;
+  const marketContextIsError = !isVisualCheck && marketContextQuery.isError;
+  const marketContextIsFetching =
+    !isVisualCheck && marketContextQuery.isFetching;
 
   const mtfRows = useMemo(
-    () => buildMtfScreenerRowsFromResponse(latestQuery.data),
-    [latestQuery.data],
+    () => buildMtfScreenerRowsFromResponse(latestData),
+    [latestData],
   );
   const watchlistRows = useMemo(
     () => buildWatchlistRows(symbols, mtfRows),
@@ -125,10 +163,19 @@ export function WatchlistPageClient() {
     () => sortWatchlistRows(filteredRows, sortState),
     [filteredRows, sortState],
   );
+  const tableSortState = useMemo<WatchlistTableSortState>(
+    () => ({ key: sortState.field, direction: sortState.direction }),
+    [sortState],
+  );
   const exportText = useMemo(
     () => buildWatchlistExportText(parseWatchlistSymbols(draftInput)),
     [draftInput],
   );
+  const persistWatchlist = (nextSymbols: readonly string[]) => {
+    if (!isVisualCheck) {
+      saveWatchlistSymbols(getBrowserStorage(), nextSymbols);
+    }
+  };
 
   const saveWatchlist = () => {
     const nextSymbols = parseWatchlistSymbols(draftInput);
@@ -137,17 +184,19 @@ export function WatchlistPageClient() {
     setDraftInput(formatWatchlistInput(nextSymbols));
     setImportStatus(null);
     setExportStatus(null);
-    saveWatchlistSymbols(getBrowserStorage(), nextSymbols);
+    persistWatchlist(nextSymbols);
   };
   const resetDefault = () => {
-    const nextSymbols = [...DEFAULT_WATCHLIST_SYMBOLS];
+    const nextSymbols = [
+      ...(visualCheckData?.selectedSymbols ?? DEFAULT_WATCHLIST_SYMBOLS),
+    ];
 
     setSymbols(nextSymbols);
     setDraftInput(formatWatchlistInput(nextSymbols));
     setImportInput("");
     setImportStatus(null);
     setExportStatus(null);
-    saveWatchlistSymbols(getBrowserStorage(), nextSymbols);
+    persistWatchlist(nextSymbols);
   };
   const clearWatchlist = () => {
     setSymbols([]);
@@ -155,7 +204,7 @@ export function WatchlistPageClient() {
     setImportInput("");
     setImportStatus(null);
     setExportStatus(null);
-    saveWatchlistSymbols(getBrowserStorage(), []);
+    persistWatchlist([]);
   };
   const applyPreset = (presetId: WatchlistPresetId) => {
     const presetSymbols = applyWatchlistPreset(presetId);
@@ -198,7 +247,7 @@ export function WatchlistPageClient() {
     setDraftInput(formatWatchlistInput(nextSymbols));
     setImportStatus(null);
     setExportStatus(null);
-    saveWatchlistSymbols(getBrowserStorage(), nextSymbols);
+    persistWatchlist(nextSymbols);
   };
   const updateFilter = <Key extends keyof WatchlistFilters>(
     key: Key,
@@ -206,46 +255,47 @@ export function WatchlistPageClient() {
   ) => {
     setFilters((current) => ({ ...current, [key]: value }));
   };
-  const updateSortField = (field: WatchlistSortField) => {
-    setSortState((current) => ({ ...current, field }));
-  };
-  const updateSortDirection = (direction: WatchlistSortDirection) => {
-    setSortState((current) => ({ ...current, direction }));
+  const updateTableSort = (
+    field: WatchlistSortField,
+    defaultDirection: WatchlistSortState["direction"],
+  ) => {
+    setSortState((current) =>
+      current.field === field
+        ? {
+            field,
+            direction: current.direction === "asc" ? "desc" : "asc",
+          }
+        : { field, direction: defaultDirection },
+    );
   };
   const refreshData = () => {
+    if (isVisualCheck) {
+      return;
+    }
+
     void latestQuery.refetch();
     void marketContextQuery.refetch();
   };
 
   return (
-    <PageShell>
-      <PageHeader
-        eyebrow="Watchlist"
-        title="Watchlist Multi-Timeframe"
-        description={`${shortResearchDisclaimer} MTF view for selected Binance USDT crypto symbols. All selected symbols remain visible by default.`}
-        actions={
-          <button
-            type="button"
-            onClick={refreshData}
-            disabled={latestQuery.isFetching || marketContextQuery.isFetching}
-            className="ui-button h-8 px-3 text-[11px] disabled:cursor-not-allowed disabled:opacity-60"
-          >
-            {latestQuery.isFetching || marketContextQuery.isFetching
-              ? "Refreshing"
-              : "Refresh Data"}
-          </button>
-        }
+    <PageShell className="watchlist-terminal max-w-none xl:h-full xl:min-h-0 xl:overflow-hidden">
+      <WatchlistCommandBar
+        summary={summary}
+        researchSummary={researchSummary}
+        sourceData={latestData}
+        isLoading={latestIsLoading}
+        isError={latestIsError}
+        isRefreshing={latestIsFetching || marketContextIsFetching}
+        isVisualCheck={isVisualCheck}
+        visibleRows={sortedRows.length}
+        totalRows={watchlistRows.length}
+        onRefresh={refreshData}
+        onSave={saveWatchlist}
+        onResetDefault={resetDefault}
+        onClear={clearWatchlist}
       />
 
-      <div className="mb-2">
-        <MarketContextPanel
-          data={marketContextQuery.data}
-          isLoading={marketContextQuery.isLoading}
-          isError={marketContextQuery.isError}
-        />
-      </div>
-
-      <div className="grid min-h-0 flex-1 gap-2 xl:grid-cols-[300px_minmax(0,1fr)]">
+      <div className="grid min-h-0 flex-1 gap-2 xl:grid-cols-[232px_minmax(0,1fr)] xl:overflow-hidden">
         <WatchlistControls
           draftInput={draftInput}
           importInput={importInput}
@@ -253,47 +303,70 @@ export function WatchlistPageClient() {
           exportText={exportText}
           exportStatus={exportStatus}
           filters={filters}
-          sortState={sortState}
           onDraftInputChange={setDraftInput}
           onImportInputChange={setImportInput}
-          onSave={saveWatchlist}
-          onResetDefault={resetDefault}
-          onClear={clearWatchlist}
           onPreset={applyPreset}
           onImport={importSymbols}
           onCopyExport={copyExportText}
           onFilterChange={updateFilter}
-          onSortFieldChange={updateSortField}
-          onSortDirectionChange={updateSortDirection}
         />
 
-        <main className="min-w-0 space-y-2">
-          <WatchlistSummaryCards summary={summary} />
-          <WatchlistSourcePanel
-            data={latestQuery.data}
-            totalRows={watchlistRows.length}
-            filteredRows={sortedRows.length}
-          />
-          <WatchlistStatusNotice
+        <main className="min-w-0 space-y-2 xl:flex xl:min-h-0 xl:flex-col xl:overflow-hidden">
+          <WatchlistSummaryCards
             summary={summary}
-            isLoading={latestQuery.isLoading}
+            researchSummary={researchSummary}
           />
+          {!latestIsError ? (
+            <WatchlistSourcePanel
+              data={latestData}
+              totalRows={watchlistRows.length}
+              filteredRows={sortedRows.length}
+            />
+          ) : null}
+          {latestIsError ? (
+            <WatchlistApiNotice
+              message={getWatchlistErrorMessage(latestError)}
+              summary={summary}
+            />
+          ) : (
+            <WatchlistStatusNotice
+              summary={summary}
+              isLoading={latestIsLoading}
+            />
+          )}
           <WatchlistResearchSummaryPanel summary={researchSummary} />
 
-          {latestQuery.isLoading ? (
+          {latestIsLoading ? (
             <WatchlistStatePanel message="Loading watchlist multi-timeframe data..." />
-          ) : latestQuery.isError ? (
-            <>
-              <WatchlistStatePanel
-                message={getWatchlistErrorMessage(latestQuery.error)}
-              />
-              <WatchlistTable rows={sortedRows} onRemoveSymbol={removeSymbol} />
-            </>
+          ) : latestIsError ? (
+            <WatchlistTable
+              rows={sortedRows}
+              onRemoveSymbol={removeSymbol}
+              sourceData={latestData}
+              totalRows={watchlistRows.length}
+              filteredRows={sortedRows.length}
+              sortState={tableSortState}
+              onSortChange={updateTableSort}
+            />
           ) : (
-            <WatchlistTable rows={sortedRows} onRemoveSymbol={removeSymbol} />
+            <WatchlistTable
+              rows={sortedRows}
+              onRemoveSymbol={removeSymbol}
+              sourceData={latestData}
+              totalRows={watchlistRows.length}
+              filteredRows={sortedRows.length}
+              sortState={tableSortState}
+              onSortChange={updateTableSort}
+            />
           )}
 
-          <footer className="border border-[var(--border)] bg-[var(--panel)] px-3 py-2 text-[11px] text-[var(--muted)]">
+          <WatchlistBackdropDisclosure
+            data={marketContextData}
+            isLoading={marketContextIsLoading}
+            isError={marketContextIsError}
+          />
+
+          <footer className="border border-[var(--border)] bg-[var(--panel)] px-3 py-1.5 text-[11px] text-[var(--muted)]">
             {shortResearchDisclaimer}
           </footer>
         </main>
@@ -302,12 +375,129 @@ export function WatchlistPageClient() {
   );
 }
 
+function WatchlistCommandBar({
+  summary,
+  researchSummary,
+  sourceData,
+  isLoading,
+  isError,
+  isRefreshing,
+  isVisualCheck,
+  visibleRows,
+  totalRows,
+  onRefresh,
+  onSave,
+  onResetDefault,
+  onClear,
+}: {
+  summary: WatchlistSummary;
+  researchSummary: WatchlistResearchSummary;
+  sourceData?: MtfLatestScreenerResponse;
+  isLoading: boolean;
+  isError: boolean;
+  isRefreshing: boolean;
+  isVisualCheck: boolean;
+  visibleRows: number;
+  totalRows: number;
+  onRefresh: () => void;
+  onSave: () => void;
+  onResetDefault: () => void;
+  onClear: () => void;
+}) {
+  const statusTone = getWatchlistStatusTone({ isLoading, isError, summary });
+  const statusLabel = getWatchlistStatusLabel({ isLoading, isError, summary });
+  const contextLabel = sourceData
+    ? `${isVisualCheck ? "visual check / " : ""}${sourceData.assetClass} / ${sourceData.timeframes.join(" ")}`
+    : `${assetClass} / ${MTF_SCREENER_TIMEFRAMES.join(" ")}`;
+  const commandStats = [
+    ["Selected", summary.totalSelectedSymbols, "accent"],
+    ["Found", summary.foundSymbols, "neutral"],
+    ["Missing", summary.missingSymbols, "missing"],
+    ["HTF Risk", summary.higherTimeframeRiskSymbols, "risk"],
+    ["Broad Risk", researchSummary.counts.broadRiskSymbols, "risk"],
+  ] as const satisfies ReadonlyArray<readonly [string, number, StatusTone]>;
+
+  return (
+    <section className="mb-2 border border-[var(--border-medium)] bg-[var(--terminal-bar)] px-2 py-1.5 text-[var(--terminal-bar-foreground)] shadow-[var(--shadow-panel)]">
+      <div className="flex min-w-0 flex-wrap items-center justify-between gap-2">
+        <div className="flex min-w-0 flex-wrap items-center gap-2">
+          <h1 className="text-[13px] font-semibold uppercase tracking-normal">
+            Watchlist Multi-Timeframe
+          </h1>
+          <StatusBadge tone={statusTone}>{statusLabel}</StatusBadge>
+          <span className="text-[10px] font-semibold uppercase text-[var(--terminal-bar-muted)]">
+            {contextLabel}
+          </span>
+          <span className="text-[10px] font-semibold uppercase text-[var(--terminal-bar-muted)]">
+            Visible {visibleRows}/{totalRows}
+          </span>
+        </div>
+        <div className="flex flex-wrap items-center gap-1.5">
+          <button
+            type="button"
+            onClick={onRefresh}
+            disabled={isRefreshing || isVisualCheck}
+            className={commandButtonClass}
+          >
+            {isVisualCheck
+              ? "Mock Data"
+              : isRefreshing
+                ? "Refreshing"
+                : "Refresh Data"}
+          </button>
+          <button type="button" onClick={onSave} className={commandButtonClass}>
+            Save
+          </button>
+          <button
+            type="button"
+            onClick={onResetDefault}
+            className={commandButtonClass}
+          >
+            Reset
+          </button>
+          <button type="button" onClick={onClear} className={commandButtonClass}>
+            Clear
+          </button>
+        </div>
+      </div>
+      <dl className="mt-1.5 flex min-w-0 flex-wrap gap-1.5">
+        {commandStats.map(([label, value, tone]) => (
+          <div
+            key={label}
+            className="inline-flex items-center gap-1 border border-[var(--terminal-bar-border)] bg-[rgba(255,255,255,0.03)] px-1.5 py-0.5 text-[10px]"
+          >
+            <dt className="font-semibold uppercase text-[var(--terminal-bar-muted)]">
+              {label}
+            </dt>
+            <dd className={`font-mono font-semibold tabular-nums ${getStatusValueClass(tone)}`}>
+              {value}
+            </dd>
+          </div>
+        ))}
+      </dl>
+    </section>
+  );
+}
+
 export function WatchlistTable({
   rows,
   onRemoveSymbol,
+  sourceData,
+  totalRows = rows.length,
+  filteredRows = rows.length,
+  sortState = null,
+  onSortChange,
 }: {
   rows: WatchlistRow[];
   onRemoveSymbol?: (symbol: string) => void;
+  sourceData?: MtfLatestScreenerResponse;
+  totalRows?: number;
+  filteredRows?: number;
+  sortState?: WatchlistTableSortState | null;
+  onSortChange?: (
+    field: WatchlistSortField,
+    defaultDirection: WatchlistSortState["direction"],
+  ) => void;
 }) {
   if (rows.length === 0) {
     return (
@@ -316,35 +506,82 @@ export function WatchlistTable({
   }
 
   return (
-    <section className="overflow-hidden border border-[var(--border)] bg-[var(--panel)]">
-      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[var(--border)] px-3 py-2">
-        <h2 className="text-xs font-semibold text-[var(--foreground)]">
-          Selected Symbols
-        </h2>
-        <span className="text-[11px] text-[var(--muted)]">
-          {rows.length} watchlist rows
+    <section className="overflow-hidden border border-[var(--border-medium)] bg-[var(--panel-data)] shadow-[var(--shadow-panel)] xl:flex xl:min-h-0 xl:flex-1 xl:flex-col">
+      <div className="flex min-h-8 flex-wrap items-center justify-between gap-2 border-b border-[var(--border-medium)] bg-[var(--table-header)] px-2 py-1">
+        <div className="flex min-w-0 flex-wrap items-center gap-2">
+          <h2 className="text-[12px] font-semibold uppercase text-[var(--foreground)]">
+            Selected Symbols
+          </h2>
+          <StatusBadge tone="accent" className="text-[10px]">
+            Showing {filteredRows} of {totalRows}
+          </StatusBadge>
+          {sourceData ? (
+            <span className="text-[10px] font-semibold uppercase text-[var(--muted)]">
+              {sourceData.assetClass} / {sourceData.timeframes.join(" ")}
+            </span>
+          ) : null}
+        </div>
+        <span className="text-[10px] font-semibold uppercase text-[var(--muted)]">
+          State + Rank
         </span>
       </div>
-      <div className="overflow-x-auto">
-        <table className="min-w-[1400px] table-fixed text-left text-xs">
-          <thead className="bg-[var(--table-header)] text-[11px] uppercase text-[var(--muted)]">
+      <DataTableScroll className="xl:min-h-0 xl:flex-1 xl:overflow-auto">
+        <DataTable minWidth="min-w-[1060px]" className="table-fixed">
+          <thead className="bg-[var(--table-header)] text-[10px] uppercase text-[var(--muted)]">
             <tr>
-              <HeaderCell className="w-[118px]">Symbol</HeaderCell>
+              <DataTableHeaderCell<WatchlistSortField>
+                sortKey="symbol"
+                sortState={sortState}
+                onSortChange={onSortChange}
+                defaultDirection="asc"
+                className="sticky left-0 top-0 z-30 w-[150px] border-r border-[var(--border-medium)] bg-[var(--table-header)]"
+              >
+                Symbol
+              </DataTableHeaderCell>
               {MTF_SCREENER_TIMEFRAMES.map((timeframe) => (
-                <HeaderCell key={`${timeframe}-group`} className="w-[86px]">
-                  {timeframe} Group
-                </HeaderCell>
+                <DataTableHeaderCell<WatchlistSortField>
+                  key={timeframe}
+                  sortKey={`${timeframe}_rank` as WatchlistSortField}
+                  sortState={sortState}
+                  onSortChange={onSortChange}
+                  defaultDirection="desc"
+                  align="center"
+                  className="sticky top-0 z-20 w-[92px] border-l border-[var(--table-group)] bg-[var(--table-header-strong)] text-[var(--foreground)]"
+                >
+                  {timeframe}
+                </DataTableHeaderCell>
               ))}
-              {MTF_SCREENER_TIMEFRAMES.map((timeframe) => (
-                <HeaderCell key={`${timeframe}-rank`} className="w-[68px]">
-                  {timeframe} Rank
-                </HeaderCell>
-              ))}
-              <HeaderCell className="w-[180px]">Primary Signal</HeaderCell>
-              <HeaderCell className="w-[275px]">Risk Notes</HeaderCell>
-              <HeaderCell className="w-[132px]">Research</HeaderCell>
+              <DataTableHeaderCell<WatchlistSortField>
+                sortKey="higher_timeframe_safety"
+                sortState={sortState}
+                onSortChange={onSortChange}
+                defaultDirection="asc"
+                className="sticky top-0 z-20 w-[166px] border-l border-[var(--table-group)] bg-[var(--table-header)]"
+              >
+                Primary
+              </DataTableHeaderCell>
+              <DataTableHeaderCell<WatchlistSortField>
+                sortKey="best_short_term_rank"
+                sortState={sortState}
+                onSortChange={onSortChange}
+                defaultDirection="desc"
+                className="sticky top-0 z-20 w-[220px] bg-[var(--table-header)]"
+              >
+                Attention
+              </DataTableHeaderCell>
+              <DataTableHeaderCell
+                align="center"
+                className="sticky top-0 z-20 w-[96px] bg-[var(--table-header)]"
+              >
+                Research
+              </DataTableHeaderCell>
               {onRemoveSymbol ? (
-                <HeaderCell className="w-[86px]">Action</HeaderCell>
+                <DataTableHeaderCell
+                  align="center"
+                  className="sticky top-0 z-20 w-[78px] bg-[var(--table-header)]"
+                >
+                  Remove
+                </DataTableHeaderCell>
               ) : null}
             </tr>
           </thead>
@@ -352,85 +589,101 @@ export function WatchlistTable({
             {rows.map((row) => (
               <tr
                 key={row.symbol}
-                className="border-t border-[var(--border)] align-top hover:bg-[var(--row-hover)]"
+                className="group border-t border-[var(--table-grid)] align-top odd:bg-[var(--panel-data)] even:bg-[var(--panel-muted)] hover:bg-[var(--row-hover)] hover:shadow-[inset_3px_0_0_var(--accent)]"
               >
-                <BodyCell>
-                  <div className="font-mono text-sm font-semibold text-[var(--foreground)]">
-                    {row.symbol}
+                <DataTableCell className="sticky left-0 z-10 border-r border-[var(--border-medium)] bg-inherit group-hover:bg-[var(--row-hover)]">
+                  <div className="flex min-w-0 items-center gap-1.5">
+                    <span className={`h-2 w-2 shrink-0 ${getWatchlistRowDotClass(row)}`} />
+                    <span className="min-w-0 truncate font-mono text-[12px] font-semibold text-[var(--foreground)]">
+                      {row.symbol}
+                    </span>
                   </div>
-                  <div className="mt-0.5 text-[11px] text-[var(--muted)]">
+                  <div className="mt-0.5 truncate text-[9px] uppercase text-[var(--muted)]">
                     {row.mtfRow
                       ? `${row.mtfRow.exchange} / ${row.mtfRow.market}`
-                      : "Not found"}
+                      : "Missing"}
                   </div>
-                </BodyCell>
+                </DataTableCell>
                 {MTF_SCREENER_TIMEFRAMES.map((timeframe) => (
-                  <BodyCell key={`${row.symbol}-${timeframe}-group`}>
-                    <WatchlistGroupCell row={row} timeframe={timeframe} />
-                  </BodyCell>
+                  <DataTableCell
+                    key={`${row.symbol}-${timeframe}`}
+                    align="center"
+                    className="border-l border-[var(--table-group)]"
+                  >
+                    <WatchlistTimeframeCell row={row} timeframe={timeframe} />
+                  </DataTableCell>
                 ))}
-                {MTF_SCREENER_TIMEFRAMES.map((timeframe) => (
-                  <BodyCell key={`${row.symbol}-${timeframe}-rank`}>
-                    <span className="font-mono tabular-nums">
-                      {row.mtfRow
-                        ? formatMtfRank(row.mtfRow.snapshots[timeframe])
-                        : "-"}
-                    </span>
-                  </BodyCell>
-                ))}
-                <BodyCell>
-                  {row.mtfRow ? getMtfPrimarySignal(row.mtfRow) : "Not found"}
-                </BodyCell>
-                <BodyCell>
+                <DataTableCell
+                  className="border-l border-[var(--table-group)]"
+                  truncate
+                  title={row.mtfRow ? getMtfPrimarySignal(row.mtfRow) : "Missing"}
+                >
+                  {row.mtfRow ? getMtfPrimarySignal(row.mtfRow) : "Missing"}
+                </DataTableCell>
+                <DataTableCell>
                   {row.mtfRow ? <RiskNotesCell row={row} /> : "Not found"}
-                </BodyCell>
-                <BodyCell>
+                </DataTableCell>
+                <DataTableCell align="center">
                   <ResearchLink row={row} />
-                </BodyCell>
+                </DataTableCell>
                 {onRemoveSymbol ? (
-                  <BodyCell>
+                  <DataTableCell align="center">
                     <button
                       type="button"
                       onClick={() => onRemoveSymbol(row.symbol)}
-                      className="border border-[var(--border)] px-2 py-1 text-[11px] font-semibold text-[var(--foreground)] hover:border-[var(--warning)]"
+                      className="inline-flex h-6 items-center border border-[var(--border)] px-1.5 text-[10px] font-semibold text-[var(--muted)] hover:border-[var(--accent-border)] hover:text-[var(--accent-hover)]"
                     >
                       Remove
                     </button>
-                  </BodyCell>
+                  </DataTableCell>
                 ) : null}
               </tr>
             ))}
           </tbody>
-        </table>
-      </div>
+        </DataTable>
+      </DataTableScroll>
     </section>
   );
 }
 
 export function WatchlistSummaryCards({
   summary,
+  researchSummary,
 }: {
   summary: WatchlistSummary;
+  researchSummary?: WatchlistResearchSummary;
 }) {
   const cards = [
-    ["Total selected symbols", summary.totalSelectedSymbols],
-    ["Found symbols", summary.foundSymbols],
-    ["Missing symbols", summary.missingSymbols],
-    ["Higher-timeframe risk", summary.higherTimeframeRiskSymbols],
-    ["Short-term watch / repair", summary.shortTermWatchSymbols],
-  ] as const;
+    ["Selected", summary.totalSelectedSymbols, "accent"],
+    ["Found", summary.foundSymbols, "neutral"],
+    ["Missing", summary.missingSymbols, "missing"],
+    ["HTF Risk", summary.higherTimeframeRiskSymbols, "risk"],
+    ["Watch", summary.shortTermWatchSymbols, "watch"],
+    ...(researchSummary
+      ? ([
+          ["Broad Risk", researchSummary.counts.broadRiskSymbols, "risk"],
+          ["Repair", researchSummary.counts.repairInsideRiskSymbols, "watch"],
+          ["Data Gaps", researchSummary.counts.missingImportantDataSymbols, "warning"],
+        ] as const)
+      : []),
+  ] as const satisfies ReadonlyArray<readonly [string, number, StatusTone]>;
 
   return (
-    <section className="grid gap-2 md:grid-cols-5">
-      {cards.map(([label, value]) => (
+    <section className="flex min-w-0 items-center gap-1.5 overflow-x-auto border border-[var(--border)] bg-[var(--panel)] px-2 py-1 [scrollbar-gutter:stable] xl:shrink-0">
+      <span className="shrink-0 border-r border-[var(--border)] pr-2 text-[10px] font-semibold uppercase text-[var(--muted)]">
+        Summary
+      </span>
+      {cards.map(([label, value, tone]) => (
         <div
           key={label}
-          className="border border-[var(--border)] bg-[var(--panel)] px-3 py-2"
+          className="inline-flex h-6 shrink-0 items-center gap-1.5 border border-[var(--border)] bg-[var(--panel-2)] px-1.5 text-[10px]"
         >
-          <div className="text-[11px] text-[var(--muted)]">{label}</div>
-          <div className="mt-1 font-mono text-lg font-semibold tabular-nums text-[var(--foreground)]">
+          <span className="font-semibold uppercase text-[var(--muted)]">
+            {label}
+          </span>
+          <span className={`font-mono font-semibold tabular-nums ${getStatusValueClass(tone)}`}>
             {value}
-          </div>
+          </span>
         </div>
       ))}
     </section>
@@ -442,68 +695,36 @@ export function WatchlistResearchSummaryPanel({
 }: {
   summary: WatchlistResearchSummary;
 }) {
-  const countItems = [
-    ["Selected", summary.counts.totalSelectedSymbols],
-    ["Found", summary.counts.foundSymbols],
-    ["Missing", summary.counts.missingSymbols],
-    ["1d risk", summary.counts.oneDayRiskSymbols],
-    ["1w risk", summary.counts.oneWeekRiskSymbols],
-    ["1h/4h watch", summary.counts.shortTermWatchSymbols],
-    ["Repair inside risk", summary.counts.repairInsideRiskSymbols],
-    ["Broad risk", summary.counts.broadRiskSymbols],
-    ["Data gaps", summary.counts.missingImportantDataSymbols],
-  ] as const;
+  if (summary.counts.foundSymbols === 0) {
+    return null;
+  }
 
   return (
-    <section className="border border-[var(--border)] bg-[var(--panel)] px-3 py-3">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <div className="flex flex-wrap items-center gap-2">
-            <h2 className="text-xs font-semibold text-[var(--foreground)]">
-              Watchlist Research Summary
-            </h2>
-            <span className="border border-[var(--border)] px-1.5 py-0.5 text-[10px] font-semibold uppercase text-[var(--muted)]">
-              Research-only
-            </span>
-            <span className="border border-[var(--border)] px-1.5 py-0.5 text-[11px] font-semibold text-[var(--foreground)]">
-              {summary.conditionLabel}
-            </span>
-          </div>
-          <p className="mt-1 max-w-3xl text-[11px] leading-5 text-[var(--muted)]">
+    <section className="space-y-1.5 xl:shrink-0">
+      <div className="flex flex-wrap items-center justify-between gap-2 border border-[var(--border)] bg-[var(--panel)] px-2 py-1.5">
+        <div className="flex min-w-0 flex-wrap items-center gap-2">
+          <h2 className="text-[12px] font-semibold uppercase text-[var(--foreground)]">
+            Attention
+          </h2>
+          <StatusBadge tone={getConditionTone(summary.conditionLabel)}>
+            {summary.conditionLabel}
+          </StatusBadge>
+          <span className="truncate text-[11px] text-[var(--muted)]">
             {summary.conditionText}
-          </p>
+          </span>
         </div>
-        <div className="text-left sm:text-right">
-          <div className="text-[10px] uppercase text-[var(--muted)]">
-            Research posture
-          </div>
-          <div className="mt-1 text-xs font-semibold text-[var(--foreground)]">
-            {summary.researchPosture}
-          </div>
-        </div>
+        <StatusBadge tone="neutral">{summary.researchPosture}</StatusBadge>
       </div>
-
-      <dl className="mt-3 grid gap-x-4 gap-y-1 border-t border-[var(--border)] pt-2 text-[11px] sm:grid-cols-3 xl:grid-cols-9">
-        {countItems.map(([label, value]) => (
-          <div key={label} className="flex items-center justify-between gap-2">
-            <dt className="text-[var(--muted)]">{label}</dt>
-            <dd className="font-mono font-semibold tabular-nums text-[var(--foreground)]">
-              {value}
-            </dd>
-          </div>
-        ))}
-      </dl>
-
-      <div className="mt-3 grid gap-4 border-t border-[var(--border)] pt-3 lg:grid-cols-3">
+      <div className="grid items-start gap-1.5 lg:grid-cols-3">
         <ResearchSummaryList
-          title="Manual Review Candidates"
-          emptyText="No high-priority manual-review states."
-          items={summary.bestResearchCandidates}
-        />
-        <ResearchSummaryList
-          title="Risk-First Review"
+          title="Risk First"
           emptyText="No concentrated risk flags."
           items={summary.highestRiskSymbols}
+        />
+        <ResearchSummaryList
+          title="Watch / Repair"
+          emptyText="No short-term watch states."
+          items={summary.bestResearchCandidates}
         />
         <ResearchSummaryList
           title="Data Gaps"
@@ -553,18 +774,12 @@ function WatchlistControls({
   exportText,
   exportStatus,
   filters,
-  sortState,
   onDraftInputChange,
   onImportInputChange,
-  onSave,
-  onResetDefault,
-  onClear,
   onPreset,
   onImport,
   onCopyExport,
   onFilterChange,
-  onSortFieldChange,
-  onSortDirectionChange,
 }: {
   draftInput: string;
   importInput: string;
@@ -572,12 +787,8 @@ function WatchlistControls({
   exportText: string;
   exportStatus: string | null;
   filters: WatchlistFilters;
-  sortState: WatchlistSortState;
   onDraftInputChange: (value: string) => void;
   onImportInputChange: (value: string) => void;
-  onSave: () => void;
-  onResetDefault: () => void;
-  onClear: () => void;
   onPreset: (presetId: WatchlistPresetId) => void;
   onImport: () => void;
   onCopyExport: () => void;
@@ -585,109 +796,49 @@ function WatchlistControls({
     key: Key,
     value: WatchlistFilters[Key],
   ) => void;
-  onSortFieldChange: (field: WatchlistSortField) => void;
-  onSortDirectionChange: (direction: WatchlistSortDirection) => void;
 }) {
   return (
-    <aside className="border border-[var(--border)] bg-[var(--panel)] p-3 xl:h-full xl:overflow-y-auto">
-      <section className="space-y-2">
+    <aside className="border border-[var(--border)] bg-[var(--panel)] p-1.5 xl:min-h-0 xl:overflow-auto">
+      <section className="space-y-1">
+        <h2 className={railSectionLabelClass}>
+          Symbols
+        </h2>
         <label className="block">
-          <span className="mb-1 block text-[11px] font-semibold uppercase text-[var(--muted)]">
-            Symbols
-          </span>
           <textarea
             value={draftInput}
             onChange={(event) => onDraftInputChange(event.target.value)}
-            className={`${controlClass} h-36 resize-y py-2 leading-5`}
+            className={`${controlClass} h-[76px] resize-none py-1.5 leading-4`}
             placeholder="BTC, ETH, SOL"
           />
         </label>
-        <div className="grid grid-cols-2 gap-2">
-          <button type="button" onClick={onSave} className={buttonClass}>
-            Save Watchlist
-          </button>
-          <button type="button" onClick={onResetDefault} className={buttonClass}>
-            Reset Default
-          </button>
-          <button type="button" onClick={onClear} className={buttonClass}>
-            Clear
-          </button>
-        </div>
       </section>
 
-      <section className="mt-4 space-y-2">
-        <h2 className="text-[11px] font-semibold uppercase text-[var(--muted)]">
+      <section className="mt-2 space-y-1">
+        <h2 className={railSectionLabelClass}>
           Presets
         </h2>
-        <div className="grid grid-cols-2 gap-2">
+        <div className="grid grid-cols-2 gap-1">
           {watchlistPresets.map((preset) => (
             <button
               key={preset.id}
               type="button"
               onClick={() => onPreset(preset.id)}
-              className="border border-[var(--border)] px-2 py-1.5 text-left text-[11px] text-[var(--foreground)] hover:border-[var(--info)]"
+              className="min-h-6 border border-[var(--border)] px-1.5 py-0.5 text-left text-[10px] font-semibold leading-4 text-[var(--foreground)] hover:border-[var(--accent-border)] hover:text-[var(--accent-hover)]"
               title={preset.symbols.join(", ")}
             >
-              <span className="block font-semibold">{preset.label}</span>
-              <span className="block text-[10px] text-[var(--muted)]">
-                Use Preset
-              </span>
+              {preset.label}
             </button>
           ))}
         </div>
       </section>
 
-      <section className="mt-4 space-y-2">
-        <h2 className="text-[11px] font-semibold uppercase text-[var(--muted)]">
-          Import / Export
-        </h2>
-        <label className="block">
-          <span className="mb-1 block text-[11px] text-[var(--muted)]">
-            Import Symbols
-          </span>
-          <textarea
-            value={importInput}
-            onChange={(event) => onImportInputChange(event.target.value)}
-            className={`${controlClass} h-24 resize-y py-2 leading-5`}
-            placeholder="BTC, ETH, SEI"
-          />
-        </label>
-        <button type="button" onClick={onImport} className={buttonClass}>
-          Import to Editor
-        </button>
-        {importStatus ? (
-          <p className="text-[11px] leading-4 text-[var(--muted)]">
-            {importStatus}
-          </p>
-        ) : null}
-        <label className="block">
-          <span className="mb-1 block text-[11px] text-[var(--muted)]">
-            Export Text
-          </span>
-          <textarea
-            readOnly
-            value={exportText}
-            className={`${controlClass} h-20 resize-y py-2 leading-5`}
-            placeholder="No valid symbols to export"
-          />
-        </label>
-        <button type="button" onClick={onCopyExport} className={buttonClass}>
-          Copy Export Text
-        </button>
-        {exportStatus ? (
-          <p className="text-[11px] leading-4 text-[var(--muted)]">
-            {exportStatus}
-          </p>
-        ) : null}
-      </section>
-
-      <section className="mt-4 space-y-3">
-        <h2 className="text-[11px] font-semibold uppercase text-[var(--muted)]">
+      <section className="mt-2 space-y-1">
+        <h2 className={railSectionLabelClass}>
           Filters
         </h2>
         <label className="block">
-          <span className="mb-1 block text-[11px] text-[var(--muted)]">
-            Symbol Search
+          <span className={railFieldLabelClass}>
+            Search
           </span>
           <input
             type="search"
@@ -699,35 +850,38 @@ function WatchlistControls({
             placeholder="BTC"
           />
         </label>
-        <label className="flex items-center gap-2 text-xs text-[var(--muted)]">
+        <label className={railCheckboxLabelClass}>
           <input
             type="checkbox"
             checked={filters.hideMissing}
             onChange={() => onFilterChange("hideMissing", !filters.hideMissing)}
+            className={railCheckboxClass}
           />
-          Hide missing symbols
+          Hide missing
         </label>
-        <label className="flex items-center gap-2 text-xs text-[var(--muted)]">
+        <label className={railCheckboxLabelClass}>
           <input
             type="checkbox"
             checked={filters.exclude1dRisk}
             onChange={() =>
               onFilterChange("exclude1dRisk", !filters.exclude1dRisk)
             }
+            className={railCheckboxClass}
           />
           Exclude 1d risk
         </label>
-        <label className="flex items-center gap-2 text-xs text-[var(--muted)]">
+        <label className={railCheckboxLabelClass}>
           <input
             type="checkbox"
             checked={filters.exclude1wRisk}
             onChange={() =>
               onFilterChange("exclude1wRisk", !filters.exclude1wRisk)
             }
+            className={railCheckboxClass}
           />
           Exclude 1w risk
         </label>
-        <label className="flex items-center gap-2 text-xs text-[var(--muted)]">
+        <label className={railCheckboxLabelClass}>
           <input
             type="checkbox"
             checked={filters.onlyShortTermWatch}
@@ -737,53 +891,61 @@ function WatchlistControls({
                 !filters.onlyShortTermWatch,
               )
             }
+            className={railCheckboxClass}
           />
-          Show only 1h or 4h eligible/watch
+          1h/4h watch only
         </label>
       </section>
 
-      <section className="mt-4 space-y-3">
-        <h2 className="text-[11px] font-semibold uppercase text-[var(--muted)]">
-          Sort
-        </h2>
-        <label className="block">
-          <span className="mb-1 block text-[11px] text-[var(--muted)]">
-            Field
-          </span>
-          <select
-            value={sortState.field}
-            onChange={(event) =>
-              onSortFieldChange(event.target.value as WatchlistSortField)
-            }
-            className={controlClass}
-          >
-            {watchlistSortOptions.map((option) => (
-              <option key={option.field} value={option.field}>
-                {option.label}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label className="block">
-          <span className="mb-1 block text-[11px] text-[var(--muted)]">
-            Direction
-          </span>
-          <select
-            value={sortState.direction}
-            onChange={(event) =>
-              onSortDirectionChange(event.target.value as WatchlistSortDirection)
-            }
-            className={controlClass}
-          >
-            <option value="asc">
-              {sortState.field === "symbol" ? "A to Z" : "Low to high"}
-            </option>
-            <option value="desc">
-              {sortState.field === "symbol" ? "Z to A" : "High to low"}
-            </option>
-          </select>
-        </label>
-      </section>
+      <details className={railDetailsClass}>
+        <summary className={railSummaryClass}>
+          <span>Import / Export</span>
+        </summary>
+        <div className="space-y-1.5 border-t border-[var(--border)] p-1.5">
+          <div>
+            <div className="mb-0.5 flex items-center justify-between gap-2">
+              <span className={railFieldLabelClass}>Import</span>
+              <button type="button" onClick={onImport} className={railMiniButtonClass}>
+                Import
+              </button>
+            </div>
+            <textarea
+              value={importInput}
+              onChange={(event) => onImportInputChange(event.target.value)}
+              className={`${controlClass} h-12 resize-none py-1.5 leading-4`}
+              placeholder="BTC, ETH, SEI"
+            />
+          </div>
+          {importStatus ? (
+            <p className="text-[11px] leading-4 text-[var(--muted)]">
+              {importStatus}
+            </p>
+          ) : null}
+          <div>
+            <div className="mb-0.5 flex items-center justify-between gap-2">
+              <span className={railFieldLabelClass}>Export</span>
+              <button
+                type="button"
+                onClick={onCopyExport}
+                className={railMiniButtonClass}
+              >
+                Copy
+              </button>
+            </div>
+            <textarea
+              readOnly
+              value={exportText}
+              className={`${controlClass} h-10 resize-none py-1.5 leading-4`}
+              placeholder="No valid symbols to export"
+            />
+          </div>
+          {exportStatus ? (
+            <p className="text-[11px] leading-4 text-[var(--muted)]">
+              {exportStatus}
+            </p>
+          ) : null}
+        </div>
+      </details>
     </aside>
   );
 }
@@ -798,21 +960,14 @@ function WatchlistSourcePanel({
   filteredRows: number;
 }) {
   return (
-    <section className="border border-[var(--border)] bg-[var(--panel)] px-3 py-2">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <div>
-          <h2 className="text-xs font-semibold text-[var(--foreground)]">
-            Data Source / Run Freshness
-          </h2>
-          <p className="mt-1 text-[11px] text-[var(--muted)]">
-            Latest selected crypto scanner runs joined across watchlist symbols.
-          </p>
-        </div>
-        <div className="text-[11px] text-[var(--muted)]">
-          Showing {filteredRows} of {totalRows} selected symbols
-        </div>
-      </div>
-      <div className="mt-2 grid gap-2 md:grid-cols-4">
+    <section className="border border-[var(--border)] bg-[var(--panel-muted)] px-2 py-1.5">
+      <div className="flex min-w-0 items-center gap-1.5 overflow-x-auto [scrollbar-gutter:stable]">
+        <span className="shrink-0 border-r border-[var(--border)] pr-2 text-[10px] font-semibold uppercase text-[var(--muted)]">
+          Runs
+        </span>
+        <span className="shrink-0 text-[10px] font-semibold uppercase text-[var(--muted)]">
+          {filteredRows}/{totalRows} selected
+        </span>
         {MTF_SCREENER_TIMEFRAMES.map((timeframe) => {
           const run = data?.runs[timeframe];
           const signalCount = data?.signalCounts[timeframe] ?? 0;
@@ -821,21 +976,45 @@ function WatchlistSourcePanel({
           return (
             <div
               key={timeframe}
-              className="border border-[var(--border)] bg-[var(--panel-2)] px-2 py-1.5"
+              className="inline-flex shrink-0 items-center gap-1.5 border border-[var(--border)] bg-[var(--panel)] px-1.5 py-0.5 text-[10px]"
             >
-              <div className="text-[11px] font-semibold text-[var(--foreground)]">
+              <span className="font-mono font-semibold uppercase text-[var(--foreground)]">
                 {timeframe}
-              </div>
-              <div className="mt-1 text-[11px] text-[var(--muted)]">
+              </span>
+              <span className="text-[var(--muted)]">
                 {run
-                  ? `${formatDateTime(run.finishedAt ?? run.startedAt)} - ${signalCount} signals, ${missingCount} missing`
-                  : "No selected latest run"}
-              </div>
+                  ? `${formatDateTime(run.finishedAt ?? run.startedAt)} / ${signalCount} signals / ${missingCount} missing`
+                  : "No run"}
+              </span>
             </div>
           );
         })}
       </div>
     </section>
+  );
+}
+
+function WatchlistBackdropDisclosure({
+  data,
+  isLoading,
+  isError,
+}: MarketContextPanelState) {
+  return (
+    <details className="border border-[var(--border)] bg-[var(--panel)] xl:shrink-0">
+      <summary className="flex min-h-7 cursor-pointer list-none items-center justify-between gap-2 px-2 py-1 text-[11px] font-semibold uppercase text-[var(--muted)] marker:hidden">
+        <span>Backdrop</span>
+        <span className="text-[9px] text-[var(--muted-2)]">
+          Secondary context
+        </span>
+      </summary>
+      <MarketContextPanel
+        variant="compact"
+        data={data}
+        isLoading={isLoading}
+        isError={isError}
+        className="border-x-0 border-b-0 shadow-none"
+      />
+    </details>
   );
 }
 
@@ -848,28 +1027,31 @@ function ResearchSummaryList({
   emptyText: string;
   items: WatchlistResearchSummaryItem[];
 }) {
+  const visibleItems = items.slice(0, 2);
+
   return (
-    <section>
+    <section className="min-w-0 border border-[var(--border)] bg-[var(--panel-muted)] px-2 py-1.5">
       <h3 className="text-[11px] font-semibold uppercase text-[var(--muted)]">
         {title}
       </h3>
       {items.length === 0 ? (
-        <p className="mt-2 text-[11px] text-[var(--muted)]">{emptyText}</p>
+        <p className="mt-1 text-[11px] text-[var(--muted)]">{emptyText}</p>
       ) : (
         <ul className="mt-1 divide-y divide-[var(--border)]">
-          {items.map((item) => (
-            <li key={item.symbol} className="py-1.5">
+          {visibleItems.map((item) => (
+            <li key={item.symbol} className="py-1">
               <div className="flex items-center justify-between gap-2">
                 <span className="font-mono text-xs font-semibold text-[var(--foreground)]">
                   {item.symbol}
                 </span>
                 <span className="text-[10px] uppercase text-[var(--muted)]">
-                  {item.timeframe
-                    ? `${item.timeframe} manual review`
-                    : "Research-only"}
+                  {item.timeframe ?? "Data"}
                 </span>
               </div>
-              <p className="mt-0.5 text-[11px] leading-4 text-[var(--muted)]">
+              <p
+                className="mt-0.5 truncate text-[11px] leading-4 text-[var(--muted)]"
+                title={item.reason}
+              >
                 {item.reason}
               </p>
               {item.rankScore !== null ? (
@@ -894,7 +1076,10 @@ function WatchlistStatusNotice({
 }) {
   if (summary.totalSelectedSymbols === 0) {
     return (
-      <CompactNotice message="Watchlist is empty. Add symbols, use a preset, or import a list to begin research." />
+      <CompactNotice
+        tone="missing"
+        message="Watchlist is empty. Add symbols, use a preset, or import a list to begin research."
+      />
     );
   }
 
@@ -904,13 +1089,17 @@ function WatchlistStatusNotice({
 
   if (summary.foundSymbols === 0) {
     return (
-      <CompactNotice message="All selected symbols are currently missing from the latest MTF API response. Check spelling, quote asset, or latest scan coverage." />
+      <CompactNotice
+        tone="missing"
+        message={`Insufficient data · latest MTF data unavailable for selected symbols · ${summary.totalSelectedSymbols} selected / 0 found / ${summary.missingSymbols} missing`}
+      />
     );
   }
 
   if (summary.missingSymbols > 0) {
     return (
       <CompactNotice
+        tone="missing"
         message={`${summary.missingSymbols} selected symbols are not returned by the latest MTF API and will show Not found until data is available.`}
       />
     );
@@ -919,9 +1108,32 @@ function WatchlistStatusNotice({
   return null;
 }
 
-function CompactNotice({ message }: { message: string }) {
+function WatchlistApiNotice({
+  message,
+  summary,
+}: {
+  message: string;
+  summary: WatchlistSummary;
+}) {
   return (
-    <section className="border border-[var(--border)] bg-[var(--panel-2)] px-3 py-2 text-[11px] leading-4 text-[var(--muted)]">
+    <CompactNotice
+      tone="risk"
+      message={`API Error · latest MTF data unavailable · ${summary.totalSelectedSymbols} selected / ${summary.foundSymbols} found / ${summary.missingSymbols} missing · ${message}`}
+    />
+  );
+}
+
+function CompactNotice({
+  message,
+  tone = "neutral",
+}: {
+  message: string;
+  tone?: StatusTone;
+}) {
+  return (
+    <section
+      className={`border border-l-2 border-[var(--border)] bg-[var(--panel-2)] px-3 py-2 text-[11px] leading-4 text-[var(--muted)] ${getNoticeToneClass(tone)}`}
+    >
       {message}
     </section>
   );
@@ -929,13 +1141,13 @@ function CompactNotice({ message }: { message: string }) {
 
 function WatchlistStatePanel({ message }: { message: string }) {
   return (
-    <section className="border border-[var(--border)] bg-[var(--panel)] px-3 py-8 text-center text-sm text-[var(--muted)]">
+    <section className="border border-[var(--border)] bg-[var(--panel)] px-3 py-3 text-center text-xs text-[var(--muted)]">
       {message}
     </section>
   );
 }
 
-function WatchlistGroupCell({
+function WatchlistTimeframeCell({
   row,
   timeframe,
 }: {
@@ -943,15 +1155,26 @@ function WatchlistGroupCell({
   timeframe: MtfScreenerTimeframe;
 }) {
   if (!row.mtfRow) {
-    return <MissingBadge>Not found</MissingBadge>;
+    return <DataTableChip tone="missing">Not found</DataTableChip>;
   }
 
   const snapshot = row.mtfRow.snapshots[timeframe];
 
+  if (!snapshot) {
+    return <DataTableChip tone="missing">Not returned</DataTableChip>;
+  }
+
+  const tone = getWatchlistGroupTone(snapshot.resultGroup);
+
   return (
-    <GroupBadge group={snapshot?.resultGroup}>
-      {formatWatchlistGroup(snapshot)}
-    </GroupBadge>
+    <DataTableChip
+      tone={tone}
+      className="w-full justify-center gap-1"
+      title={`${timeframe} ${formatWatchlistGroup(snapshot)} rank ${formatMtfRank(snapshot)}`}
+    >
+      <span className="truncate">{formatWatchlistGroup(snapshot)}</span>
+      <span className="font-mono tabular-nums">{formatMtfRank(snapshot)}</span>
+    </DataTableChip>
   );
 }
 
@@ -960,31 +1183,22 @@ function RiskNotesCell({ row }: { row: WatchlistRow }) {
     return <span>Not found</span>;
   }
 
-  const summary = getMtfRiskNotesSummary(row.mtfRow, 3);
+  const summary = getMtfRiskNotesSummary(row.mtfRow, 2);
 
   if (summary.notes.length === 0) {
-    return <span>Manual review</span>;
+    return <span className="text-[var(--muted-2)]">No notes</span>;
   }
 
   return (
-    <div className="space-y-1 leading-4">
-      <div className="flex flex-wrap gap-1">
-        {summary.visibleNotes.map((note) => (
-          <span
-            key={note}
-            className="border border-[var(--border)] bg-[var(--panel-2)] px-1.5 py-0.5"
-          >
-            {note}
-          </span>
-        ))}
-      </div>
+    <div
+      className="flex min-w-0 items-center gap-1 leading-4"
+      title={summary.notes.join("; ")}
+    >
+      <span className="min-w-0 truncate">{summary.visibleNotes.join("; ")}</span>
       {summary.hiddenCount > 0 ? (
-        <details className="text-[10px] text-[var(--muted)]">
-          <summary className="cursor-pointer text-[var(--foreground)]">
-            +{summary.hiddenCount} more
-          </summary>
-          <div className="mt-1">{summary.hiddenNotes.join("; ")}</div>
-        </details>
+        <span className="shrink-0 border border-[var(--border)] bg-[var(--panel)] px-1 text-[10px] font-semibold text-[var(--muted)]">
+          +{summary.hiddenCount}
+        </span>
       ) : null}
     </div>
   );
@@ -998,9 +1212,9 @@ function ResearchLink({ row }: { row: WatchlistRow }) {
     return (
       <span
         aria-disabled="true"
-        className="inline-flex border border-[var(--border)] px-2 py-1 text-[11px] font-semibold text-[var(--muted)] opacity-70"
+        className="inline-flex h-6 items-center border border-[var(--border)] px-1.5 text-[10px] font-semibold text-[var(--muted)] opacity-70"
       >
-        {row.mtfRow ? "Not returned" : "Not found"}
+        {row.mtfRow ? "No TF" : "Missing"}
       </span>
     );
   }
@@ -1008,62 +1222,199 @@ function ResearchLink({ row }: { row: WatchlistRow }) {
   return (
     <Link
       href={href}
-      className="inline-flex border border-[var(--border)] px-2 py-1 text-[11px] font-semibold text-[var(--foreground)] hover:border-[var(--info)]"
+      className="inline-flex h-6 items-center border border-[var(--accent-border)] bg-[var(--accent-soft)] px-1.5 text-[10px] font-semibold text-[var(--accent)] hover:border-[var(--accent-hover)] hover:text-[var(--accent-hover)]"
     >
       {timeframe} Research
     </Link>
   );
 }
 
-function HeaderCell({
-  children,
-  className = "",
-}: {
-  children: React.ReactNode;
-  className?: string;
-}) {
-  return <th className={`px-2 py-2 font-semibold ${className}`}>{children}</th>;
-}
-
-function BodyCell({ children }: { children: React.ReactNode }) {
-  return <td className="px-2 py-2 text-[11px] text-[var(--muted)]">{children}</td>;
-}
-
-function GroupBadge({
-  group,
-  children,
-}: {
-  group?: string;
-  children: React.ReactNode;
-}) {
-  const tone =
-    group === "eligible"
-      ? "border-[var(--eligible-border)] bg-[var(--eligible-bg)] text-[var(--eligible)]"
-      : group === "watch"
-        ? "border-[var(--watch-border)] bg-[var(--watch-bg)] text-[var(--watch)]"
-        : group === "overheated"
-          ? "border-[var(--overheated-border)] bg-[var(--overheated-bg)] text-[var(--overheated)]"
-          : group === "risk"
-            ? "border-[var(--risk-border)] bg-[var(--risk-bg)] text-[var(--risk)]"
-            : "border-[var(--neutral-border)] bg-[var(--neutral-bg)] text-[var(--neutral)]";
-
-  return (
-    <span className={`inline-flex border px-1.5 py-0.5 text-[11px] ${tone}`}>
-      {children}
-    </span>
-  );
-}
-
-function MissingBadge({ children }: { children: React.ReactNode }) {
-  return (
-    <span className="inline-flex border border-[var(--border)] px-1.5 py-0.5 text-[11px] text-[var(--muted)]">
-      {children}
-    </span>
-  );
-}
-
 function formatWatchlistGroup(snapshot: MtfScreenerSnapshot | undefined) {
-  return snapshot ? formatMtfGroup(snapshot) : "Not returned";
+  if (!snapshot) {
+    return "Not returned";
+  }
+
+  return snapshot.resultGroup === "overheated" ? "Hot" : formatMtfGroup(snapshot);
+}
+
+function getWatchlistGroupTone(group: string | null | undefined): ChipTone {
+  if (group === "eligible") {
+    return "eligible";
+  }
+
+  if (group === "watch") {
+    return "watch";
+  }
+
+  if (group === "overheated") {
+    return "overheated";
+  }
+
+  if (group === "risk") {
+    return "risk";
+  }
+
+  return "neutral";
+}
+
+function getWatchlistRowDotClass(row: WatchlistRow) {
+  if (!row.mtfRow) {
+    return "bg-[var(--missing)]";
+  }
+
+  const groups = MTF_SCREENER_TIMEFRAMES.map(
+    (timeframe) => row.mtfRow?.snapshots[timeframe]?.resultGroup,
+  );
+
+  if (groups.includes("risk")) {
+    return "bg-[var(--risk)]";
+  }
+
+  if (groups.includes("overheated")) {
+    return "bg-[var(--overheated)]";
+  }
+
+  if (groups.includes("watch")) {
+    return "bg-[var(--watch)]";
+  }
+
+  if (groups.includes("eligible")) {
+    return "bg-[var(--eligible)]";
+  }
+
+  return "bg-[var(--neutral)]";
+}
+
+function getWatchlistStatusTone({
+  isLoading,
+  isError,
+  summary,
+}: {
+  isLoading: boolean;
+  isError: boolean;
+  summary: WatchlistSummary;
+}): StatusTone {
+  if (isError) {
+    return "danger";
+  }
+
+  if (isLoading) {
+    return "warning";
+  }
+
+  if (summary.totalSelectedSymbols === 0 || summary.foundSymbols === 0) {
+    return "missing";
+  }
+
+  if (summary.higherTimeframeRiskSymbols > 0) {
+    return "risk";
+  }
+
+  if (summary.shortTermWatchSymbols > 0) {
+    return "watch";
+  }
+
+  return "neutral";
+}
+
+function getWatchlistStatusLabel({
+  isLoading,
+  isError,
+  summary,
+}: {
+  isLoading: boolean;
+  isError: boolean;
+  summary: WatchlistSummary;
+}) {
+  if (isError) {
+    return "API Error";
+  }
+
+  if (isLoading) {
+    return "Loading";
+  }
+
+  if (summary.totalSelectedSymbols === 0) {
+    return "Empty";
+  }
+
+  if (summary.foundSymbols === 0) {
+    return "Missing";
+  }
+
+  return "Monitoring";
+}
+
+function getConditionTone(
+  conditionLabel: WatchlistResearchSummary["conditionLabel"],
+): StatusTone {
+  if (conditionLabel === "Broad risk") {
+    return "risk";
+  }
+
+  if (conditionLabel === "Short-term repair inside higher-timeframe risk") {
+    return "watch";
+  }
+
+  if (conditionLabel === "Higher-timeframe improving") {
+    return "eligible";
+  }
+
+  if (conditionLabel === "Insufficient data") {
+    return "missing";
+  }
+
+  return "watch";
+}
+
+function getStatusValueClass(tone: StatusTone) {
+  switch (tone) {
+    case "eligible":
+    case "complete":
+    case "positive":
+      return "text-[var(--eligible)]";
+    case "watch":
+      return "text-[var(--watch)]";
+    case "risk":
+    case "danger":
+    case "negative":
+      return "text-[var(--risk)]";
+    case "overheated":
+    case "warning":
+    case "partial":
+      return "text-[var(--overheated)]";
+    case "accent":
+    case "info":
+      return "text-[var(--accent)]";
+    case "missing":
+    case "neutral":
+      return "text-[var(--neutral)]";
+  }
+}
+
+function getNoticeToneClass(tone: StatusTone) {
+  switch (tone) {
+    case "eligible":
+    case "complete":
+    case "positive":
+      return "border-l-[var(--eligible)]";
+    case "watch":
+      return "border-l-[var(--watch)]";
+    case "risk":
+    case "danger":
+    case "negative":
+      return "border-l-[var(--risk)]";
+    case "overheated":
+    case "warning":
+    case "partial":
+      return "border-l-[var(--overheated)]";
+    case "accent":
+    case "info":
+      return "border-l-[var(--accent)]";
+    case "missing":
+    case "neutral":
+      return "border-l-[var(--missing)]";
+  }
 }
 
 function getWatchlistErrorMessage(error: unknown) {
@@ -1081,6 +1432,19 @@ function formatSummaryRank(value: number) {
 }
 
 const controlClass =
-  "h-8 w-full border border-[var(--border)] bg-[var(--control)] px-2 text-xs text-[var(--foreground)]";
-const buttonClass =
-  "h-8 border border-[var(--border)] px-2 text-[11px] font-semibold text-[var(--foreground)] hover:border-[var(--info)]";
+  "h-6 w-full border border-[var(--border)] bg-[var(--control)] px-1.5 text-[10px] text-[var(--foreground)]";
+const commandButtonClass =
+  "h-7 border border-[var(--terminal-bar-border)] px-2 text-[11px] font-semibold text-[var(--terminal-bar-foreground)] hover:border-[var(--accent-border)] hover:text-[var(--accent-hover)] disabled:cursor-not-allowed disabled:opacity-60";
+const railSectionLabelClass =
+  "text-[10px] font-semibold uppercase leading-4 text-[var(--muted)]";
+const railFieldLabelClass =
+  "mb-0.5 block text-[9px] font-semibold uppercase leading-3 text-[var(--muted)]";
+const railCheckboxLabelClass =
+  "flex min-h-5 items-center gap-1.5 text-[10px] leading-4 text-[var(--muted)]";
+const railCheckboxClass = "h-3 w-3 shrink-0 accent-[var(--accent)]";
+const railMiniButtonClass =
+  "h-5 border border-[var(--border)] px-1.5 text-[9px] font-semibold uppercase text-[var(--foreground)] hover:border-[var(--accent-border)] hover:text-[var(--accent-hover)]";
+const railDetailsClass =
+  "mt-2 border border-[var(--border)] bg-[var(--panel-2)]";
+const railSummaryClass =
+  "flex min-h-6 cursor-pointer list-none items-center justify-between gap-2 px-1.5 py-0.5 text-[10px] font-semibold uppercase leading-4 text-[var(--muted)] marker:hidden";

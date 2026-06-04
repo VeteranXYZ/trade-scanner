@@ -110,7 +110,8 @@
 }
 
 body:has(.screener-terminal),
-body:has(.symbol-terminal) {
+body:has(.symbol-terminal),
+body:has(.watchlist-terminal) {
   color-scheme: dark;
   --app-background: #080d12;
   --page-background: #080d12;
@@ -239,24 +240,30 @@ body {
 html:has(.screener-terminal),
 body:has(.screener-terminal),
 html:has(.symbol-terminal),
-body:has(.symbol-terminal) {
+body:has(.symbol-terminal),
+html:has(.watchlist-terminal),
+body:has(.watchlist-terminal) {
   overflow-x: clip;
 }
 
 @media (min-width: 1280px) {
   html:has(.screener-terminal),
-  body:has(.screener-terminal) {
+  body:has(.screener-terminal),
+  html:has(.watchlist-terminal),
+  body:has(.watchlist-terminal) {
     height: 100%;
     overflow: hidden;
   }
 
-  body:has(.screener-terminal) > main {
+  body:has(.screener-terminal) > main,
+  body:has(.watchlist-terminal) > main {
     min-height: 0;
     height: calc(100dvh - var(--app-header-height));
     overflow: hidden;
   }
 
-  body:has(.screener-terminal) footer {
+  body:has(.screener-terminal) footer,
+  body:has(.watchlist-terminal) footer {
     display: none;
   }
 }

@@ -82,6 +82,14 @@ The Screener is table-first. Keep full result visibility by default, with a comp
 
 Avoid pagination-first layouts, oversized summary cards, or empty marketing sections. Preserve dense comparison workflows.
 
+## Watchlist Rules
+
+The Watchlist is a selected-symbol monitoring terminal. The selected-symbol table is primary; summary, attention, and backdrop context must stay compact and secondary. Use fixed terminal context where feasible so the command/status band remains visible during row review.
+
+The left rail should prioritize Symbols, Presets, and Filters. Import/export is a secondary collapsed affordance and must not dominate permanent rail space. Avoid generic "show more" overflow controls.
+
+Follow strict semantic color rules: blue is UI/system only, green is eligible/constructive, violet is watch/observation, red is risk, amber is hot/caution/data gap, and gray is neutral/missing/not found. Repair/recovery should not read as healthy green.
+
 ## Copy Rules
 
 Use concise English UI copy. Prefer words like research, context, evidence, observation, state, quality, and check next.
