@@ -53,7 +53,7 @@ const historySnapshotObservationsQueryName =
 export const recentRunsPanelClassName =
   "border border-[var(--border-medium)] bg-[var(--panel)] shadow-[var(--shadow-panel)] xl:flex xl:min-h-0 xl:flex-col xl:overflow-hidden";
 export const recentRunsScrollContainerClassName =
-  "space-y-1 p-1.5 pr-1 xl:min-h-0 xl:flex-1 xl:overflow-y-auto xl:overscroll-contain";
+  "space-y-0.5 p-1 pr-1 xl:min-h-0 xl:flex-1 xl:overflow-y-auto xl:overscroll-contain";
 const unsafePrimarySignalLabelMap: Record<string, string> = {
   "do not chase": "Overheated caution",
   avoid: "Risk review",
@@ -597,11 +597,11 @@ export function HistoryPageClient({
         onRefresh={refreshData}
       />
 
-      <div className="mb-2 flex flex-wrap items-center gap-2 border border-[var(--border-medium)] bg-[var(--panel-muted)] px-2 py-1">
+      <div className="mb-1 flex flex-wrap items-center gap-2 border border-[var(--border-medium)] bg-[var(--panel-muted)] px-2 py-1">
         <TimeframeSelector timeframe={timeframe} onTimeframeChange={setTimeframe} />
       </div>
 
-      <div className="grid min-h-0 flex-1 gap-2 xl:grid-cols-[280px_minmax(0,1fr)] xl:overflow-hidden">
+      <div className="grid min-h-0 flex-1 gap-2 xl:grid-cols-[260px_minmax(0,1fr)] xl:overflow-hidden">
         <RecentSuccessfulRunsPanel
           timeframe={timeframe}
           snapshots={snapshots}
@@ -806,7 +806,7 @@ export function RecentSuccessfulRunsPanel({
       data-testid="recent-runs-panel"
       aria-label="Selected Scan recent runs"
     >
-      <div className="shrink-0 border-b border-[var(--border-medium)] bg-[var(--table-header)] px-2 py-1.5">
+      <div className="shrink-0 border-b border-[var(--border-medium)] bg-[var(--table-header)] px-2 py-1">
         <div className="flex items-center justify-between gap-2">
           <h2 className="text-[12px] font-semibold uppercase tracking-normal text-[var(--foreground)]">
             Recent Runs
@@ -815,7 +815,7 @@ export function RecentSuccessfulRunsPanel({
             {timeframe.toUpperCase()}
           </StatusBadge>
         </div>
-        <p className="mt-0.5 text-[10px] font-semibold uppercase text-[var(--muted)]">
+        <p className="text-[9px] font-semibold uppercase text-[var(--muted)]">
           Selected Scan
         </p>
       </div>
@@ -856,38 +856,33 @@ export function RecentSuccessfulRunsPanel({
                 aria-label={`Select historical run ${run.runId}`}
                 className={formatRecentRunCardClassName(run, isSelected)}
               >
-                <div className="flex items-start justify-between gap-2">
-                  <div className="min-w-0 flex-1">
-                    <p
-                      className="truncate font-mono text-[11px] font-semibold text-[var(--foreground)]"
-                      title={run.runId}
-                    >
-                      {formatCompactRunId(run.runId)}
-                    </p>
-                    <p className="mt-0.5 truncate text-[10px] text-[var(--muted)]">
-                      {formatHistoryDateTime(run.finishedAt)}
-                    </p>
-                  </div>
-                  <span className="shrink-0 border border-[var(--border)] bg-[var(--panel-muted)] px-1.5 py-0.5 text-[9px] font-semibold uppercase text-[var(--muted)]">
+                <div className="flex min-w-0 items-center gap-1">
+                  <span
+                    className="min-w-0 truncate font-mono text-[11px] font-semibold text-[var(--foreground)]"
+                    title={run.runId}
+                  >
+                    {formatCompactRunId(run.runId)}
+                  </span>
+                  <span className="shrink-0 border border-[var(--border)] bg-[var(--panel-muted)] px-1 py-0 text-[9px] font-semibold uppercase leading-4 text-[var(--muted)]">
                     {run.timeframe.toUpperCase()}
                   </span>
-                </div>
-                {badges.length > 0 ? (
-                  <div className="mt-1 flex flex-wrap gap-1">
-                    {badges.map((badge) => (
+                  {badges.length > 0
+                    ? badges.map((badge) => (
                       <StatusBadge
                         key={badge}
                         tone={getRecentRunBadgeTone(badge)}
-                        className="text-[9px]"
+                        className="px-1 text-[9px]"
+                        title={badge}
                       >
-                        {badge}
+                        {formatRecentRunBadgeLabel(badge)}
                       </StatusBadge>
-                    ))}
-                  </div>
-                ) : null}
-                <div className="mt-1 grid grid-cols-2 gap-x-2 gap-y-0.5 text-[10px] text-[var(--muted)]">
-                  <span>Rows {formatCount(run.symbolsScanned)}</span>
-                  <span>Signals {formatCount(run.signalsCreated)}</span>
+                    ))
+                    : null}
+                </div>
+                <div className="mt-0.5 flex min-w-0 flex-wrap items-center gap-x-2 gap-y-0.5 text-[10px] leading-4 text-[var(--muted)]">
+                  <span className="font-mono">{formatHistoryDateTime(run.finishedAt)}</span>
+                  <span>{formatCount(run.symbolsScanned)} rows</span>
+                  <span>{formatCount(run.signalsCreated)} sig</span>
                   <span
                     className={
                       run.isLikelyFullUniverse === true
@@ -897,7 +892,6 @@ export function RecentSuccessfulRunsPanel({
                   >
                     {formatFullUniverse(run)}
                   </span>
-                  <span>{formatCompactTime(run.finishedAt)}</span>
                 </div>
               </button>
             );
@@ -936,7 +930,7 @@ function formatRecentRunCardClassName(
   isSelected: boolean,
 ) {
   const base =
-    "w-full border border-l-4 px-2 py-1.5 text-left transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)]";
+    "w-full border border-l-4 px-1.5 py-1 text-left transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)]";
 
   if (isSelected) {
     return `${base} border-[var(--accent-border)] border-l-[var(--accent)] bg-[var(--section-selected-bg)] shadow-[inset_3px_0_0_var(--accent)]`;
@@ -961,6 +955,19 @@ function getRecentRunBadgeTone(badge: string) {
       return "watch";
     default:
       return "neutral";
+  }
+}
+
+function formatRecentRunBadgeLabel(badge: string) {
+  switch (badge) {
+    case "Selected":
+      return "Sel";
+    case "Validation Source":
+      return "Val";
+    case "Recommended":
+      return "Rec";
+    default:
+      return badge;
   }
 }
 
@@ -1014,7 +1021,7 @@ export function ForwardObservationSection({
 
   return (
     <section className="overflow-hidden border border-[var(--border-medium)] bg-[var(--panel)] shadow-[var(--shadow-panel)] xl:flex xl:min-h-0 xl:flex-1 xl:flex-col">
-      <div className="flex min-h-8 flex-wrap items-center justify-between gap-2 border-b border-[var(--border-medium)] bg-[var(--table-header)] px-2 py-1">
+      <div className="flex min-h-7 flex-wrap items-center justify-between gap-2 border-b border-[var(--border-medium)] bg-[var(--table-header)] px-2 py-1">
         <div className="flex min-w-0 flex-wrap items-center gap-2">
           <h2 className="text-[12px] font-semibold uppercase tracking-normal text-[var(--foreground)]">
             Outcome Summary
@@ -1049,7 +1056,7 @@ export function ForwardObservationSection({
         </div>
       </div>
 
-      <div className="flex min-h-0 flex-col gap-2 px-2 py-2 xl:flex-1 xl:overflow-hidden">
+      <div className="flex min-h-0 flex-col gap-1 px-2 py-1 xl:flex-1 xl:overflow-hidden">
         {snapshotError ? (
           <StatePanel title="Selected Scan unavailable" message={snapshotError} />
         ) : snapshotIsLoading ? (
@@ -1078,11 +1085,6 @@ export function ForwardObservationSection({
           summary={summary}
           window={window}
         />
-
-        <p className="border-l-2 border-l-[var(--accent)] bg-[var(--panel-muted)] px-2 py-1 text-[11px] leading-4 text-[var(--muted)]">
-          Outcome metrics use Validation Source; Original Scan Rows stay tied to
-          Selected Scan.
-        </p>
 
         {uiState.status !== "observation_ready" ? (
           <ForwardObservationStatePanel
@@ -1123,45 +1125,116 @@ function SelectedScanValidationStrip({
   summary: ForwardObservationSummary | null;
   window: ObservationWindow;
 }) {
+  const validationWindow = summary?.window ?? window;
+
   return (
-    <div className="grid gap-2 lg:grid-cols-2">
-      <HistoryContextBlock
-        title="Selected Scan"
-        rows={[
-          ["Run ID", selectedRun ? shortRunId(selectedRun.runId) : "-"],
-          ["Finished", formatHistoryDateTime(selectedRun?.finishedAt)],
-          [
-            "Rows / Signals",
-            `${formatCount(selectedRun?.symbolsScanned)} / ${formatCount(
+    <div className="grid gap-1 border border-[var(--border)] bg-[var(--panel-muted)] px-2 py-1 text-[10px] lg:grid-cols-2">
+      <HistoryContextStripLine
+        label="Scan"
+        runId={selectedRun?.runId ?? null}
+        items={[
+          {
+            value: formatHistoryDateTime(selectedRun?.finishedAt),
+            title: "Finished",
+          },
+          {
+            value: `${formatCount(selectedRun?.symbolsScanned)}/${formatCount(
               selectedRun?.signalsCreated,
             )}`,
-          ],
-          ["Universe", selectedRun ? formatFullUniverse(selectedRun) : "-"],
+            title: "Rows / signals",
+          },
+          {
+            value: selectedRun ? formatFullUniverse(selectedRun) : "-",
+            tone:
+              selectedRun?.isLikelyFullUniverse === true
+                ? "complete"
+                : "partial",
+            title: "Universe",
+          },
         ]}
       />
-      <HistoryContextBlock
-        title="Validation Source"
-        rows={[
-          ["Run ID", validationRun ? shortRunId(validationRun.runId) : "-"],
-          ["Finished", formatHistoryDateTime(validationRun?.finishedAt)],
-          ["Maturity", formatReadinessRunStatus(validationReadiness)],
-          [
-            "Forward Window",
-            `${summary?.window ?? window} ${
-              (summary?.window ?? window) === 1 ? "candle" : "candles"
-            }`,
-          ],
-          [
-            "Complete / Partial / Missing",
-            summary
-              ? `${formatCount(summary.completeCount)} / ${formatCount(
+      <HistoryContextStripLine
+        label="Validation"
+        runId={validationRun?.runId ?? null}
+        items={[
+          {
+            value: formatReadinessRunStatus(validationReadiness),
+            tone: validationReadiness?.state === "ready" ? "complete" : "partial",
+            title: "Readiness",
+          },
+          {
+            value: summary
+              ? `${formatCount(summary.completeCount)}/${formatCount(
                   summary.partialCount,
-                )} / ${formatCount(summary.missingCount)}`
+                )}/${formatCount(summary.missingCount)}`
               : "-",
-          ],
+            title: "Complete / partial / missing",
+          },
+          {
+            value: `Window ${validationWindow} ${
+              validationWindow === 1 ? "candle" : "candles"
+            }`,
+            tone: "accent",
+            title: "Forward window",
+          },
         ]}
       />
     </div>
+  );
+}
+
+function HistoryContextStripLine({
+  label,
+  runId,
+  items,
+}: {
+  label: string;
+  runId: string | null;
+  items: Array<{ value: string; tone?: StatusTone; title?: string }>;
+}) {
+  return (
+    <div
+      className="flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-0.5"
+      aria-label={`${label} ${runId ?? "unavailable"}`}
+    >
+      <span className="shrink-0 font-semibold uppercase text-[var(--foreground)]">
+        {label}
+      </span>
+      <HistoryInlineValue
+        value={shortRunId(runId)}
+        tone="accent"
+        title={runId ?? `${label} unavailable`}
+      />
+      {items.map((item, index) => (
+        <HistoryInlineValue
+          key={`${label}-${index}-${item.value}`}
+          value={item.value}
+          tone={item.tone}
+          title={item.title}
+        />
+      ))}
+    </div>
+  );
+}
+
+function HistoryInlineValue({
+  value,
+  tone = "neutral",
+  title,
+}: {
+  value: string;
+  tone?: StatusTone;
+  title?: string;
+}) {
+  return (
+    <span
+      title={title}
+      className={`inline-flex h-5 max-w-full items-center truncate border border-l-2 bg-[var(--panel)] px-1.5 font-mono text-[10px] font-semibold leading-4 ${getHistoryStatusToneBorderClass(
+        tone,
+      )} ${getHistoryStatusToneTextClass(tone)}`}
+    >
+      {value}
+    </span>
   );
 }
 
@@ -1222,6 +1295,10 @@ function HistoryDetails({
       </summary>
       <div className="space-y-2 border-t border-[var(--border)] px-2 py-2">
         <ObservationDataStatusLegend />
+        <DetailLine
+          label="Data path"
+          value="Outcome metrics use Validation Source; Original Scan Rows stay tied to Selected Scan."
+        />
         {readyContextNote ? (
           <DetailLine label="Validation note" value={readyContextNote} />
         ) : null}
@@ -1368,57 +1445,50 @@ export function ObservationRowsTable({
 
   return (
     <section className="overflow-hidden border border-[var(--border-medium)] bg-[var(--panel-data)] shadow-[var(--shadow-panel)] xl:flex xl:min-h-0 xl:flex-1 xl:flex-col">
-      <div className="flex min-h-8 flex-wrap items-center justify-between gap-2 border-b border-[var(--border-medium)] bg-[var(--table-header)] px-2 py-1">
-        <div className="flex min-w-0 flex-wrap items-center gap-2">
-          <h3 className="text-[12px] font-semibold uppercase tracking-normal text-[var(--foreground)]">
-            Outcome Rows
-          </h3>
-          <StatusBadge
-            tone={visibleRows.length === rows.length ? "complete" : "info"}
-            className="text-[10px]"
-          >
-            {formatObservationRowsFilterCount({
-              visibleCount: visibleRows.length,
-              totalCount: rows.length,
-            })}
+      <div className="flex min-h-8 flex-wrap items-center gap-1.5 border-b border-[var(--border-medium)] bg-[var(--table-header)] px-2 py-1">
+        <h3 className="shrink-0 text-[12px] font-semibold uppercase tracking-normal text-[var(--foreground)]">
+          Outcome Rows
+        </h3>
+        <StatusBadge
+          tone={visibleRows.length === rows.length ? "complete" : "info"}
+          className="text-[10px]"
+        >
+          {formatObservationRowsFilterCount({
+            visibleCount: visibleRows.length,
+            totalCount: rows.length,
+          })}
+        </StatusBadge>
+        {isFetching ? (
+          <StatusBadge tone="partial" className="text-[10px]">
+            Refreshing
           </StatusBadge>
-          {isFetching ? (
-            <StatusBadge tone="partial" className="text-[10px]">
-              Refreshing
-            </StatusBadge>
-          ) : null}
-        </div>
-        <span className="text-[10px] font-semibold uppercase text-[var(--muted)]">
+        ) : null}
+        <span className="shrink-0 text-[10px] font-semibold uppercase text-[var(--muted)]">
           Validation Source
         </span>
-      </div>
-
-      <div className="border-b border-[var(--border)] bg-[var(--panel-muted)] px-2 py-1.5">
-        <div className="grid gap-2 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_180px]">
-          <ObservationRowsFilterGroup
-            label="Status"
-            options={observationRowsDataStatusFilters}
-            selectedValue={dataStatusFilter}
-            onSelect={(value) => setDataStatusFilter(value)}
+        <ObservationRowsFilterGroup
+          label="Status"
+          options={observationRowsDataStatusFilters}
+          selectedValue={dataStatusFilter}
+          onSelect={(value) => setDataStatusFilter(value)}
+        />
+        <ObservationRowsFilterGroup
+          label="State"
+          options={observationRowsGroupFilters}
+          selectedValue={groupFilter}
+          onSelect={(value) => setGroupFilter(value)}
+        />
+        <label className="flex min-w-[150px] flex-1 items-center gap-1 sm:flex-none">
+          <span className="shrink-0 text-[10px] font-semibold uppercase tracking-normal text-[var(--muted)]">
+            Search
+          </span>
+          <input
+            value={symbolSearch}
+            onChange={(event) => setSymbolSearch(event.target.value)}
+            placeholder="Symbol"
+            className="h-6 min-w-0 flex-1 border border-[var(--border)] bg-[var(--control)] px-2 font-mono text-[10px] text-[var(--foreground)] outline-none focus:border-[var(--accent)] sm:w-32 sm:flex-none"
           />
-          <ObservationRowsFilterGroup
-            label="Original State"
-            options={observationRowsGroupFilters}
-            selectedValue={groupFilter}
-            onSelect={(value) => setGroupFilter(value)}
-          />
-          <label className="min-w-0">
-            <span className="text-[10px] font-semibold uppercase tracking-normal text-[var(--muted)]">
-              Symbol
-            </span>
-            <input
-              value={symbolSearch}
-              onChange={(event) => setSymbolSearch(event.target.value)}
-              placeholder="Search"
-              className="mt-1 h-6 w-full border border-[var(--border)] bg-[var(--control)] px-2 font-mono text-[10px] text-[var(--foreground)] outline-none focus:border-[var(--accent)]"
-            />
-          </label>
-        </div>
+        </label>
       </div>
 
       {visibleRows.length === 0 ? (
@@ -1427,7 +1497,7 @@ export function ObservationRowsTable({
           message="No observation rows match the current filters."
         />
       ) : (
-        <DataTableScroll className="max-h-[56vh] overflow-auto xl:min-h-0 xl:flex-1 xl:overflow-auto">
+        <DataTableScroll className="max-h-[70vh] overflow-auto xl:min-h-0 xl:flex-1 xl:overflow-auto">
           <DataTable minWidth="min-w-[1180px]">
             <thead className="sticky top-0 z-20 bg-[var(--table-header)] text-[10px] uppercase tracking-normal text-[var(--muted)]">
               <tr>
@@ -1593,11 +1663,11 @@ function ObservationRowsFilterGroup<TValue extends string>({
   onSelect: (value: TValue) => void;
 }) {
   return (
-    <div>
-      <p className="text-[10px] font-semibold uppercase tracking-normal text-[var(--muted)]">
+    <div className="flex min-w-0 flex-wrap items-center gap-1">
+      <span className="shrink-0 text-[10px] font-semibold uppercase tracking-normal text-[var(--muted)]">
         {label}
-      </p>
-      <div className="mt-1 flex flex-wrap gap-1">
+      </span>
+      <div className="flex flex-wrap gap-1">
         {options.map((option) => {
           const isSelected = option.value === selectedValue;
 
@@ -1758,9 +1828,9 @@ function formatObservationRowsFilterCount({
   visibleCount: number;
   totalCount: number;
 }) {
-  return `Showing ${formatCount(visibleCount)} of ${formatCount(
-    totalCount,
-  )} outcome rows.`;
+  return visibleCount === totalCount
+    ? `Showing ${formatCount(visibleCount)}`
+    : `Showing ${formatCount(visibleCount)}/${formatCount(totalCount)}`;
 }
 
 function getObservedChangeClass(value: number | null | undefined) {
@@ -1803,24 +1873,12 @@ function getPositiveRateTone(value: number | null): StatusTone {
   return "neutral";
 }
 
-function formatOutcomeInterpretation(
-  summary: ObservationSummary,
-  window: ObservationWindow,
-) {
-  const outcome =
-    summary.completeCount === 0
-      ? "mixed"
-      : (summary.medianObservedChangePct ?? 0) > 0 &&
-          (summary.positiveRatePct ?? 0) >= 50
-        ? "positive"
-        : (summary.medianObservedChangePct ?? 0) < 0 &&
-            (summary.positiveRatePct ?? 100) <= 50
-          ? "negative"
-          : "mixed";
+function getDrawdownSummaryTone(value: number | null): StatusTone {
+  if (typeof value !== "number" || !Number.isFinite(value) || value === 0) {
+    return "neutral";
+  }
 
-  return `Prior rows showed ${outcome} follow-through over ${window} ${
-    window === 1 ? "candle" : "candles"
-  }.`;
+  return value < 0 ? "warning" : "neutral";
 }
 
 function formatSelectedControlClassName(isSelected: boolean) {
@@ -2001,49 +2059,81 @@ function ObservationSummarySection({
   window: ObservationWindow;
 }) {
   return (
-    <section className="border border-[var(--border-medium)] bg-[var(--panel-data)] p-1.5">
-      <div className="grid gap-1.5 sm:grid-cols-2 lg:grid-cols-4">
-        <Metric label="Total rows" value={formatCount(summary.totalRows)} tone="info" />
-        <Metric
-          label="Complete"
-          value={formatCount(summary.completeCount)}
-          tone="complete"
-        />
-        <Metric
-          label="Partial"
-          value={formatCount(summary.partialCount)}
-          tone="partial"
-        />
-        <Metric
-          label="Missing"
-          value={formatCount(summary.missingCount)}
-          tone="missing"
-        />
-        <Metric
-          label="Median return"
-          value={formatObservationSummaryPercent(summary.medianObservedChangePct)}
-          tone={getObservedSummaryTone(summary.medianObservedChangePct)}
-        />
-        <Metric
-          label="Positive rate"
-          value={formatObservationSummaryPercent(summary.positiveRatePct)}
-          tone={getPositiveRateTone(summary.positiveRatePct)}
-        />
-        <Metric
-          label="Drawdown"
-          value={formatObservationSummaryPercent(summary.worstMaxDrawdownPct)}
-          tone="warning"
-        />
-        <Metric
-          label="Forward window"
-          value={`${window} ${window === 1 ? "candle" : "candles"}`}
-          tone="accent"
-        />
-      </div>
-      <p className="mt-1.5 border-l-2 border-l-[var(--complete)] bg-[var(--panel-muted)] px-2 py-1 text-[11px] leading-4 text-[var(--muted)]">
-        {formatOutcomeInterpretation(summary, window)}
-      </p>
+    <section className="flex min-w-0 flex-wrap items-center gap-1 border border-[var(--border-medium)] bg-[var(--panel-data)] px-2 py-1">
+      <SummaryStripStat
+        label="Rows"
+        value={formatCount(summary.totalRows)}
+        tone="info"
+      />
+      <SummaryStripStat
+        label="Complete"
+        value={formatCount(summary.completeCount)}
+        tone="complete"
+      />
+      <SummaryStripStat
+        label="Partial"
+        value={formatCount(summary.partialCount)}
+        tone="partial"
+      />
+      <SummaryStripStat
+        label="Missing"
+        value={formatCount(summary.missingCount)}
+        tone="missing"
+      />
+      <SummaryStripStat
+        label="Median"
+        value={formatCompactObservationSummaryPercent(
+          summary.medianObservedChangePct,
+        )}
+        tone={getObservedSummaryTone(summary.medianObservedChangePct)}
+      />
+      <SummaryStripStat
+        label="Positive"
+        value={formatCompactObservationSummaryPercent(summary.positiveRatePct)}
+        tone={getPositiveRateTone(summary.positiveRatePct)}
+      />
+      <SummaryStripStat
+        label="Drawdown"
+        value={formatCompactObservationSummaryPercent(
+          summary.worstMaxDrawdownPct,
+        )}
+        tone={getDrawdownSummaryTone(summary.worstMaxDrawdownPct)}
+      />
+      <SummaryStripStat
+        label="Window"
+        value={`${window} ${window === 1 ? "candle" : "candles"}`}
+        tone="accent"
+      />
     </section>
+  );
+}
+
+function SummaryStripStat({
+  label,
+  value,
+  tone,
+}: {
+  label: string;
+  value: string;
+  tone: StatusTone;
+}) {
+  return (
+    <span
+      className={`inline-flex h-5 max-w-full items-center gap-1 border border-l-2 bg-[var(--panel-muted)] px-1.5 text-[10px] leading-4 ${getHistoryStatusToneBorderClass(
+        tone,
+      )}`}
+    >
+      <span className="shrink-0 font-semibold uppercase text-[var(--muted)]">
+        {label}
+      </span>
+      <span
+        className={`min-w-0 truncate font-mono font-semibold tabular-nums ${getHistoryStatusToneTextClass(
+          tone,
+        )}`}
+      >
+        {value}
+      </span>
+    </span>
   );
 }
 
@@ -2415,14 +2505,11 @@ export function SnapshotTable({
 
   return (
     <details className="shrink-0 overflow-hidden border border-[var(--border-medium)] bg-[var(--panel-data)] shadow-[var(--shadow-panel)]">
-      <summary className="flex min-h-8 cursor-pointer list-none flex-wrap items-center justify-between gap-2 border-b border-[var(--border-medium)] bg-[var(--table-header)] px-2 py-1 marker:hidden">
-        <div className="min-w-0">
+      <summary className="flex min-h-7 cursor-pointer list-none flex-wrap items-center justify-between gap-2 bg-[var(--table-header)] px-2 py-1 marker:hidden">
+        <div className="flex min-w-0 items-center gap-2">
           <h2 className="text-[12px] font-semibold uppercase tracking-normal text-[var(--foreground)]">
             Original Scan Rows
           </h2>
-          <p className="text-[10px] leading-4 text-[var(--muted)]">
-            Original scanner output from Selected Scan.
-          </p>
         </div>
         <StatusBadge tone={isLoading ? "partial" : "accent"} className="text-[10px]">
           {isLoading ? "Refreshing" : `${rows.length} rows`}
@@ -2430,7 +2517,8 @@ export function SnapshotTable({
       </summary>
       <div className="border-t border-[var(--border)] px-2 py-2">
         <p className="mb-2 text-[11px] leading-4 text-[var(--muted)]">
-          Research opens current symbol view, not historical replay.
+          Original scanner output from Selected Scan. Research opens current
+          symbol view, not historical replay.
         </p>
       {rows.length === 0 ? (
         <StatePanel
@@ -2591,35 +2679,6 @@ function getSnapshotRowsSortValue(
     case "rank_score":
       return item.row.rankScore;
   }
-}
-
-function Metric({
-  label,
-  value,
-  tone = "neutral",
-}: {
-  label: string;
-  value: string;
-  tone?: StatusTone;
-}) {
-  return (
-    <div
-      className={`min-w-0 border border-l-2 bg-[var(--panel-muted)] px-2 py-1 ${getHistoryStatusToneBorderClass(
-        tone,
-      )}`}
-    >
-      <div className="truncate text-[9px] font-semibold uppercase tracking-normal text-[var(--muted)]">
-        {label}
-      </div>
-      <div
-        className={`mt-0.5 truncate font-mono text-[12px] font-semibold tabular-nums ${getHistoryStatusToneTextClass(
-          tone,
-        )}`}
-      >
-        {value}
-      </div>
-    </div>
-  );
 }
 
 function StatePanel({ title, message }: { title: string; message: string }) {
@@ -3582,20 +3641,6 @@ export function formatHistoryDateTime(value: string | null | undefined) {
   ].join("-") + ` ${padDatePart(date.getUTCHours())}:${padDatePart(date.getUTCMinutes())}`;
 }
 
-function formatCompactTime(value: string | null | undefined) {
-  if (!value) {
-    return "-";
-  }
-
-  const date = new Date(value);
-
-  if (Number.isNaN(date.getTime())) {
-    return "-";
-  }
-
-  return `${padDatePart(date.getUTCHours())}:${padDatePart(date.getUTCMinutes())}`;
-}
-
 export function formatHistoryPrimarySignal(value: string | null | undefined) {
   const label = value?.trim();
 
@@ -3682,6 +3727,14 @@ function formatObservationSummaryPercent(value: number | null | undefined) {
   return typeof value === "number" && Number.isFinite(value)
     ? formatObservationPercent(value)
     : "Not enough complete rows";
+}
+
+function formatCompactObservationSummaryPercent(
+  value: number | null | undefined,
+) {
+  return typeof value === "number" && Number.isFinite(value)
+    ? formatObservationPercent(value)
+    : "N/A";
 }
 
 function formatDataStatus(value: ObservationDataStatus) {
@@ -3822,31 +3875,23 @@ function formatDuration(value: number, unit: "hour" | "day" | "week") {
 }
 
 function shortRunId(value: string | null | undefined) {
-  return value ? value.slice(0, 8) : "-";
+  return value ? value.slice(0, 5) : "-";
 }
 
 function formatCompactRunId(value: string | null | undefined) {
-  if (!value) {
-    return "-";
-  }
-
-  if (value.length <= 16) {
-    return value;
-  }
-
-  return `${value.slice(0, 8)}...${value.slice(-4)}`;
+  return shortRunId(value);
 }
 
 function formatFullUniverse(run: HistoricalSnapshotRun) {
   if (run.isLikelyFullUniverse === true) {
-    return "Likely full universe";
+    return "Full";
   }
 
   if (run.isLikelyFullUniverse === false) {
-    return "Limited or unknown";
+    return "Limited";
   }
 
-  return "Unknown universe";
+  return "Unknown";
 }
 
 function formatMarket(row: HistoricalSnapshotRow) {

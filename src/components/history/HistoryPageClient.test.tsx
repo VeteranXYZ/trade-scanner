@@ -290,7 +290,7 @@ describe("HistoryPageClient display formatting", () => {
     expect(html).toContain("Outcome Rows");
     expect(html).toContain("Validation Source");
     expect(html).toContain("bg-[var(--panel-data)]");
-    expect(html).toContain("Showing 4 of 4 outcome rows.");
+    expect(html).toContain("Showing 4");
     expect(html).toContain("Original State");
     expect(html).toContain("Hot");
     expect(html).toContain("Outcome Status");
@@ -348,7 +348,7 @@ describe("HistoryPageClient display formatting", () => {
       initialSortState: { key: "observed_change", direction: "desc" },
     });
 
-    expect(html).toContain("Showing 4 of 4 outcome rows.");
+    expect(html).toContain("Showing 4");
     expectMarkupOrder(html, ["HIGHUSDT", "MIDUSDT", "LOWUSDT", "MISSINGUSDT"]);
     expect(html).toContain("\u2193");
     expect(html).toContain('aria-sort="descending"');
@@ -359,7 +359,7 @@ describe("HistoryPageClient display formatting", () => {
       initialDataStatusFilter: "complete",
     });
 
-    expect(html).toContain("Showing 2 of 4 outcome rows.");
+    expect(html).toContain("Showing 2/4");
     expect(html).toContain("COMPLETEELIGIBLEUSDT");
     expect(html).toContain("COMPLETEWATCHUSDT");
     expect(html).not.toContain("PARTIALRISKUSDT");
@@ -371,7 +371,7 @@ describe("HistoryPageClient display formatting", () => {
       initialDataStatusFilter: "partial",
     });
 
-    expect(html).toContain("Showing 1 of 4 outcome rows.");
+    expect(html).toContain("Showing 1/4");
     expect(html).toContain("PARTIALRISKUSDT");
     expect(html).toContain("Insufficient future candles");
     expect(html).not.toContain("COMPLETEELIGIBLEUSDT");
@@ -384,7 +384,7 @@ describe("HistoryPageClient display formatting", () => {
       initialDataStatusFilter: "missing",
     });
 
-    expect(html).toContain("Showing 1 of 4 outcome rows.");
+    expect(html).toContain("Showing 1/4");
     expect(html).toContain("MISSINGRISKUSDT");
     expect(html).toContain("No completed future candles yet");
     expect(html).not.toContain("COMPLETEELIGIBLEUSDT");
@@ -397,7 +397,7 @@ describe("HistoryPageClient display formatting", () => {
       initialGroupFilter: "risk",
     });
 
-    expect(html).toContain("Showing 2 of 4 outcome rows.");
+    expect(html).toContain("Showing 2/4");
     expect(html).toContain("PARTIALRISKUSDT");
     expect(html).toContain("MISSINGRISKUSDT");
     expect(html).not.toContain("COMPLETEELIGIBLEUSDT");
@@ -410,7 +410,7 @@ describe("HistoryPageClient display formatting", () => {
       initialGroupFilter: "risk",
     });
 
-    expect(html).toContain("Showing 1 of 4 outcome rows.");
+    expect(html).toContain("Showing 1/4");
     expect(html).toContain("PARTIALRISKUSDT");
     expect(html).not.toContain("MISSINGRISKUSDT");
     expect(html).not.toContain("COMPLETEELIGIBLEUSDT");
@@ -423,7 +423,7 @@ describe("HistoryPageClient display formatting", () => {
       initialGroupFilter: "risk",
     });
 
-    expect(html).toContain("Showing 0 of 4 outcome rows.");
+    expect(html).toContain("Showing 0/4");
     expect(html).toContain("No matching observation rows");
     expect(html).toContain("No observation rows match the current filters.");
     expect(html).not.toContain("COMPLETEELIGIBLEUSDT");
@@ -469,21 +469,21 @@ describe("HistoryPageClient display formatting", () => {
     expect(html).toContain("xl:overflow-y-auto");
     expect(html).toContain("xl:overscroll-contain");
     expect(html).toContain("aria-pressed=\"true\"");
-    expect(html).toContain("11111111...1111");
-    expect(html).toContain("22222222...2222");
-    expect(html).toContain("33333333...3333");
+    expect(html).toContain(">11111<");
+    expect(html).toContain(">22222<");
+    expect(html).toContain(">33333<");
     expect(html).toContain('title="11111111-1111-4111-8111-111111111111"');
     expect(html).toContain(
       'aria-label="Select historical run 11111111-1111-4111-8111-111111111111"',
     );
     expect(html).not.toContain(">11111111-1111-4111-8111-111111111111<");
-    expect(html).toContain("Rows 409");
+    expect(html).toContain("409 rows");
     expect(html).toContain("Selected");
     expect(html).toContain("Latest");
     expect(html).toContain("Validation Source");
     expect(html).toContain("Recommended");
     expect(html).not.toContain(">Observation<");
-    expect(html).toContain("Limited or unknown");
+    expect(html).toContain("Limited");
     expect(html).toContain("opacity-80");
     expect(recentRunsPanelClassName).toContain("xl:min-h-0");
     expect(recentRunsPanelClassName).toContain("xl:flex-col");
@@ -517,14 +517,14 @@ describe("HistoryPageClient display formatting", () => {
     expect(html).toContain("3 candles");
     expect(html).toContain("5 candles");
     expect(html).toContain("10 candles");
-    expect(html).toContain("Total rows");
+    expect(html).toContain("Rows");
     expect(html).toContain("Complete");
     expect(html).toContain("Partial");
     expect(html).toContain("Missing");
-    expect(html).toContain("Median return");
-    expect(html).toContain("Positive rate");
+    expect(html).toContain("Median");
+    expect(html).toContain("Positive");
     expect(html).toContain("Drawdown");
-    expect(html).toContain("Forward window");
+    expect(html).toContain("Window");
     expect(html).toContain("Outcome metrics use Validation Source");
     expect(html).toContain("Group distribution");
     expect(html).toContain("Notable symbols");
@@ -628,7 +628,7 @@ describe("HistoryPageClient display formatting", () => {
     expect(html).toContain("selected");
     expect(html).toContain("mature-r");
     expect(html).toContain("Outcome Summary");
-    expect(html).toContain("Prior rows showed positive follow-through");
+    expect(html).toContain("3.00%");
     expect(html).not.toContain("Loading Validation Source");
     expect(html).not.toContain("Validation Source unavailable");
   });
@@ -776,9 +776,9 @@ describe("HistoryPageClient display formatting", () => {
       }),
     );
 
-    expect(html).toContain("Total rows");
+    expect(html).toContain("Rows");
     expect(html).toContain(">5<");
-    expect(html).toContain("Positive rate");
+    expect(html).toContain("Positive");
     expect(html).toContain("2.00%");
     expect(html).toContain("66.67%");
     expect(html).toContain("-12.00%");
@@ -863,7 +863,7 @@ describe("HistoryPageClient display formatting", () => {
 
     expect(html).toContain("Outcome Summary");
     expect(html).toContain("Not enough complete rows");
-    expect(html).toContain("Prior rows showed mixed follow-through");
+    expect(html).toContain("N/A");
     expect(html).toContain("PARTIALUPUSDT");
     expect(html).toContain("PARTIALDOWNUSDT");
     expect(html).toContain("Insufficient future candles");
@@ -1080,7 +1080,7 @@ describe("HistoryPageClient display formatting", () => {
     expect(html).toContain("Validation ready");
     expect(html).toContain("11111111");
     expect(html).toContain("22222222");
-    expect(html).toContain("2026-06-02 02:52");
+    expect(html).toContain("Window 3 candles");
     expect(html).toContain("Selected Scan has stale market data coverage");
     expect(html).toContain("Return");
     expect(html).not.toContain("Validation Source unavailable");
@@ -1354,7 +1354,7 @@ describe("HistoryPageClient display formatting", () => {
     });
     expect(html).toContain("Outcome Rows not returned");
     expect(html).toContain("Validation Source is available, but no Outcome Rows were returned.");
-    expect(html).toContain("Total rows");
+    expect(html).toContain("Rows");
     expect(html).toContain("Returned Rows");
     expect(html).toContain(">413<");
     expect(html).toContain(">0<");
