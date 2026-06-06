@@ -347,7 +347,7 @@ describe("WatchlistPageClient", () => {
     expect(html).toContain("Missing");
     expect(html).toContain("HTF Risk");
     expect(html).toContain("Broad Risk");
-    expect(html).toContain("Mock Data");
+    expect(html).toContain('aria-label="Mock data"');
     expect(html).not.toContain("Watchlist Multi-Timeframe");
     expect(html).not.toContain("<dl");
   });

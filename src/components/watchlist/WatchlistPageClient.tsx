@@ -18,7 +18,12 @@ import {
   DataTableScroll,
   type ChipTone,
 } from "@/components/table/DataTable";
-import { PageShell, StatusBadge, type StatusTone } from "@/components/ui/workspace";
+import {
+  PageShell,
+  RefreshIconButton,
+  StatusBadge,
+  type StatusTone,
+} from "@/components/ui/workspace";
 import {
   MTF_SCREENER_TIMEFRAMES,
   buildMtfScreenerRowsFromResponse,
@@ -437,18 +442,12 @@ function WatchlistCommandBar({
         ))}
       </div>
       <div className="flex shrink-0 flex-wrap items-center gap-1">
-        <button
-          type="button"
+        <RefreshIconButton
           onClick={onRefresh}
           disabled={isRefreshing || isVisualCheck}
-          className={commandButtonClass}
-        >
-          {isVisualCheck
-            ? "Mock Data"
-            : isRefreshing
-              ? "Refreshing"
-              : "Refresh Data"}
-        </button>
+          isRefreshing={isRefreshing}
+          label={isVisualCheck ? "Mock data" : "Refresh"}
+        />
         <button type="button" onClick={onSave} className={commandButtonClass}>
           Save
         </button>
@@ -1155,7 +1154,7 @@ function WatchlistTimeframeCell({
   return (
     <DataTableChip
       tone={tone}
-      className="w-full justify-center gap-1"
+      className="justify-center gap-1"
       title={`${timeframe} ${formatWatchlistGroup(snapshot)} rank ${formatMtfRank(snapshot)}`}
     >
       <span className="truncate">{formatWatchlistGroup(snapshot)}</span>
@@ -1170,7 +1169,7 @@ function WatchlistPrimaryCell({ row }: { row: WatchlistRow }) {
   return (
     <DataTableChip
       tone={primary.tone}
-      className="w-full justify-center"
+      className="justify-center"
       title={primary.title}
     >
       <span className="truncate">{primary.label}</span>

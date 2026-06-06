@@ -27,6 +27,7 @@ import {
 import { buildSymbolResearchHref } from "@/components/symbol/symbolResearchLinks";
 import {
   PageShell,
+  RefreshIconButton,
   StatusBadge,
   type StatusTone,
 } from "@/components/ui/workspace";
@@ -80,6 +81,10 @@ type HistoryTerminalTone =
   | "neutral"
   | "risk"
   | "watch";
+type RequestedObservationRows = {
+  runId: string;
+  window: ObservationWindow;
+};
 export type ObservationRowsSortKey =
   | "symbol"
   | "group"
@@ -433,6 +438,8 @@ export function HistoryPageClient({
   const [requestedSnapshotRunId, setRequestedSnapshotRunId] = useState<
     string | null
   >(null);
+  const [requestedObservationRows, setRequestedObservationRows] =
+    useState<RequestedObservationRows | null>(null);
   const snapshotsQuery = useQuery({
     queryKey: buildHistorySnapshotsQueryKey({ timeframe, assetClass }),
     queryFn: ({ signal }) =>
@@ -450,6 +457,11 @@ export function HistoryPageClient({
   const shouldLoadSnapshotRows =
     isVisualCheck ||
     (selectedRunId !== null && requestedSnapshotRunId === selectedRunId);
+  const shouldLoadObservationRows =
+    isVisualCheck ||
+    (selectedRunId !== null &&
+      requestedObservationRows?.runId === selectedRunId &&
+      requestedObservationRows.window === observationWindow);
   const visualSnapshotData =
     selectedRunId && visualCheckData
       ? visualCheckData.snapshotsByRunId[selectedRunId] ?? null
@@ -482,14 +494,18 @@ export function HistoryPageClient({
         window: observationWindow,
         signal,
       }),
-    enabled: selectedRunId !== null && !isVisualCheck,
+    enabled:
+      selectedRunId !== null && shouldLoadObservationRows && !isVisualCheck,
     staleTime: 60_000,
   });
   const readinessData =
     selectedRunId && visualCheckData
       ? visualCheckData.readinessByRunId[selectedRunId] ?? null
-      : readinessQuery.data ?? null;
-  const readinessError = !isVisualCheck && readinessQuery.isError
+      : shouldLoadObservationRows
+        ? readinessQuery.data ?? null
+        : null;
+  const readinessError =
+    !isVisualCheck && shouldLoadObservationRows && readinessQuery.isError
     ? formatQueryError(readinessQuery.error)
     : null;
   const observationRunId = getForwardObservationRowsRunId({
@@ -516,11 +532,15 @@ export function HistoryPageClient({
         window: observationWindow,
         signal,
       }),
-    enabled: observationRunId !== null && !isVisualCheck,
+    enabled:
+      observationRunId !== null && shouldLoadObservationRows && !isVisualCheck,
     staleTime: 60_000,
   });
-  const observationData = visualObservationData ?? observationQuery.data ?? null;
-  const observationRowsError = !isVisualCheck && observationQuery.isError
+  const effectiveObservationData =
+    visualObservationData ??
+    (shouldLoadObservationRows ? (observationQuery.data ?? null) : null);
+  const observationRowsError =
+    !isVisualCheck && shouldLoadObservationRows && observationQuery.isError
     ? formatQueryError(observationQuery.error)
     : null;
   const forwardObservationUiState = deriveForwardObservationUiState({
@@ -528,18 +548,21 @@ export function HistoryPageClient({
     readiness: readinessData,
     readinessIsLoading:
       selectedRunId !== null &&
+      shouldLoadObservationRows &&
       !isVisualCheck &&
       readinessQuery.isLoading &&
       !readinessQuery.data,
     readinessError,
-    response: observationData,
+    response: effectiveObservationData,
     observationRunId,
     observationIsLoading:
       observationRunId !== null &&
+      shouldLoadObservationRows &&
       !isVisualCheck &&
       observationQuery.isLoading &&
       !observationQuery.data,
-    observationIsFetching: !isVisualCheck && observationQuery.isFetching,
+    observationIsFetching:
+      !isVisualCheck && shouldLoadObservationRows && observationQuery.isFetching,
     observationRowsError,
     fallbackWindow: observationWindow,
   });
@@ -569,10 +592,12 @@ export function HistoryPageClient({
         blockingRefreshes.push(snapshotQuery.refetch());
       }
 
-      blockingRefreshes.push(readinessQuery.refetch());
+      if (shouldLoadObservationRows) {
+        blockingRefreshes.push(readinessQuery.refetch());
+      }
     }
 
-    if (refreshScope.backgroundQueryKeys.length > 0) {
+    if (shouldLoadObservationRows && refreshScope.backgroundQueryKeys.length > 0) {
       void observationQuery.refetch();
     }
 
@@ -603,7 +628,11 @@ export function HistoryPageClient({
       <HistoryCommandBar
         timeframe={timeframe}
         selectedRunId={selectedRunId}
-        validationStatus={formatValidationStatus(forwardObservationUiState)}
+        validationStatus={
+          shouldLoadObservationRows
+            ? formatValidationStatus(forwardObservationUiState)
+            : "not loaded"
+        }
         window={observationWindow}
         rowCount={commandRows}
         isRefreshing={isRefreshing}
@@ -636,10 +665,19 @@ export function HistoryPageClient({
           <ForwardObservationSection
             window={observationWindow}
             onWindowChange={setObservationWindow}
-            response={observationData}
+            response={effectiveObservationData}
             readiness={readinessData}
             uiState={forwardObservationUiState}
             selectedRun={selectedRun}
+            isRequested={shouldLoadObservationRows}
+            onRequestLoad={() => {
+              if (selectedRunId) {
+                setRequestedObservationRows({
+                  runId: selectedRunId,
+                  window: observationWindow,
+                });
+              }
+            }}
             snapshotError={
               shouldLoadSnapshotRows && !isVisualCheck && snapshotQuery.isError
                 ? formatQueryError(snapshotQuery.error)
@@ -702,7 +740,7 @@ function HistoryCommandBar({
     <header className="mb-1 overflow-hidden border border-[var(--terminal-bar-border)] bg-[var(--terminal-bar)] text-[var(--terminal-bar-foreground)] shadow-[var(--shadow-panel)]">
       <div className="flex min-w-0 flex-wrap items-center gap-1 px-2 py-1 text-[10px] font-semibold uppercase text-[var(--terminal-bar-muted)]">
         <div className="flex h-6 min-w-0 shrink-0 items-center gap-1.5 overflow-hidden border-r border-white/10 pr-2">
-          <h1 className="shrink-0 border-b border-[var(--accent)] px-1 text-[11px] leading-5 text-[var(--terminal-bar-foreground)]">
+          <h1 className="terminal-command-title">
             HISTORY
           </h1>
           <span className="shrink-0 font-mono text-[10px] text-[var(--terminal-bar-muted)]">
@@ -737,14 +775,12 @@ function HistoryCommandBar({
           />
         </div>
         <div className="ml-auto flex shrink-0 items-center justify-end gap-1">
-          <button
-            type="button"
+          <RefreshIconButton
             onClick={onRefresh}
             disabled={isRefreshing || isVisualCheck}
-            className="inline-flex h-6 items-center justify-center border border-white/20 bg-white/[0.08] px-2 text-[10px] font-semibold text-[var(--terminal-bar-foreground)] transition hover:border-white/35 hover:bg-white/[0.14] disabled:cursor-not-allowed disabled:opacity-55"
-          >
-            {isRefreshing ? "Refreshing" : "Refresh"}
-          </button>
+            isRefreshing={isRefreshing}
+            label={isVisualCheck ? "Mock data" : "Refresh"}
+          />
         </div>
       </div>
     </header>
@@ -1011,6 +1047,8 @@ export function ForwardObservationSection({
   readiness,
   uiState,
   selectedRun = null,
+  isRequested = true,
+  onRequestLoad,
   snapshotError = null,
   snapshotIsLoading = false,
 }: {
@@ -1020,15 +1058,19 @@ export function ForwardObservationSection({
   readiness?: HistoricalObservationReadinessResponse | null;
   uiState: ForwardObservationUiState;
   selectedRun?: HistoricalSnapshotRun | null;
+  isRequested?: boolean;
+  onRequestLoad?: () => void;
   snapshotError?: string | null;
   snapshotIsLoading?: boolean;
 }) {
   const rows = response?.rows ?? emptyHistoricalObservationRows;
   const summary = uiState.summary;
-  const outcomeSummaryStatus = getOutcomeSummaryStatus({
-    summary,
-    uiState,
-  });
+  const outcomeSummaryStatus = isRequested
+    ? getOutcomeSummaryStatus({
+        summary,
+        uiState,
+      })
+    : { label: "Not loaded", tone: "missing" as const };
   const selectedReadiness = readiness?.selectedRun ?? null;
   const selectedReadinessRun =
     selectedRun ?? selectedReadiness?.run ?? uiState.selectedRun;
@@ -1087,7 +1129,12 @@ export function ForwardObservationSection({
       </div>
 
       <div className="flex min-h-0 flex-col gap-1 px-2 py-1 xl:flex-1 xl:overflow-hidden">
-        {snapshotError ? (
+        {!isRequested ? (
+          <OutcomeRowsLoadPanel
+            selectedRun={selectedReadinessRun}
+            onRequestLoad={onRequestLoad}
+          />
+        ) : snapshotError ? (
           <StatePanel title="Selected Scan unavailable" message={snapshotError} />
         ) : snapshotIsLoading ? (
           <StatePanel title="Loading Selected Scan" message="Loading scan rows." />
@@ -1116,7 +1163,7 @@ export function ForwardObservationSection({
           window={window}
         />
 
-        {uiState.status !== "observation_ready" ? (
+        {!isRequested ? null : uiState.status !== "observation_ready" ? (
           <ForwardObservationStatePanel
             uiState={uiState}
             readiness={readiness ?? null}
@@ -1130,15 +1177,50 @@ export function ForwardObservationSection({
           <ObservationRowsTable rows={rows} isFetching={uiState.isFetching} />
         )}
 
-        <HistoryDetails
-          readiness={readiness ?? null}
-          response={response}
-          uiState={uiState}
-          summary={showObservationSummary ? observationSummary : null}
-          readyContextNote={readyContextNote}
-        />
+        {isRequested ? (
+          <HistoryDetails
+            readiness={readiness ?? null}
+            response={response}
+            uiState={uiState}
+            summary={showObservationSummary ? observationSummary : null}
+            readyContextNote={readyContextNote}
+          />
+        ) : null}
       </div>
     </section>
+  );
+}
+
+function OutcomeRowsLoadPanel({
+  selectedRun,
+  onRequestLoad,
+}: {
+  selectedRun: HistoricalSnapshotRun | null;
+  onRequestLoad?: () => void;
+}) {
+  return (
+    <div className="border border-[var(--border)] bg-[var(--panel-muted)] px-3 py-3">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="min-w-0">
+          <h3 className="text-[12px] font-semibold uppercase tracking-normal text-[var(--foreground)]">
+            Outcome Rows not loaded
+          </h3>
+          <p className="mt-1 text-[11px] leading-4 text-[var(--muted)]">
+            {selectedRun
+              ? `Selected scan ${shortRunId(selectedRun.runId)}.`
+              : "Choose a run from Recent Runs."}
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={onRequestLoad}
+          disabled={!selectedRun || !onRequestLoad}
+          className="inline-flex h-7 items-center justify-center border border-[var(--accent-border)] bg-[var(--accent-soft)] px-2 text-[11px] font-semibold text-[var(--accent)] hover:border-[var(--accent-hover)] hover:text-[var(--accent-hover)] disabled:cursor-not-allowed disabled:opacity-55"
+        >
+          Load Outcome Rows
+        </button>
+      </div>
+    </div>
   );
 }
 
@@ -1640,10 +1722,15 @@ export function ObservationRowsTable({
                     {row.symbol}
                   </DataTableCell>
                   <DataTableCell>
-                    <div className="flex min-w-0 flex-col gap-0.5">
+                    <div
+                      className="flex min-w-0 items-center gap-1.5"
+                      title={`${formatGroupLabel(
+                        normalizeGroupKey(row.group),
+                      )} · ${formatSignalLabel(row.label)}`}
+                    >
                       <GroupChip group={normalizeGroupKey(row.group)} />
                       <span
-                        className="truncate text-[10px] text-[var(--muted)]"
+                        className="min-w-0 truncate text-[10px] text-[var(--muted)]"
                         title={formatSignalLabel(row.label)}
                       >
                         {formatSignalLabel(row.label)}
@@ -1752,7 +1839,7 @@ function ObservationDataStatusBadge({
   return (
     <DataTableChip
       tone={getObservationDataStatusChipTone(status)}
-      className="max-w-[180px] justify-center"
+      className="max-w-[180px]"
       title={
         missingReason
           ? `${formatDataStatus(status)}: ${formatMissingReason(missingReason)}`
@@ -1969,6 +2056,8 @@ function getHistoryValidationTone(status: string): HistoryTerminalTone {
       return "complete";
     case "pending":
       return "partial";
+    case "not loaded":
+      return "neutral";
     case "unavailable":
       return "missing";
     default:

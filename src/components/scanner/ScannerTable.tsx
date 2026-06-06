@@ -8,6 +8,7 @@ import {
 } from "@tanstack/react-table";
 import { useMemo, type ReactNode } from "react";
 import { useLanguage } from "@/components/providers/LanguageProvider";
+import { RefreshIconButton } from "@/components/ui/workspace";
 import {
   SignalSummaryBar,
   type SignalSummaryItem,
@@ -203,14 +204,13 @@ export function ScannerTable({
               : t.scanner.waiting}
           </p>
         </div>
-        <button
-          type="button"
+        <RefreshIconButton
           onClick={onRefresh}
           disabled={isFetching}
-          className="h-6 border border-[var(--border)] px-2 text-[11px] font-semibold text-[var(--foreground)] disabled:cursor-not-allowed disabled:opacity-60"
-        >
-          {isFetching ? t.common.refreshing : t.common.refresh}
-        </button>
+          isRefreshing={isFetching}
+          label={t.common.refresh}
+          refreshingLabel={t.common.refreshing}
+        />
       </div>
 
       <SignalSummaryBar

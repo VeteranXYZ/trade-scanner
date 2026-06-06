@@ -18,7 +18,12 @@ import {
   type DataSortState,
   type DataSortValue,
 } from "@/components/table/dataTableSorting";
-import { PageShell, StatusBadge, type StatusTone } from "@/components/ui/workspace";
+import {
+  PageShell,
+  RefreshIconButton,
+  StatusBadge,
+  type StatusTone,
+} from "@/components/ui/workspace";
 import { formatDisplayDateTime } from "@/lib/utils/format";
 import {
   formatDateTime,
@@ -33,7 +38,6 @@ import {
   getLatestScanActionDisplay,
   getReviewStatusNote,
   getReviewStatusReasons,
-  getVisibleReviewReason,
   latestScanGroupOrder,
   normalizeGroupKey,
   toTitleCase,
@@ -196,7 +200,6 @@ const assetClassOptions: LatestScanAssetClass[] = [
 ];
 const timeframeOptions: LatestScanTimeframe[] = ["4h", "1h", "1d", "1w"];
 const limitOptions: LatestScanLimit[] = [100, 200, 300, 500];
-const latestScanTableColumnCount = 9;
 type LatestScanSortKey =
   | "symbol"
   | "rank"
@@ -245,7 +248,6 @@ export function LatestScanPageClient({
       key: "rank",
       direction: "desc",
     });
-  const [utilityMessage, setUtilityMessage] = useState<string | null>(null);
   const latestScanQuery = useQuery({
     queryKey: ["latest-scan", timeframe, assetClass, limit, includeLowQuality],
     queryFn: ({ signal }) =>
@@ -284,24 +286,8 @@ export function LatestScanPageClient({
       getNextDataSortState({ current, key, defaultDirection }),
     );
   };
-  const copyVisibleSymbols = async () => {
-    const symbols = visibleItems.map((item) => item.symbol).join("\n");
-
-    if (!symbols) {
-      setUtilityMessage("No symbols to copy.");
-      return;
-    }
-
-    try {
-      await navigator.clipboard.writeText(symbols);
-      setUtilityMessage(`${visibleItems.length} symbols copied.`);
-    } catch {
-      setUtilityMessage("Copy unavailable in this browser.");
-    }
-  };
   const downloadVisibleCsv = () => {
-    if (visibleItems.length === 0) {
-      setUtilityMessage("No rows to export.");
+    if (visibleItems.length === 0 || typeof document === "undefined") {
       return;
     }
 
@@ -315,7 +301,6 @@ export function LatestScanPageClient({
     link.download = `scanner-${timeframe}-${assetClass}.csv`;
     link.click();
     URL.revokeObjectURL(url);
-    setUtilityMessage(`${visibleItems.length} rows exported.`);
   };
 
   return (
@@ -330,11 +315,13 @@ export function LatestScanPageClient({
         isLoading={isLoading}
         isError={hasUnavailableData}
         isRefreshing={!isVisualCheck && latestScanQuery.isFetching}
+        canExport={visibleItems.length > 0}
         onRefresh={() => {
           if (!isVisualCheck) {
             void latestScanQuery.refetch();
           }
         }}
+        onExportCsv={downloadVisibleCsv}
       />
 
       <div className="grid min-h-0 flex-1 gap-2 xl:grid-cols-[208px_minmax(0,1fr)] xl:overflow-hidden 2xl:grid-cols-[216px_minmax(0,1fr)]">
@@ -347,10 +334,6 @@ export function LatestScanPageClient({
           onAssetClassChange={setAssetClass}
           onLimitChange={setLimit}
           onIncludeLowQualityChange={setIncludeLowQuality}
-          visibleItemCount={visibleItems.length}
-          utilityMessage={utilityMessage}
-          onCopySymbols={() => void copyVisibleSymbols()}
-          onDownloadCsv={downloadVisibleCsv}
         />
 
         <main className="min-h-0 min-w-0 space-y-1.5 xl:flex xl:flex-col xl:overflow-hidden">
@@ -410,7 +393,9 @@ function LatestScanCommandBar({
   isLoading,
   isError,
   isRefreshing,
+  canExport,
   onRefresh,
+  onExportCsv,
 }: {
   timeframe: LatestScanTimeframe;
   assetClass: LatestScanAssetClass;
@@ -421,7 +406,9 @@ function LatestScanCommandBar({
   isLoading: boolean;
   isError: boolean;
   isRefreshing: boolean;
+  canExport: boolean;
   onRefresh: () => void;
+  onExportCsv: () => void;
 }) {
   const statusLabel = getLatestScanRunStatusLabel({ run, isLoading, isError });
   const statusTone = getLatestScanRunStatusTone({ run, isLoading, isError });
@@ -430,7 +417,7 @@ function LatestScanCommandBar({
     <header className="mb-1 overflow-hidden border border-[var(--terminal-bar-border)] bg-[var(--terminal-bar)] text-[var(--terminal-bar-foreground)] shadow-[var(--shadow-panel)]">
       <div className="flex min-w-0 flex-wrap items-center gap-1 px-2 py-1 text-[10px] font-semibold uppercase text-[var(--terminal-bar-muted)]">
         <div className="flex h-6 min-w-0 shrink-0 items-center gap-1.5 overflow-hidden border-r border-white/10 pr-2">
-          <h1 className="shrink-0 border-b border-[var(--accent)] px-1 text-[11px] leading-5 text-[var(--terminal-bar-foreground)]">
+          <h1 className="terminal-command-title">
             SCANNER
           </h1>
           <span className="shrink-0 font-mono text-[10px] text-[var(--terminal-bar-muted)]">
@@ -467,12 +454,18 @@ function LatestScanCommandBar({
         <div className="ml-auto flex shrink-0 items-center justify-end gap-1">
           <button
             type="button"
-            onClick={onRefresh}
-            disabled={isRefreshing}
+            onClick={onExportCsv}
+            disabled={!canExport}
             className="terminal-command-action disabled:cursor-not-allowed disabled:opacity-55"
           >
-            {isRefreshing ? "Refreshing" : "Refresh"}
+            Export CSV
           </button>
+          <RefreshIconButton
+            onClick={onRefresh}
+            disabled={isRefreshing}
+            isRefreshing={isRefreshing}
+            label="Refresh"
+          />
         </div>
       </div>
     </header>
@@ -516,10 +509,6 @@ function LatestScanControls({
   onAssetClassChange,
   onLimitChange,
   onIncludeLowQualityChange,
-  visibleItemCount,
-  utilityMessage,
-  onCopySymbols,
-  onDownloadCsv,
 }: {
   timeframe: LatestScanTimeframe;
   assetClass: LatestScanAssetClass;
@@ -529,10 +518,6 @@ function LatestScanControls({
   onAssetClassChange: (value: LatestScanAssetClass) => void;
   onLimitChange: (value: LatestScanLimit) => void;
   onIncludeLowQualityChange: (value: boolean) => void;
-  visibleItemCount: number;
-  utilityMessage: string | null;
-  onCopySymbols: () => void;
-  onDownloadCsv: () => void;
 }) {
   return (
     <aside className="border border-[var(--border-medium)] bg-[var(--panel)] p-2 shadow-[var(--shadow-panel)] xl:h-full xl:min-h-0 xl:overflow-y-auto">
@@ -614,37 +599,6 @@ function LatestScanControls({
             </span>
           </label>
         </ControlSection>
-
-        <ControlSection title="Actions">
-          <div className="grid gap-1.5">
-            <button
-              type="button"
-              onClick={onCopySymbols}
-              className={controlButtonClass}
-            >
-              Copy symbols
-            </button>
-            <button
-              type="button"
-              onClick={onDownloadCsv}
-              className={controlButtonClass}
-            >
-              Export CSV
-            </button>
-            <Link href="/screener" className={controlLinkClass}>
-              Open Screener
-            </Link>
-            <Link href="/watchlist" className={controlLinkClass}>
-              Open Watchlist
-            </Link>
-            <Link href="/history" className={controlLinkClass}>
-              Open History
-            </Link>
-          </div>
-          <p className="mt-1 text-[10px] leading-4 text-[var(--muted-2)]">
-            {utilityMessage ?? `${formatInteger(visibleItemCount)} sorted rows ready.`}
-          </p>
-        </ControlSection>
       </div>
     </aside>
   );
@@ -683,47 +637,64 @@ function LatestScanSummaryPanel({
   });
 
   return (
-    <section className="terminal-command-band">
-      <div className="flex min-w-0 flex-wrap items-center gap-1.5">
-        <span className="terminal-command-label">Run Summary</span>
-        <CompactMetric label="Universe" value={formatInteger(run?.symbolsTotal)} />
-        <CompactMetric label="Scanned" value={formatInteger(run?.symbolsScanned)} />
-        <CompactMetric label="Signals" value={formatInteger(run?.signalsCreated)} />
-        <CompactMetric label="Skipped" value={formatInteger(run?.symbolsSkipped)} />
-        <CompactMetric label="Low-quality" value={formatInteger(lowQualityExcluded)} />
-        <CompactMetric
-          label="Limited"
-          value={`${formatInteger(returnedItems)}/${formatInteger(totalSignals)}`}
-        />
-      </div>
-      <div className="flex min-w-0 flex-wrap items-center gap-1.5">
-        <StatusBadge tone={run ? "complete" : "missing"}>
-          {run?.status ?? "No run"}
-        </StatusBadge>
-        <StatusBadge tone="accent">{timeframe.toUpperCase()}</StatusBadge>
-        <StatusBadge>{assetClass.toUpperCase()}</StatusBadge>
-        <StatusBadge tone={includeLowQuality ? "warning" : "neutral"}>
-          {includeLowQuality ? "Low quality included" : "Low quality excluded"}
-        </StatusBadge>
-        <span className="terminal-command-chip">
-          Finished {formatDateTime(finishedAt)}
-        </span>
-      </div>
-
-      {(showUniverseWarning || limitedViewWarning) && (
-        <div className="flex max-w-full flex-wrap gap-1">
-          {showUniverseWarning && (
-            <StatusBadge tone="warning" className="text-[10px]">
-              Partial universe
-            </StatusBadge>
-          )}
-          {limitedViewWarning && (
-            <span className="max-w-full border border-[var(--accent-border)] bg-[var(--accent-soft)] px-1.5 py-0.5 text-[10px] font-semibold leading-none text-[var(--accent)]">
-              {limitedViewWarning}
-            </span>
-          )}
+    <section className="border border-[var(--border-medium)] bg-[var(--panel)] px-2 py-1 shadow-[var(--shadow-panel)]">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="flex min-w-0 flex-wrap items-center gap-1.5">
+          <span className="terminal-command-label">Run Summary</span>
+          <CompactMetric label="Universe" value={formatInteger(run?.symbolsTotal)} />
+          <CompactMetric label="Scanned" value={formatInteger(run?.symbolsScanned)} />
+          <CompactMetric
+            label="Signals"
+            value={formatInteger(run?.signalsCreated ?? totalSignals)}
+          />
+          <CompactMetric label="Skipped" value={formatInteger(run?.symbolsSkipped)} />
+          <CompactMetric label="Low-quality" value={formatInteger(lowQualityExcluded)} />
+          <CompactMetric
+            label="Limited"
+            value={`${formatInteger(returnedItems)}/${formatInteger(totalSignals)}`}
+          />
         </div>
-      )}
+        <div className="flex min-w-0 flex-wrap items-center justify-end gap-1">
+          <StatusBadge tone={run ? "complete" : "missing"}>
+            {run?.status ?? "No run"}
+          </StatusBadge>
+          <StatusBadge tone="accent">{timeframe.toUpperCase()}</StatusBadge>
+          <StatusBadge tone="neutral">{assetClass.toUpperCase()}</StatusBadge>
+          {!includeLowQuality ? (
+            <StatusBadge tone="neutral">Low quality excluded</StatusBadge>
+          ) : null}
+          <StatusBadge tone={finishedAt ? "neutral" : "missing"}>
+            Finished {formatCompactDateTime(finishedAt)}
+          </StatusBadge>
+        </div>
+      </div>
+      {showUniverseWarning ? (
+        <p className="mt-1 inline-flex border border-[var(--warning-border)] bg-[var(--warning-bg)] px-1.5 py-0.5 text-[10px] font-semibold uppercase text-[var(--warning)]">
+          Scan universe incomplete: {formatInteger(run?.symbolsTotal)} crypto symbols.
+        </p>
+      ) : null}
+      {limitedViewWarning ? (
+        <p className="mt-1 inline-flex border border-[var(--accent-border)] bg-[var(--accent-soft)] px-1.5 py-0.5 text-[10px] font-semibold uppercase text-[var(--accent)]">
+          {limitedViewWarning}
+        </p>
+      ) : null}
+    </section>
+  );
+}
+
+function ControlSection({
+  title,
+  children,
+}: {
+  title: string;
+  children: ReactNode;
+}) {
+  return (
+    <section className="space-y-2 border-t border-[var(--border)] pt-2 first:border-t-0 first:pt-0">
+      <h3 className="text-[10px] font-semibold uppercase tracking-wide text-[var(--muted)]">
+        {title}
+      </h3>
+      {children}
     </section>
   );
 }
@@ -731,20 +702,20 @@ function LatestScanSummaryPanel({
 function LatestScanGroupSummary({ summary }: { summary: LatestScanSummary }) {
   const chips = getLatestScanGroupSummaryChips(summary);
 
+  if (chips.length === 0) {
+    return null;
+  }
+
   return (
-    <section className="terminal-command-band">
-      <div className="flex min-w-0 flex-wrap items-center gap-1.5">
-        <span className="terminal-command-label">Group Counts</span>
-        {chips.map((chip) => (
-          <StatusBadge
-            key={chip.group}
-            tone={getLatestScanGroupTone(chip.group)}
-            className="text-[10px]"
-          >
-            {chip.label} {formatInteger(chip.count)}
-          </StatusBadge>
-        ))}
-      </div>
+    <section className="flex min-h-7 flex-wrap items-center gap-1.5 border border-[var(--border-medium)] bg-[var(--panel)] px-2 py-1 shadow-[var(--shadow-panel)]">
+      <span className="text-[10px] font-semibold uppercase text-[var(--muted)]">
+        Group Counts
+      </span>
+      {chips.map((chip) => (
+        <StatusBadge key={chip.label} tone={getLatestScanGroupTone(chip.group)}>
+          {chip.label} {formatInteger(chip.count)}
+        </StatusBadge>
+      ))}
     </section>
   );
 }
@@ -770,6 +741,9 @@ function LatestScanResultsTable({
   limit: LatestScanLimit;
 }) {
   const [expandedItemId, setExpandedItemId] = useState<string | null>(null);
+  const sharedCandleTime = getSharedLatestScanCandleTime(rows);
+  const showCandleTimeColumn = sharedCandleTime === null;
+  const tableColumnCount = showCandleTimeColumn ? 9 : 8;
 
   return (
     <section className="min-h-0 overflow-hidden border border-[var(--border-medium)] bg-[var(--panel)] shadow-[var(--shadow-panel)] xl:flex xl:flex-1 xl:flex-col">
@@ -782,102 +756,115 @@ function LatestScanResultsTable({
             <StatusBadge tone="accent" className="text-[10px]">
               {formatInteger(rows.length)} rows
             </StatusBadge>
+            {sharedCandleTime ? (
+              <StatusBadge tone="neutral" className="text-[10px]">
+                Candle {formatDateTime(sharedCandleTime)}
+              </StatusBadge>
+            ) : null}
           </div>
         </div>
       </div>
 
       <DataTableScroll className="!overflow-x-auto !overflow-y-auto xl:min-h-0 xl:flex-1">
-        <DataTable minWidth="min-w-[900px]" className="table-fixed">
-            <thead>
-              <tr>
-                <DataTableHeaderCell
-                  sortKey="symbol"
-                  sortState={sortState}
-                  onSortChange={onSortChange}
-                  className="w-[96px]"
-                >
-                  Symbol
-                </DataTableHeaderCell>
-                <DataTableHeaderCell
-                  sortKey="rank"
-                  sortState={sortState}
-                  defaultDirection="desc"
-                  onSortChange={onSortChange}
-                  className="w-[72px]"
-                  align="right"
-                >
-                  Rank
-                </DataTableHeaderCell>
-                <DataTableHeaderCell
-                  sortKey="signal"
-                  sortState={sortState}
-                  onSortChange={onSortChange}
-                  className="w-[126px]"
-                >
-                  Signal
-                </DataTableHeaderCell>
-                <DataTableHeaderCell
-                  sortKey="action"
-                  sortState={sortState}
-                  onSortChange={onSortChange}
-                  className="w-[126px]"
-                >
-                  Action
-                </DataTableHeaderCell>
-                <DataTableHeaderCell
-                  sortKey="setup"
-                  sortState={sortState}
-                  onSortChange={onSortChange}
-                  className="w-[138px]"
-                >
-                  Setup Type
-                </DataTableHeaderCell>
-                <DataTableHeaderCell
-                  sortKey="quality"
-                  sortState={sortState}
-                  onSortChange={onSortChange}
-                  className="w-[128px]"
-                >
-                  Quality
-                </DataTableHeaderCell>
-                <DataTableHeaderCell
-                  sortKey="price"
-                  sortState={sortState}
-                  defaultDirection="desc"
-                  onSortChange={onSortChange}
-                  className="w-[104px]"
-                  align="right"
-                >
-                  Price
-                </DataTableHeaderCell>
+        <DataTable
+          minWidth={showCandleTimeColumn ? "min-w-[900px]" : "min-w-[790px]"}
+          className="table-fixed"
+        >
+          <thead>
+            <tr>
+              <DataTableHeaderCell
+                sortKey="symbol"
+                sortState={sortState}
+                onSortChange={onSortChange}
+                className="w-[96px]"
+              >
+                Symbol
+              </DataTableHeaderCell>
+              <DataTableHeaderCell
+                sortKey="rank"
+                sortState={sortState}
+                defaultDirection="desc"
+                onSortChange={onSortChange}
+                className="w-[72px]"
+                align="right"
+              >
+                Rank
+              </DataTableHeaderCell>
+              <DataTableHeaderCell
+                sortKey="signal"
+                sortState={sortState}
+                onSortChange={onSortChange}
+                className="w-[146px]"
+              >
+                Signal
+              </DataTableHeaderCell>
+              <DataTableHeaderCell
+                sortKey="action"
+                sortState={sortState}
+                onSortChange={onSortChange}
+                className="w-[150px]"
+              >
+                Action
+              </DataTableHeaderCell>
+              <DataTableHeaderCell
+                sortKey="setup"
+                sortState={sortState}
+                onSortChange={onSortChange}
+                className="w-[138px]"
+              >
+                Setup Type
+              </DataTableHeaderCell>
+              <DataTableHeaderCell
+                sortKey="quality"
+                sortState={sortState}
+                onSortChange={onSortChange}
+                className="w-[92px]"
+              >
+                Quality
+              </DataTableHeaderCell>
+              <DataTableHeaderCell
+                sortKey="price"
+                sortState={sortState}
+                defaultDirection="desc"
+                onSortChange={onSortChange}
+                className="w-[104px]"
+                align="right"
+              >
+                Price
+              </DataTableHeaderCell>
+              {showCandleTimeColumn ? (
                 <DataTableHeaderCell className="w-[154px]">
                   Candle Time
                 </DataTableHeaderCell>
-                <DataTableHeaderCell className="w-[86px]">Details</DataTableHeaderCell>
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map(({ item }) => {
-                const isExpanded = expandedItemId === item.id;
+              ) : null}
+              <DataTableHeaderCell className="w-[86px]">Details</DataTableHeaderCell>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map(({ item }) => {
+              const isExpanded = expandedItemId === item.id;
 
-                return (
-                  <Fragment key={item.id}>
-                    <LatestScanRow
-                      item={item}
-                      isExpanded={isExpanded}
-                      onToggleDetails={() =>
-                        setExpandedItemId(isExpanded ? null : item.id)
-                      }
-                      timeframe={timeframe}
-                      assetClass={assetClass}
-                      includeLowQuality={includeLowQuality}
-                      limit={limit}
-                    />
-                    {isExpanded && <LatestScanDetailsRow item={item} />}
-                  </Fragment>
-                );
-              })}
-            </tbody>
+              return (
+                <Fragment key={item.id}>
+                  <LatestScanRow
+                    item={item}
+                    isExpanded={isExpanded}
+                    onToggleDetails={() =>
+                      setExpandedItemId(isExpanded ? null : item.id)
+                    }
+                    timeframe={timeframe}
+                    assetClass={assetClass}
+                    includeLowQuality={includeLowQuality}
+                    limit={limit}
+                    showCandleTimeColumn={showCandleTimeColumn}
+                  />
+                  {isExpanded ? (
+                    <LatestScanDetailsRow item={item} colSpan={tableColumnCount} />
+                  ) : null}
+                </Fragment>
+              );
+            })}
+          </tbody>
         </DataTable>
       </DataTableScroll>
     </section>
@@ -892,6 +879,7 @@ function LatestScanRow({
   assetClass,
   includeLowQuality,
   limit,
+  showCandleTimeColumn,
 }: {
   item: LatestScanItem;
   isExpanded: boolean;
@@ -900,17 +888,20 @@ function LatestScanRow({
   assetClass: LatestScanAssetClass;
   includeLowQuality: boolean;
   limit: LatestScanLimit;
+  showCandleTimeColumn: boolean;
 }) {
-  const visibleReason = getVisibleReviewReason(item);
   const group = normalizeGroupKey(item.resultGroup);
   const groupTone = getLatestScanGroupTone(group);
+  const signalLabel = formatSignalLabel(item.signalLabel);
+  const actionLabel = getLatestScanActionDisplay(item);
+  const statusNote = getReviewStatusNote(item);
 
   return (
     <tr
       className={
         isExpanded
-          ? "border-t border-[var(--table-grid)] bg-[var(--row-selected)] align-top"
-          : "border-t border-[var(--table-grid)] align-top hover:bg-[var(--row-hover)]"
+          ? "border-t border-[var(--table-grid)] bg-[var(--row-selected)] align-middle"
+          : "border-t border-[var(--table-grid)] align-middle hover:bg-[var(--row-hover)]"
       }
     >
       <DataTableCell className="font-semibold text-[var(--foreground)]">
@@ -933,50 +924,50 @@ function LatestScanRow({
         {formatScore(item.rankScore)}
       </DataTableCell>
       <DataTableCell>
-        <div className="flex min-w-0 flex-col gap-1">
-          <DataTableChip tone={groupTone} title={formatGroupLabel(group)}>
+        <div
+          className="flex min-w-0 items-center gap-1.5"
+          title={`${formatGroupLabel(group)} · ${signalLabel}`}
+        >
+          <DataTableChip tone={groupTone} className="shrink-0">
             {formatGroupLabel(group)}
           </DataTableChip>
-          <span
-            className="truncate text-[10px] font-semibold text-[var(--muted)]"
-            title={formatSignalLabel(item.signalLabel)}
-          >
-            {formatSignalLabel(item.signalLabel)}
+          <span className="min-w-0 truncate text-[10px] font-semibold text-[var(--muted)]">
+            {signalLabel}
           </span>
         </div>
       </DataTableCell>
       <DataTableCell>
-        <DataTableChip tone={groupTone} title={getLatestScanActionDisplay(item)}>
-          {getLatestScanActionDisplay(item)}
-        </DataTableChip>
-        <div className="mt-1 text-[10px] font-semibold text-[var(--muted)]">
-          {getReviewStatusNote(item)}
+        <div
+          className="flex min-w-0 items-center gap-1.5"
+          title={`${actionLabel} · ${statusNote}`}
+        >
+          <DataTableChip tone={groupTone} className="shrink-0">
+            {actionLabel}
+          </DataTableChip>
+          <span className="min-w-0 truncate text-[10px] font-semibold text-[var(--muted)]">
+            {statusNote}
+          </span>
         </div>
-        {visibleReason && (
-          <div className="mt-0.5 text-[10px] text-[var(--muted-2)]">
-            {visibleReason}
-          </div>
-        )}
       </DataTableCell>
       <DataTableCell truncate title={formatStructure(item.primaryStructure)}>
         {formatStructure(item.primaryStructure)}
       </DataTableCell>
       <DataTableCell>
-        <DataTableChip tone={item.isLowQuality ? "warning" : "neutral"}>
+        <DataTableChip
+          tone={item.isLowQuality ? "warning" : "neutral"}
+          title={item.isLowQuality ? "Low quality" : formatQualityTier(item.qualityTier)}
+        >
           {formatQualityTier(item.qualityTier)}
         </DataTableChip>
-        {item.isLowQuality && (
-          <span className="mt-1 inline-block border border-[var(--warning-border)] bg-[var(--warning-bg)] px-1 py-0.5 text-[10px] text-[var(--warning)]">
-            Low quality
-          </span>
-        )}
       </DataTableCell>
       <DataTableCell align="right" className="font-mono tabular-nums text-[var(--foreground)]">
         {formatPrice(item.priceAtSignal)}
       </DataTableCell>
-      <DataTableCell className="text-[var(--muted)]">
-        {formatDateTime(item.candleOpenTime)}
-      </DataTableCell>
+      {showCandleTimeColumn ? (
+        <DataTableCell className="text-[var(--muted)]">
+          {formatDateTime(item.candleOpenTime)}
+        </DataTableCell>
+      ) : null}
       <DataTableCell>
         <button
           type="button"
@@ -991,10 +982,16 @@ function LatestScanRow({
   );
 }
 
-function LatestScanDetailsRow({ item }: { item: LatestScanItem }) {
+function LatestScanDetailsRow({
+  item,
+  colSpan,
+}: {
+  item: LatestScanItem;
+  colSpan: number;
+}) {
   return (
     <tr className="border-t border-[var(--border)] bg-[var(--panel-2)]">
-      <td colSpan={latestScanTableColumnCount} className="px-3 py-3">
+      <td colSpan={colSpan} className="px-3 py-3">
         <LatestScanDetails item={item} />
       </td>
     </tr>
@@ -1087,23 +1084,6 @@ function StatePanel({ title, message }: { title: string; message: string }) {
   );
 }
 
-function ControlSection({
-  title,
-  children,
-}: {
-  title: string;
-  children: ReactNode;
-}) {
-  return (
-    <section className="space-y-1.5 border-t border-[var(--border)] pt-2 first:border-t-0 first:pt-0">
-      <h3 className="text-[10px] font-semibold uppercase tracking-wide text-[var(--muted-2)]">
-        {title}
-      </h3>
-      {children}
-    </section>
-  );
-}
-
 function DetailBlock({
   title,
   children,
@@ -1152,6 +1132,22 @@ function TextList({ values }: { values: string[] }) {
       ))}
     </ul>
   );
+}
+
+function getSharedLatestScanCandleTime(rows: LatestScanTableRow[]) {
+  if (rows.length === 0) {
+    return null;
+  }
+
+  const firstTime = rows[0]?.item.candleOpenTime ?? null;
+
+  if (!firstTime) {
+    return null;
+  }
+
+  return rows.every((row) => row.item.candleOpenTime === firstTime)
+    ? firstTime
+    : null;
 }
 
 function buildLatestScanTableRows(data: LatestScanResponse | null) {
@@ -1603,10 +1599,6 @@ function pickRawMetrics(metrics: Record<string, unknown> | undefined) {
 
 const controlClass =
   "h-7 w-full border border-[var(--border-medium)] bg-[var(--control)] px-2 text-[11px] text-[var(--foreground)]";
-const controlButtonClass =
-  "h-7 w-full border border-[var(--accent-border)] bg-[var(--accent-soft)] px-2 text-left text-[11px] font-semibold text-[var(--accent)] transition hover:border-[var(--accent-hover)] hover:text-[var(--accent-hover)]";
-const controlLinkClass =
-  "inline-flex h-7 w-full items-center border border-[var(--border)] bg-[var(--control)] px-2 text-[11px] font-semibold text-[var(--foreground)] transition hover:border-[var(--border-strong)] hover:bg-[var(--control-hover)]";
 
 function getLatestScanRunStatusLabel({
   run,

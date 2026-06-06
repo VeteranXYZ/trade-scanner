@@ -19,6 +19,7 @@ import {
 import {
   EmptyState,
   PageShell,
+  RefreshIconButton,
   StatusBadge,
   type StatusTone,
 } from "@/components/ui/workspace";
@@ -616,7 +617,7 @@ export function MtfScreenerCommandBar({
           className="flex h-6 min-w-0 shrink-0 items-center gap-1.5 overflow-hidden border-r border-white/10 pr-2"
           title={`${title} · ${datasetLabel}`}
         >
-          <h1 className="shrink-0 border-b border-[var(--accent)] px-1 text-[11px] leading-5 text-[var(--terminal-bar-foreground)]">
+          <h1 className="terminal-command-title">
             MTF Screener
           </h1>
           <span className="shrink-0 font-mono text-[10px] text-[var(--terminal-bar-muted)]">
@@ -658,14 +659,12 @@ export function MtfScreenerCommandBar({
 
         <div className="ml-auto flex shrink-0 flex-wrap items-center justify-end gap-1">
           {onRefresh ? (
-            <button
-              type="button"
+            <RefreshIconButton
               onClick={onRefresh}
               disabled={isRefreshing}
-              className="inline-flex h-6 items-center justify-center border border-white/20 bg-white/[0.08] px-2 text-[10px] font-semibold text-[var(--terminal-bar-foreground)] transition hover:border-white/35 hover:bg-white/[0.14] disabled:cursor-not-allowed disabled:opacity-55"
-            >
-              {isRefreshing ? "Refreshing" : "Refresh"}
-            </button>
+              isRefreshing={isRefreshing}
+              label="Refresh"
+            />
           ) : null}
           {onExportVisible && onExportAll ? (
             <MtfScreenerExportControls

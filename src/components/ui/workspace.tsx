@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import type { ButtonHTMLAttributes, ReactNode } from "react";
 
 export type StatusTone =
   | "neutral"
@@ -333,6 +333,48 @@ export function StatusBadge({
     >
       {children}
     </span>
+  );
+}
+
+export function RefreshIconButton({
+  isRefreshing,
+  label = "Refresh",
+  refreshingLabel = "Refreshing",
+  className = "",
+  ...buttonProps
+}: ButtonHTMLAttributes<HTMLButtonElement> & {
+  isRefreshing?: boolean;
+  label?: string;
+  refreshingLabel?: string;
+}) {
+  const accessibleLabel = isRefreshing ? refreshingLabel : label;
+
+  return (
+    <button
+      type="button"
+      title={accessibleLabel}
+      aria-label={accessibleLabel}
+      aria-busy={isRefreshing || undefined}
+      className={`terminal-icon-action ${isRefreshing ? "is-refreshing" : ""} ${className}`}
+      {...buttonProps}
+    >
+      <svg
+        aria-hidden="true"
+        viewBox="0 0 24 24"
+        className="h-3.5 w-3.5"
+        fill="none"
+        stroke="currentColor"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth="2"
+      >
+        <path d="M21 12a9 9 0 0 1-15.4 6.4L3 16" />
+        <path d="M3 16h5v5" />
+        <path d="M3 12A9 9 0 0 1 18.4 5.6L21 8" />
+        <path d="M21 8h-5V3" />
+      </svg>
+      <span className="sr-only">{accessibleLabel}</span>
+    </button>
   );
 }
 

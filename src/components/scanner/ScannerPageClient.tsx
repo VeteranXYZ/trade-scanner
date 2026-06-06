@@ -3,6 +3,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
 import { useLanguage } from "@/components/providers/LanguageProvider";
+import { RefreshIconButton } from "@/components/ui/workspace";
 import { ScannerFilters, type ScannerSortKey } from "./ScannerFilters";
 import { ScannerTable } from "./ScannerTable";
 import { SelectedSymbolPanel } from "./SelectedSymbolPanel";
@@ -344,14 +345,13 @@ function ResearchEvaluationPanel({
         <h2 className="text-[10px] font-semibold uppercase tracking-wide text-[var(--muted)]">
           Research / Evaluation
         </h2>
-        <button
-          type="button"
+        <RefreshIconButton
           onClick={onRefresh}
           disabled={isLoading}
-          className="h-6 border border-[var(--border)] px-2 text-[10px] font-semibold text-[var(--foreground)] disabled:cursor-not-allowed disabled:opacity-60"
-        >
-          {isLoading ? "Evaluating" : "Refresh"}
-        </button>
+          isRefreshing={isLoading}
+          label="Refresh"
+          refreshingLabel="Evaluating"
+        />
       </div>
       {isError || !enoughData ? (
         <div className="flex flex-wrap gap-2 text-[11px] text-[var(--muted)]">

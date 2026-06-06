@@ -199,7 +199,7 @@ export function DataTableChip({
   return (
     <span
       title={title}
-      className={`inline-flex min-h-[18px] max-w-full items-center overflow-hidden whitespace-nowrap rounded-[4px] border px-1.5 py-0 text-[10px] font-semibold leading-4 ${chipToneClass[tone]} ${className}`}
+      className={`inline-flex min-h-[18px] max-w-full self-start items-center overflow-hidden whitespace-nowrap rounded-[4px] border px-1.5 py-0 text-[10px] font-semibold leading-4 ${chipToneClass[tone]} ${className}`}
     >
       {children}
     </span>

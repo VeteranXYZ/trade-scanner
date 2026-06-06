@@ -466,6 +466,43 @@ a:focus-visible {
   color: var(--accent-hover);
 }
 
+.terminal-icon-action {
+  display: inline-flex;
+  width: 1.5rem;
+  height: 1.5rem;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  border: 1px solid var(--terminal-bar-border);
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--terminal-bar-foreground);
+  transition:
+    border-color 120ms ease,
+    background-color 120ms ease,
+    color 120ms ease;
+}
+
+.terminal-icon-action:hover {
+  border-color: var(--accent-border);
+  background: var(--accent-soft);
+  color: var(--accent-hover);
+}
+
+.terminal-icon-action:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.terminal-icon-action.is-refreshing svg {
+  animation: terminal-refresh-spin 900ms linear infinite;
+}
+
+@keyframes terminal-refresh-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
 .ui-value-positive {
   color: var(--positive);
 }

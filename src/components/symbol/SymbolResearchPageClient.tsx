@@ -4,6 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from "react";
+import { RefreshIconButton } from "@/components/ui/workspace";
 import { SymbolBehaviorPanel } from "./SymbolBehaviorPanel";
 import { SymbolResearchChart } from "./SymbolResearchChart";
 import { SymbolSignalTimeline } from "./SymbolSignalTimeline";
@@ -1382,7 +1383,7 @@ function SymbolResearchNavigation({
           className="flex h-6 min-w-0 shrink-0 items-center gap-1.5 overflow-hidden border-r border-white/10 pr-2"
           title={`Symbol Research / ${symbol} / Selected timeframe: ${timeframe}`}
         >
-          <h1 className="shrink-0 border-b border-[var(--accent)] px-1 text-[11px] leading-5 text-[var(--terminal-bar-foreground)]">
+          <h1 className="terminal-command-title">
             Symbol Research
           </h1>
           <span className="shrink-0 font-mono text-[10px] text-[var(--terminal-bar-muted)]">
@@ -1467,14 +1468,12 @@ function SymbolResearchNavigation({
           >
             Back to Scanner
           </Link>
-          <button
-            type="button"
+          <RefreshIconButton
             onClick={onRefresh}
             disabled={isFetching}
-            className="inline-flex h-6 items-center justify-center border border-white/20 bg-white/[0.08] px-2 text-[10px] font-semibold text-[var(--terminal-bar-foreground)] transition hover:border-white/35 hover:bg-white/[0.14] disabled:cursor-not-allowed disabled:opacity-55"
-          >
-            {isFetching ? "Refreshing" : "Refresh"}
-          </button>
+            isRefreshing={isFetching}
+            label="Refresh"
+          />
           {watchlistSymbol ? (
             <SymbolWatchlistControl
               symbol={watchlistSymbol}
