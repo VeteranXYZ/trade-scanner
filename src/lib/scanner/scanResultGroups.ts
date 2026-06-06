@@ -1,4 +1,10 @@
 import type { ScannerReviewKey, ScannerReviewText } from "@/lib/shared/scannerTypes";
+import {
+  actionBiasByCode,
+  primaryStructureBySetupCode,
+  riskTypeByCode,
+  signalLabelByCode,
+} from "@/lib/scanner-codebook/codeRegistry";
 
 export const SCAN_RESULT_GROUPS = [
   "eligible",
@@ -74,9 +80,9 @@ const WATCH_REVIEW_TIER_ORDER: Partial<Record<ScanResultReviewTier, number>> = {
 export function classifyScanResultGroup(
   signal: ScanResultGroupInput,
 ): ScanResultGroup {
-  const actionBias = signal.actionBias ?? "";
-  const signalLabel = signal.signalLabel ?? "";
-  const primaryStructure = signal.primaryStructure ?? "";
+  const actionBias = normalizeActionBias(signal.actionBias);
+  const signalLabel = normalizeSignalLabel(signal.signalLabel);
+  const primaryStructure = normalizePrimaryStructure(signal.primaryStructure);
   const rankScore = signal.rankScore ?? Number.NEGATIVE_INFINITY;
   const hasDetectedRisks = hasAnyDetectedRiskType(signal, [
     "overheat_risk",
@@ -145,7 +151,7 @@ export function getScanResultReview(
 ): ScanResultReview {
   const resultGroup = signal.resultGroup ?? classifyScanResultGroup(signal);
   const rankScore = signal.rankScore ?? Number.NEGATIVE_INFINITY;
-  const primaryStructure = signal.primaryStructure ?? "";
+  const primaryStructure = normalizePrimaryStructure(signal.primaryStructure);
   const detectedRiskCodes = getDetectedRiskCodes(signal);
 
   if (resultGroup === "eligible") {
@@ -236,8 +242,8 @@ function hasAnyDetectedRiskType(
 ) {
   const detectedRiskTypes = signal.detectedRiskTypes ?? [];
 
-  return detectedRiskTypes.some(
-    (riskType) => typeof riskType === "string" && riskTypes.includes(riskType),
+  return detectedRiskTypes.some((riskType) =>
+    riskTypes.includes(normalizeRiskType(riskType)),
   );
 }
 
@@ -245,8 +251,43 @@ function getDetectedRiskCodes(signal: ScanResultGroupInput) {
   const detectedRiskTypes = signal.detectedRiskTypes ?? [];
 
   return detectedRiskTypes
-    .map((riskType) => (typeof riskType === "string" ? riskType : ""))
+    .map(normalizeRiskType)
     .filter(Boolean);
+}
+
+function normalizeActionBias(value: string | null | undefined) {
+  if (!value) {
+    return "";
+  }
+
+  return actionBiasByCode[value as keyof typeof actionBiasByCode] ?? value;
+}
+
+function normalizeSignalLabel(value: string | null | undefined) {
+  if (!value) {
+    return "";
+  }
+
+  return signalLabelByCode[value as keyof typeof signalLabelByCode] ?? value;
+}
+
+function normalizePrimaryStructure(value: string | null | undefined) {
+  if (!value) {
+    return "";
+  }
+
+  return (
+    primaryStructureBySetupCode[value as keyof typeof primaryStructureBySetupCode] ??
+    value
+  );
+}
+
+function normalizeRiskType(value: unknown) {
+  if (typeof value !== "string") {
+    return "";
+  }
+
+  return riskTypeByCode[value as keyof typeof riskTypeByCode] ?? value;
 }
 
 function getWatchLowPriorityReasons({
@@ -359,30 +400,32 @@ export function summarizeScanResultGroups(
 
   for (const signal of signals) {
     const resultGroup = signal.resultGroup ?? classifyScanResultGroup(signal);
+    const signalLabel = normalizeSignalLabel(signal.signalLabel);
+    const actionBias = normalizeActionBias(signal.actionBias);
 
     summary[resultGroup] += 1;
 
-    if (signal.signalLabel === "confirmed") {
+    if (signalLabel === "confirmed") {
       summary.confirmed += 1;
-    } else if (signal.signalLabel === "trend") {
+    } else if (signalLabel === "trend") {
       summary.trend += 1;
-    } else if (signal.signalLabel === "watch") {
+    } else if (signalLabel === "watch") {
       summary.watchSignals += 1;
-    } else if (signal.signalLabel === "neutral") {
+    } else if (signalLabel === "neutral") {
       summary.neutralSignals += 1;
-    } else if (signal.signalLabel === "overheated") {
+    } else if (signalLabel === "overheated") {
       summary.overheatedSignals += 1;
-    } else if (signal.signalLabel === "breakdown_risk") {
+    } else if (signalLabel === "breakdown_risk") {
       summary.breakdownRisk += 1;
-    } else if (signal.signalLabel === "distribution_risk") {
+    } else if (signalLabel === "distribution_risk") {
       summary.distributionRisk += 1;
     }
 
-    if (signal.actionBias === "avoid") {
+    if (actionBias === "avoid") {
       summary.avoid += 1;
-    } else if (signal.actionBias === "eligible") {
+    } else if (actionBias === "eligible") {
       summary.eligibleSignals += 1;
-    } else if (signal.actionBias === "do_not_chase") {
+    } else if (actionBias === "do_not_chase") {
       summary.doNotChase += 1;
     }
   }

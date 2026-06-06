@@ -1,5 +1,13 @@
 import type http from "node:http";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import {
+  actionCodeByBias,
+  groupCodeByResultGroup,
+  riskCodeByType,
+  scannerCodeVersions,
+  setupCodeByAliasOrStructure,
+  signalCodeByLabel,
+} from "@/lib/scanner-codebook/codeRegistry";
 import { handleTradeApiRequest } from "./trade-api";
 
 const getLatestScanRunMock = vi.hoisted(() => vi.fn());
@@ -485,6 +493,7 @@ describe("trade-api latest scan run selection", () => {
     expect(response.status).toBe(200);
     expect(body.count).toBe(1);
     expect(body.items).toHaveLength(1);
+    expectPublicScannerCodeContract(body.items[0]);
     expect(body.summary).toMatchObject({
       totalSignals: 3,
       returnedItems: 1,
@@ -583,7 +592,7 @@ describe("trade-api historical snapshots", () => {
     expect(body.run).toMatchObject({
       runId: historyRunId,
       timeframe: "4h",
-      scannerVersion: "test",
+      scannerVersion: scannerCodeVersions.scannerVersion,
       scoringVersion: "test",
       isLikelyFullUniverse: true,
     });
@@ -599,16 +608,17 @@ describe("trade-api historical snapshots", () => {
     ]);
     expect(body.rows[0]).toMatchObject({
       symbol: "SEIUSDT",
-      group: "eligible",
-      label: "confirmed",
-      primarySignal: "review.status.manualReview",
-      rankScore: 82,
+      groupCode: "GR_201",
+      actionCode: "AC_501",
+      setupCode: "TR_601",
     });
+    expectPublicScannerCodeContract(body.rows[0]);
     expect(body.rows[1]).toMatchObject({
       symbol: "RISKUSDT",
-      group: "risk",
-      riskTypes: ["trend_breakdown_risk"],
+      groupCode: "GR_302",
+      riskCodes: ["RK_304"],
     });
+    expectPublicScannerCodeContract(body.rows[1]);
     expect(getHistoricalScanRunMock).toHaveBeenCalledWith({
       scanRunId: historyRunId,
       timeframe: undefined,
@@ -747,8 +757,8 @@ describe("trade-api historical snapshots", () => {
 
     expect(rowsBySymbol.get("SEIUSDT")).toMatchObject({
       symbol: "SEIUSDT",
-      group: "eligible",
-      primarySignal: "review.status.manualReview",
+      groupCode: "GR_201",
+      actionCode: "AC_501",
       anchorSource: "stored_signal",
       window: 3,
       observedChangePct: 2.5,
@@ -756,12 +766,19 @@ describe("trade-api historical snapshots", () => {
       dataStatus: "complete",
       missingReason: null,
     });
+    expectPublicScannerCodeContract(
+      rowsBySymbol.get("SEIUSDT") as Record<string, unknown>,
+    );
     expect(rowsBySymbol.get("RISKUSDT")).toMatchObject({
       symbol: "RISKUSDT",
-      group: "risk",
+      groupCode: "GR_302",
+      riskCodes: ["RK_304"],
       dataStatus: "partial",
       missingReason: "insufficient_future_candles",
     });
+    expectPublicScannerCodeContract(
+      rowsBySymbol.get("RISKUSDT") as Record<string, unknown>,
+    );
     expect(rowsBySymbol.get("SEIUSDT")).toHaveProperty("observedChangePct");
     expect(rowsBySymbol.get("SEIUSDT")).not.toHaveProperty("winRate");
     expect(rowsBySymbol.get("SEIUSDT")).not.toHaveProperty("accuracy");
@@ -1263,15 +1280,17 @@ describe("trade-api market context", () => {
     expect(body.proxies.BTCUSDT["1d"]).toMatchObject({
       available: true,
       timeframe: "1d",
-      group: "eligible",
-      signalLabel: "confirmed",
-      rankScore: 84,
+      groupCode: "GR_201",
+      signalCodes: ["PX_501"],
+      metrics: { rankScore: 84 },
       runContext: "selected_full_universe",
     });
+    expectPublicScannerCodeContract(body.proxies.BTCUSDT["1d"]);
     expect(body.proxies.ETHUSDT["4h"]).toMatchObject({
       available: true,
-      group: "watch",
+      groupCode: "GR_101",
     });
+    expectPublicScannerCodeContract(body.proxies.ETHUSDT["4h"]);
     expect(body.rules).toMatchObject({
       primaryDriver: "BTCUSDT",
       confirmationAsset: "ETHUSDT",
@@ -1372,9 +1391,11 @@ describe("trade-api market context", () => {
     });
     expect(body.proxies.BTCUSDT["4h"]).toMatchObject({
       available: true,
-      group: "risk",
+      groupCode: "GR_302",
+      riskCodes: ["RK_304"],
       runContext: "selected_full_universe",
     });
+    expectPublicScannerCodeContract(body.proxies.BTCUSDT["4h"]);
     expect(body.summary.warnings).toContain(
       "Some proxy timeframe data is unavailable.",
     );
@@ -1494,21 +1515,24 @@ describe("trade-api multi-timeframe latest screener", () => {
     expect(btc.timeframes["1h"]).toMatchObject({
       id: "1h-btc",
       symbol: "BTCUSDT",
-      resultGroup: "eligible",
-      group: "eligible",
-      action: "review.status.manualReview",
-      setupType: "strong_trend",
+      groupCode: "GR_201",
+      actionCode: "AC_501",
+      setupCode: "TR_601",
       scanTime: "2026-05-31T00:00:01.000Z",
     });
+    expectPublicScannerCodeContract(btc.timeframes["1h"]);
     expect(btc.timeframes["4h"]).toMatchObject({ id: "4h-btc" });
+    expectPublicScannerCodeContract(btc.timeframes["4h"]);
     expect(btc.timeframes["1d"]).toBeNull();
     expect(btc.timeframes["1w"]).toBeNull();
     expect(sei.timeframes["1d"]).toMatchObject({
       id: "1d-sei",
-      resultGroup: "risk",
+      groupCode: "GR_302",
     });
+    expectPublicScannerCodeContract(sei.timeframes["1d"]);
     expect(eth.timeframes["1h"]).toBeNull();
     expect(eth.timeframes["4h"]).toMatchObject({ id: "4h-eth" });
+    expectPublicScannerCodeContract(eth.timeframes["4h"]);
     expect(getLatestScanRunMock).toHaveBeenNthCalledWith(1, {
       timeframe: "1h",
       assetClass: "crypto",
@@ -1596,8 +1620,9 @@ describe("trade-api symbol research", () => {
     expect(body.symbol.symbol).toBe("SEIUSDT");
     expect(body.latest.scanRun.id).toBe("full-run");
     expect(body.latest.signal.id).toBe("signal-latest");
-    expect(body.latest.signal.resultGroup).toBe("eligible");
-    expect(body.latest.signal.reviewTier).toBe("eligible");
+    expect(body.latest.signal.groupCode).toBe("GR_201");
+    expect(body.latest.signal.actionCode).toBe("AC_501");
+    expectPublicScannerCodeContract(body.latest.signal);
     expect(body.latest.signal.isSelectedCurrentRun).toBe(true);
     expect(body.currentSelection).toMatchObject({
       selectedRunId: "full-run",
@@ -1619,12 +1644,15 @@ describe("trade-api symbol research", () => {
       opportunityScore: 74,
     });
     expect(body.interpretation).toMatchObject({
-      group: "eligible",
-      action: "review.status.manualReview",
-      setupType: "strong_trend",
+      groupCode: "GR_201",
+      actionCode: "AC_501",
+      setupCode: "TR_601",
     });
     expect(body.history).toHaveLength(1);
+    expectPublicScannerCodeContract(body.history[0]);
     expect(body.timeframes).toHaveLength(2);
+    expectPublicScannerCodeContract(body.timeframes[0]);
+    expectPublicScannerCodeContract(body.timeframes[1]);
     expect(body.candles).toMatchObject({
       timeframe: "4h",
       count: 2,
@@ -1772,6 +1800,7 @@ describe("trade-api symbol research", () => {
       isSelectedCurrentRun: true,
       sourceRunIsLikelyFullUniverse: true,
     });
+    expectPublicScannerCodeContract(dailyBody.latest.signal);
     expect(dailyBody.candles).toMatchObject({ timeframe: "1d", count: 2 });
     expect(dailyBody.candles.rows.every((row: { timeframe: string }) => row.timeframe === "1d")).toBe(
       true,
@@ -1785,6 +1814,7 @@ describe("trade-api symbol research", () => {
       isSelectedCurrentRun: true,
       sourceRunIsLikelyFullUniverse: true,
     });
+    expectPublicScannerCodeContract(weeklyBody.latest.signal);
     expect(weeklyBody.candles).toMatchObject({ timeframe: "1w", count: 2 });
     expect(weeklyBody.candles.rows.every((row: { timeframe: string }) => row.timeframe === "1w")).toBe(
       true,
@@ -1797,6 +1827,7 @@ describe("trade-api symbol research", () => {
       isSelectedCurrentRun: true,
       sourceRunIsLikelyFullUniverse: true,
     });
+    expectPublicScannerCodeContract(hourlyBody.latest.signal);
     expect(hourlyBody.candles).toMatchObject({ timeframe: "1h", count: 2 });
     expect(hourlyBody.candles.rows.every((row: { timeframe: string }) => row.timeframe === "1h")).toBe(
       true,
@@ -1864,23 +1895,27 @@ describe("trade-api symbol research", () => {
     expect(response.status).toBe(200);
     expect(body.timeframe).toBe("4h");
     expect(body.latest.signal.id).toBe("selected-risk");
-    expect(body.latest.signal.resultGroup).toBe("risk");
+    expect(body.latest.signal.groupCode).toBe("GR_302");
+    expectPublicScannerCodeContract(body.latest.signal);
     expect(body.history[0]).toMatchObject({
       id: "newer-limited",
       isSelectedCurrentRun: false,
       isNewerThanSelectedCurrentRun: true,
       sourceRunIsLikelyFullUniverse: false,
     });
+    expectPublicScannerCodeContract(body.history[0]);
     expect(body.history[1]).toMatchObject({
       id: "selected-risk",
       isSelectedCurrentRun: true,
       isNewerThanSelectedCurrentRun: false,
     });
+    expectPublicScannerCodeContract(body.history[1]);
     expect(body.timeframes[0]).toMatchObject({
       id: "newer-limited",
       isNewerThanSelectedCurrentRun: true,
       sourceRunIsLikelyFullUniverse: false,
     });
+    expectPublicScannerCodeContract(body.timeframes[0]);
   });
 
   it("returns NO_LATEST_SIGNAL when the selected run has no signal for the symbol", async () => {
@@ -2206,6 +2241,49 @@ function makeResearchSignal(
     scanRunSignalsCreated: number | null;
   }> = {},
 ) {
+  const readableSignalLabel = overrides.signalLabel ?? "confirmed";
+  const readableActionBias = overrides.actionBias ?? "eligible";
+  const readablePrimaryStructure = overrides.primaryStructure ?? "strong_trend";
+  const riskCodes = (overrides.detectedRiskTypes ?? []).map((risk) =>
+    typeof risk === "string"
+      ? riskCodeByType[risk as keyof typeof riskCodeByType] ?? risk
+      : "RK_201",
+  );
+  const signalCode =
+    signalCodeByLabel[readableSignalLabel as keyof typeof signalCodeByLabel] ??
+    readableSignalLabel ??
+    "NX_801";
+  const actionCode =
+    actionCodeByBias[readableActionBias as keyof typeof actionCodeByBias] ??
+    readableActionBias ??
+    "NX_801";
+  const setupCode =
+    setupCodeByAliasOrStructure[
+      readablePrimaryStructure as keyof typeof setupCodeByAliasOrStructure
+    ] ??
+    readablePrimaryStructure ??
+    "NX_801";
+  const groupCode = getFixtureGroupCode({
+    signalLabel: readableSignalLabel,
+    actionBias: readableActionBias,
+    primaryStructure: readablePrimaryStructure,
+    riskCodes,
+  });
+  const codeContract = {
+    groupCode,
+    actionCode,
+    riskCode: riskCodes[0] ?? null,
+    riskCodes,
+    setupCode,
+    phaseCode: setupCode,
+    reasonCodes: riskCodes,
+    signalCodes: [signalCode],
+    qualityCodes: [],
+    scannerVersion: scannerCodeVersions.scannerVersion,
+    codeSchemaVersion: scannerCodeVersions.codeSchemaVersion,
+    dictionaryVersion: scannerCodeVersions.dictionaryVersion,
+  };
+
   return {
     id: overrides.id ?? "signal-1",
     scanRunId: overrides.scanRunId ?? "full-run",
@@ -2226,17 +2304,28 @@ function makeResearchSignal(
     momentumScore: 64,
     volumeScore: 54,
     structureScore: 80,
-    signalLabel: overrides.signalLabel ?? "confirmed",
-    actionBias: overrides.actionBias ?? "eligible",
-    primaryStructure: overrides.primaryStructure ?? "strong_trend",
+    signalLabel: signalCode,
+    actionBias: actionCode,
+    primaryStructure: setupCode,
+    groupCode,
+    actionCode,
+    riskCode: riskCodes[0] ?? null,
+    riskCodes,
+    setupCode,
+    phaseCode: setupCode,
+    reasonCodes: riskCodes,
+    signalCodes: [signalCode],
+    qualityCodes: [],
+    codeSchemaVersion: scannerCodeVersions.codeSchemaVersion,
+    dictionaryVersion: scannerCodeVersions.dictionaryVersion,
     secondaryStructures: [],
-    detectedRiskTypes: overrides.detectedRiskTypes ?? [],
-    factors: {},
+    detectedRiskTypes: riskCodes,
+    factors: codeContract,
     nextConfirmation: ["Hold above latest range"],
     invalidation: ["Loses recent support"],
-    rawMetrics: {},
+    rawMetrics: { codeContract },
     scoringVersion: "test",
-    scannerVersion: "test",
+    scannerVersion: scannerCodeVersions.scannerVersion,
     createdAt: "2026-05-31T00:00:02.000Z",
     scanRunStartedAt: "2026-05-31T00:00:00.000Z",
     scanRunFinishedAt: "2026-05-31T00:01:00.000Z",
@@ -2254,7 +2343,7 @@ function makeResearchSignal(
 }
 
 function makeObservationRecord(
-  overrides: Partial<ReturnType<typeof makeResearchSignal>> &
+  overrides: NonNullable<Parameters<typeof makeResearchSignal>[0]> &
     Partial<{
       anchorTime: string | null;
       anchorClose: number | null;
@@ -2287,6 +2376,56 @@ function makeObservationRecord(
   };
 }
 
+function getFixtureGroupCode({
+  signalLabel,
+  actionBias,
+  primaryStructure,
+  riskCodes,
+}: {
+  signalLabel: string | null;
+  actionBias: string | null;
+  primaryStructure: string | null;
+  riskCodes: string[];
+}) {
+  if (
+    actionBias === "avoid" ||
+    signalLabel === "breakdown_risk" ||
+    signalLabel === "distribution_risk" ||
+    primaryStructure === "trend_breakdown" ||
+    primaryStructure === "distribution_risk" ||
+    riskCodes.length > 0
+  ) {
+    return groupCodeByResultGroup.risk;
+  }
+
+  if (
+    actionBias === "do_not_chase" ||
+    signalLabel === "overheated" ||
+    primaryStructure === "overextended"
+  ) {
+    return groupCodeByResultGroup.overheated;
+  }
+
+  if (
+    actionBias === "eligible" &&
+    (signalLabel === "confirmed" || signalLabel === "trend") &&
+    primaryStructure !== "neutral"
+  ) {
+    return groupCodeByResultGroup.eligible;
+  }
+
+  if (
+    actionBias === "eligible" ||
+    actionBias === "watch_only" ||
+    signalLabel === "watch" ||
+    signalLabel === "weak_bounce"
+  ) {
+    return groupCodeByResultGroup.watch;
+  }
+
+  return groupCodeByResultGroup.neutral;
+}
+
 function makeObservationCoverage(
   overrides: Partial<{
     timeframe: string;
@@ -2312,6 +2451,72 @@ function makeObservationCoverage(
       },
     ],
   };
+}
+
+const scannerCodePattern = /^(GR|QH|VL|PX|MO|TR|VO|RK|ST|AC|NX)_\d{3}$/;
+const legacyScannerResultFields = [
+  "group",
+  "resultGroup",
+  "signalLabel",
+  "action",
+  "actionBias",
+  "setupType",
+  "primaryStructure",
+  "detectedRiskTypes",
+  "factors",
+  "rawMetrics",
+  "observations",
+  "reviewReason",
+  "reviewStatus",
+  "reviewTier",
+  "statusNote",
+  "statusNoteKey",
+  "statusReasons",
+  "statusReasonKeys",
+  "nextConfirmation",
+  "invalidation",
+] as const;
+
+function expectPublicScannerCodeContract(item: Record<string, unknown>) {
+  for (const field of legacyScannerResultFields) {
+    expect(item).not.toHaveProperty(field);
+  }
+
+  expectCodeValue(item.groupCode);
+  expectCodeValue(item.actionCode);
+  expectNullableCodeValue(item.riskCode);
+  expectCodeValue(item.setupCode);
+  expectCodeValue(item.phaseCode);
+  expectCodeArray(item.riskCodes);
+  expectCodeArray(item.reasonCodes);
+  expectCodeArray(item.signalCodes);
+  expectCodeArray(item.qualityCodes);
+  expect(item.metrics).toBeTruthy();
+  expect(typeof item.scannerVersion).toBe("string");
+  expect(typeof item.codeSchemaVersion).toBe("string");
+  expect(typeof item.dictionaryVersion).toBe("string");
+}
+
+function expectCodeValue(value: unknown) {
+  expect(typeof value).toBe("string");
+  expect(value).toMatch(scannerCodePattern);
+}
+
+function expectNullableCodeValue(value: unknown) {
+  if (value === null) {
+    return;
+  }
+
+  expectCodeValue(value);
+}
+
+function expectCodeArray(value: unknown) {
+  expect(Array.isArray(value)).toBe(true);
+
+  for (const code of value as unknown[]) {
+    expect(code).not.toBeUndefined();
+    expectCodeValue(code);
+  }
 }
 
 function makeResearchCandle({

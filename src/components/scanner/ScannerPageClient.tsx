@@ -15,11 +15,15 @@ import {
 import { scannerSignalOrder } from "@/lib/shared/scannerConfig";
 import type { MtfPreset } from "@/lib/shared/scannerConfig";
 import { formatDisplayDateTime } from "@/lib/utils/format";
+import {
+  phaseCodeByMarketPhase,
+  signalCodeByLabel,
+} from "@/lib/scanner-codebook/codeRegistry";
+import type { ScannerCodeContractResult } from "@/lib/scanner-codebook/serializeScanResult";
 import type {
   MarketPhase,
   MultiTimeframeAlignment,
   ScannerSignalState,
-  ScanResult,
 } from "@/lib/shared/scannerTypes";
 import type { Timeframe } from "@/lib/shared/timeframes";
 
@@ -65,7 +69,7 @@ type ScanApiResponse = {
   totalBatches?: number;
   totalEligibleCount?: number;
   scannedInBatch?: number;
-  results: ScanResult[];
+  results: ScannerCodeContractResult[];
   itemCount: number;
   scannedMarketCount?: number;
   displayLimit?: number;
@@ -850,7 +854,7 @@ export function mergeBatchScanResponses(
   }
 
   const [first] = responses;
-  const resultMap = new Map<string, ScanResult>();
+  const resultMap = new Map<string, ScannerCodeContractResult>();
   const isMtf = first.mode === "mtf";
 
   for (const response of responses) {
@@ -865,7 +869,7 @@ export function mergeBatchScanResponses(
   }
 
   const results = Array.from(resultMap.values()).sort(
-    (left, right) => right.rankScore - left.rankScore,
+    (left, right) => right.metrics.rankScore - left.metrics.rankScore,
   );
   const failedCount = responses.reduce(
     (sum, response) => sum + (response.failedCount ?? 0),
@@ -988,7 +992,7 @@ function getApiMaxSymbols(filters: ScannerFiltersState) {
 }
 
 function limitDisplayRows(
-  rows: ScanResult[],
+  rows: ScannerCodeContractResult[],
   displayLimit: ScannerFiltersState["limit"],
 ) {
   if (displayLimit === "ALL") {
@@ -1081,13 +1085,14 @@ function getLatestIsoTime(values: Array<string | null | undefined>) {
   return Number.isFinite(latest) ? new Date(latest).toISOString() : null;
 }
 
-export function getSignalSummary(results: ScanResult[]) {
+export function getSignalSummary(results: ScannerCodeContractResult[]) {
   const counts = new Map<ScannerSignalState, number>(
     scannerSignalOrder.map((signal) => [signal, 0]),
   );
 
   for (const result of results) {
-    counts.set(result.signal.state, (counts.get(result.signal.state) ?? 0) + 1);
+    const signal = getScannerSignalStateFromCodes(result);
+    counts.set(signal, (counts.get(signal) ?? 0) + 1);
   }
 
   return [
@@ -1099,15 +1104,8 @@ export function getSignalSummary(results: ScanResult[]) {
   ];
 }
 
-export function getAlignmentSummary(results: ScanResult[]) {
+export function getAlignmentSummary(results: ScannerCodeContractResult[]) {
   const counts = new Map<MultiTimeframeAlignment, number>();
-
-  for (const result of results) {
-    const alignment = result.multiTimeframe?.alignment;
-    if (alignment) {
-      counts.set(alignment, (counts.get(alignment) ?? 0) + 1);
-    }
-  }
 
   return Array.from(counts.entries())
     .map(([alignment, count]) => ({ alignment, count }))
@@ -1115,16 +1113,16 @@ export function getAlignmentSummary(results: ScanResult[]) {
 }
 
 export function filterAndSortResults(
-  results: ScanResult[],
+  results: ScannerCodeContractResult[],
   filters: ScannerFiltersState,
   tableSort: TableSortState | null = null,
 ) {
   const filtered = results.filter((result) => {
     return (
-      (filters.signal === "ALL" || result.signal.state === filters.signal) &&
-      (filters.phase === "ALL" || result.phase === filters.phase) &&
-      result.opportunityScore >= filters.minOpportunityScore &&
-      result.riskScore <= filters.maxRiskScore
+      matchesSignalFilter(result, filters.signal) &&
+      matchesPhaseFilter(result, filters.phase) &&
+      result.metrics.opportunityScore >= filters.minOpportunityScore &&
+      result.metrics.riskScore <= filters.maxRiskScore
     );
   });
 
@@ -1135,14 +1133,14 @@ export function filterAndSortResults(
   return filtered.sort((left, right) => {
     switch (filters.sortBy) {
       case "opportunityScore":
-        return right.opportunityScore - left.opportunityScore;
+        return right.metrics.opportunityScore - left.metrics.opportunityScore;
       case "confirmationScore":
-        return right.confirmationScore - left.confirmationScore;
+        return right.metrics.confirmationScore - left.metrics.confirmationScore;
       case "lowestRiskScore":
-        return left.riskScore - right.riskScore;
+        return left.metrics.riskScore - right.metrics.riskScore;
       case "rankScore":
       default:
-        return right.rankScore - left.rankScore;
+        return right.metrics.rankScore - left.metrics.rankScore;
     }
   });
 }
@@ -1163,7 +1161,7 @@ export function getNextColumnSort(
 }
 
 export function sortResultsByColumn(
-  results: ScanResult[],
+  results: ScannerCodeContractResult[],
   tableSort: TableSortState,
 ) {
   return [...results].sort((left, right) => {
@@ -1173,13 +1171,13 @@ export function sortResultsByColumn(
       return primary;
     }
 
-    return right.rankScore - left.rankScore;
+    return right.metrics.rankScore - left.metrics.rankScore;
   });
 }
 
 function compareColumnValue(
-  left: ScanResult,
-  right: ScanResult,
+  left: ScannerCodeContractResult,
+  right: ScannerCodeContractResult,
   tableSort: TableSortState,
 ) {
   const direction = tableSort.direction === "asc" ? 1 : -1;
@@ -1188,58 +1186,43 @@ function compareColumnValue(
     case "symbol":
       return direction * left.symbol.localeCompare(right.symbol);
     case "phase":
-      return direction * (getPhaseSortValue(left.phase) - getPhaseSortValue(right.phase));
+      return direction * left.phaseCode.localeCompare(right.phaseCode);
     case "signal":
       return (
         direction *
-        (getSignalSortValue(left.signal.state) -
-          getSignalSortValue(right.signal.state))
+        (getSignalSortValue(getScannerSignalStateFromCodes(left)) -
+          getSignalSortValue(getScannerSignalStateFromCodes(right)))
       );
     case "score":
     case "rank":
-      return direction * (left.rankScore - right.rankScore);
+      return direction * (left.metrics.rankScore - right.metrics.rankScore);
     case "ocr":
-      return direction * (left.opportunityScore - right.opportunityScore);
+      return direction * (left.metrics.opportunityScore - right.metrics.opportunityScore);
     case "rsi":
-      return direction * (nullableNumber(left.rsi14) - nullableNumber(right.rsi14));
+      return direction * (nullableNumber(left.metrics.rsi14) - nullableNumber(right.metrics.rsi14));
     case "bb":
       return (
         direction *
-        (nullableNumber(left.bbWidthPercentile) -
-          nullableNumber(right.bbWidthPercentile))
+        (nullableNumber(left.metrics.bbWidthPercentile) -
+          nullableNumber(right.metrics.bbWidthPercentile))
       );
     case "vol":
       return (
         direction *
-        (nullableNumber(left.volume.ratio20) - nullableNumber(right.volume.ratio20))
+        (nullableNumber(left.metrics.volumeRatio) -
+          nullableNumber(right.metrics.volumeRatio))
       );
     case "macd":
-      return direction * (getMacdSortValue(left) - getMacdSortValue(right));
+      return 0;
     case "ma":
-      return direction * (getMaSortValue(left) - getMaSortValue(right));
+      return 0;
     case "warnings":
-      return direction * (left.warnings.length - right.warnings.length);
+      return direction * (getWarningCodeCount(left) - getWarningCodeCount(right));
   }
 }
 
 function getDefaultColumnSortDirection(key: TableSortKey): TableSortDirection {
   return key === "symbol" ? "asc" : "desc";
-}
-
-function getPhaseSortValue(phase: MarketPhase) {
-  const values: Record<MarketPhase, number> = {
-    BREAKOUT_CONFIRMED: 9,
-    BREAKOUT_ATTEMPT: 8,
-    TRENDING: 7,
-    PULLBACK_HEALTHY: 6,
-    SQUEEZE: 5,
-    BASE_BUILDING: 4,
-    DISTRIBUTION: 3,
-    OVEREXTENDED: 2,
-    BREAKDOWN: 1,
-  };
-
-  return values[phase] ?? 0;
 }
 
 function getSignalSortValue(signal: ScannerSignalState) {
@@ -1255,40 +1238,67 @@ function getSignalSortValue(signal: ScannerSignalState) {
   return values[signal] ?? 0;
 }
 
-function getMacdSortValue(result: ScanResult) {
-  if (!result.macd) {
-    return 0;
-  }
-
-  if (result.macd.bearishCross) {
-    return 1;
-  }
-
-  if (!result.macd.histogramRising) {
-    return 2;
-  }
-
-  if (result.macd.bullishCross) {
-    return 5;
-  }
-
-  if (result.macd.aboveZero) {
-    return 3;
-  }
-
-  return 4;
+function matchesSignalFilter(
+  result: ScannerCodeContractResult,
+  filter: ScannerSignalState | "ALL",
+) {
+  return filter === "ALL" || getScannerSignalStateFromCodes(result) === filter;
 }
 
-function getMaSortValue(result: ScanResult) {
-  return [
-    result.maStatus.aboveMA20,
-    result.maStatus.aboveMA50,
-    result.maStatus.aboveMA200,
-    result.maStatus.ma20AboveMA50,
-    result.maStatus.ma50AboveMA200,
-  ].filter(Boolean).length;
+function matchesPhaseFilter(
+  result: ScannerCodeContractResult,
+  filter: MarketPhase | "ALL",
+) {
+  return filter === "ALL" || result.phaseCode === phaseCodeByMarketPhase[filter];
+}
+
+function getScannerSignalStateFromCodes(
+  result: ScannerCodeContractResult,
+): ScannerSignalState {
+  const codes = new Set([
+    result.groupCode,
+    result.actionCode,
+    result.setupCode,
+    result.phaseCode,
+    ...result.signalCodes,
+    ...result.riskCodes,
+  ]);
+
+  if (
+    codes.has(signalCodeByLabel.confirmed) ||
+    codes.has("PX_501")
+  ) {
+    return "CONFIRMED";
+  }
+
+  if (codes.has(signalCodeByLabel.trend) || codes.has("TR_601")) {
+    return "TREND_CONTINUATION";
+  }
+
+  if (
+    codes.has(signalCodeByLabel.overheated) ||
+    codes.has(signalCodeByLabel.distribution_risk) ||
+    codes.has(signalCodeByLabel.breakdown_risk) ||
+    result.riskCodes.length > 0
+  ) {
+    return "HIGH_RISK";
+  }
+
+  if (codes.has(signalCodeByLabel.weak) || codes.has(signalCodeByLabel.weak_bounce)) {
+    return "WEAK";
+  }
+
+  if (codes.has(signalCodeByLabel.watch)) {
+    return "WATCHLIST";
+  }
+
+  return "NEUTRAL";
 }
 
 function nullableNumber(value: number | null | undefined) {
   return value ?? Number.NEGATIVE_INFINITY;
+}
+
+function getWarningCodeCount(result: ScannerCodeContractResult) {
+  return result.riskCodes.length + result.reasonCodes.length;
 }

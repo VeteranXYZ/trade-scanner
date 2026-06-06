@@ -5,6 +5,14 @@ import {
   type MtfLatestScreenerResponse,
   type MtfScreenerTimeframe,
 } from "./multiTimeframeScreenerUi";
+import {
+  actionCodeByBias,
+  groupCodeByResultGroup,
+  riskCodeByType,
+  scannerCodeVersions,
+  signalCodeByLabel,
+  setupCodeByAliasOrStructure,
+} from "@/lib/scanner-codebook/codeRegistry";
 
 type PreviewGroup = "eligible" | "watch" | "neutral" | "overheated" | "risk";
 
@@ -287,6 +295,14 @@ function buildPreviewItem({
   signalLabel: string;
   detectedRiskTypes: string[];
 }): MtfLatestScanItem {
+  const riskCodes = detectedRiskTypes.map(
+    (risk) => riskCodeByType[risk as keyof typeof riskCodeByType] ?? "RK_201",
+  );
+  const setupCode =
+    setupCodeByAliasOrStructure[
+      getPreviewSetup(group) as keyof typeof setupCodeByAliasOrStructure
+    ] ?? "ST_001";
+
   return {
     id: `preview-${timeframe}-${symbol}`,
     scanRunId: `preview-run-${timeframe}`,
@@ -295,17 +311,45 @@ function buildPreviewItem({
     assetClass: "crypto",
     symbol,
     timeframe,
-    group,
-    resultGroup: group,
-    rankScore,
-    signalLabel,
-    action: getPreviewAction(group),
-    actionBias: group === "risk" ? "avoid" : "research",
-    reviewTier: group === "eligible" ? "core" : "standard",
-    statusNote: getPreviewStatusNote(group),
-    statusReasons: detectedRiskTypes.length > 0 ? detectedRiskTypes : [group],
     scanTime: previewFinishedAt,
-    detectedRiskTypes,
+    candleOpenTime: previewFinishedAt,
+    groupCode: groupCodeByResultGroup[group],
+    actionCode:
+      actionCodeByBias[
+        getPreviewAction(group) as keyof typeof actionCodeByBias
+      ] ?? "AC_201",
+    riskCode: riskCodes[0] ?? null,
+    riskCodes,
+    setupCode,
+    phaseCode: setupCode,
+    reasonCodes: riskCodes,
+    signalCodes: [
+      signalCodeByLabel[signalLabel as keyof typeof signalCodeByLabel] ?? "NX_801",
+    ],
+    qualityCodes: ["QH_001"],
+    metrics: {
+      score: rankScore,
+      rankScore,
+      finalSignalScore: rankScore,
+      opportunityScore: null,
+      confirmationScore: null,
+      riskScore: null,
+      qualityScore: null,
+      trendScore: null,
+      momentumScore: null,
+      volumeScore: null,
+      structureScore: null,
+      volumeRank: null,
+      historyBars: null,
+      price: null,
+      rsi14: null,
+      bbPercent: null,
+      bbWidthPercentile: null,
+      volumeRatio: null,
+    },
+    scannerVersion: scannerCodeVersions.scannerVersion,
+    codeSchemaVersion: scannerCodeVersions.codeSchemaVersion,
+    dictionaryVersion: scannerCodeVersions.dictionaryVersion,
   };
 }
 
@@ -366,6 +410,21 @@ function getPreviewAction(group: PreviewGroup) {
       return "avoid";
     case "neutral":
       return "ignore";
+  }
+}
+
+function getPreviewSetup(group: PreviewGroup) {
+  switch (group) {
+    case "eligible":
+      return "strong_trend";
+    case "watch":
+      return "breakout_attempt";
+    case "overheated":
+      return "overextended";
+    case "risk":
+      return "distribution_risk";
+    case "neutral":
+      return "neutral";
   }
 }
 

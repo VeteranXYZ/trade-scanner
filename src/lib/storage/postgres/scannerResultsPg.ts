@@ -6,9 +6,18 @@ import {
 } from "@/lib/market-data/symbolClassification";
 import type { ScanResult } from "@/lib/scanner/types";
 import { SCORING_VERSION } from "@/lib/scanner/scoring";
+import {
+  explanationCodeByKey,
+  isScannerCode,
+  observationCodeByKey,
+  scannerCodeVersions,
+  type ActiveScannerCode,
+} from "@/lib/scanner-codebook/codeRegistry";
+import { serializeScanResultToCodeContract } from "@/lib/scanner-codebook/serializeScanResult";
+import { getStoredSignalCodeFields } from "@/lib/scanner-codebook/serializeStoredSignal";
 import { createPostgresPool } from "./pool";
 
-export const PG_SCANNER_VERSION = "pg-scanner-v1";
+export const PG_SCANNER_VERSION = scannerCodeVersions.scannerVersion;
 export const LATEST_SCAN_FULL_UNIVERSE_MIN_SYMBOLS = 300;
 export const HISTORICAL_SNAPSHOT_OBSERVATION_WINDOWS = [1, 3, 5, 10] as const;
 
@@ -70,6 +79,17 @@ export type ScanSignalRecord = {
   signalLabel: string | null;
   actionBias: string | null;
   primaryStructure: string | null;
+  groupCode: string | null;
+  actionCode: string | null;
+  riskCode: string | null;
+  riskCodes: string[];
+  setupCode: string | null;
+  phaseCode: string | null;
+  reasonCodes: string[];
+  signalCodes: string[];
+  qualityCodes: string[];
+  codeSchemaVersion: string | null;
+  dictionaryVersion: string | null;
   secondaryStructures: unknown[];
   detectedRiskTypes: unknown[];
   factors: Record<string, unknown>;
@@ -347,6 +367,23 @@ export class PgScannerResultsStore {
   async insertScanSignals(signals: InsertScanSignalInput[]) {
     for (const signal of signals) {
       const result = signal.result;
+      const codeContract = serializeScanResultToCodeContract(result);
+      const nextConfirmationCodes = scannerReferenceCodes(
+        result.nextConfirmationObservations,
+        result.nextConfirmation,
+      );
+      const invalidationCodes = scannerReferenceCodes(
+        result.invalidationObservations,
+        result.invalidation,
+      );
+      const rawMetrics = {
+        ...result.rawMetrics,
+        codeContract,
+      };
+
+      // Short-term physical schema strategy: keep existing column names, but write
+      // semi-anonymous scanner codes. Old readable enum rows are intentionally not
+      // migrated or converted here; reset old scan rows before relying on this shape.
       await this.pool.query(
         `
           INSERT INTO scan_signals (
@@ -383,22 +420,28 @@ export class PgScannerResultsStore {
           result.momentumScore,
           result.volumeScore,
           result.structureScore,
-          result.signalLabel,
-          result.actionBias,
-          result.primaryStructure,
-          JSON.stringify(result.secondaryStructures),
-          JSON.stringify(result.detectedRiskTypes),
+          codeContract.signalCodes[0] ?? "NX_801",
+          codeContract.actionCode,
+          codeContract.setupCode,
+          JSON.stringify(result.secondaryStructures.map(() => "NX_801")),
+          JSON.stringify(codeContract.riskCodes),
           JSON.stringify({
-            bullish: result.bullishObservations,
-            bearish: result.bearishObservations,
-            risk: result.riskObservations,
-            neutral: result.neutralObservations,
-            phase: result.phase,
-            signal: result.signal,
+            groupCode: codeContract.groupCode,
+            actionCode: codeContract.actionCode,
+            riskCode: codeContract.riskCode,
+            riskCodes: codeContract.riskCodes,
+            setupCode: codeContract.setupCode,
+            phaseCode: codeContract.phaseCode,
+            reasonCodes: codeContract.reasonCodes,
+            signalCodes: codeContract.signalCodes,
+            qualityCodes: codeContract.qualityCodes,
+            scannerVersion: codeContract.scannerVersion,
+            codeSchemaVersion: codeContract.codeSchemaVersion,
+            dictionaryVersion: codeContract.dictionaryVersion,
           }),
-          JSON.stringify(result.nextConfirmationObservations),
-          JSON.stringify(result.invalidationObservations),
-          JSON.stringify(result.rawMetrics),
+          JSON.stringify(nextConfirmationCodes),
+          JSON.stringify(invalidationCodes),
+          JSON.stringify(rawMetrics),
           SCORING_VERSION,
           PG_SCANNER_VERSION,
         ],
@@ -951,7 +994,38 @@ function toScanRunRecord(row: ScanRunRow): ScanRunRecord {
   };
 }
 
+function scannerReferenceCodes(
+  ...lists: Array<Array<{ key?: string | null }> | null | undefined>
+) {
+  const codes: ActiveScannerCode[] = [];
+
+  for (const item of lists.flatMap((list) => list ?? [])) {
+    const key = item.key ?? "";
+    const code =
+      observationCodeByKey[key as keyof typeof observationCodeByKey] ??
+      explanationCodeByKey[key as keyof typeof explanationCodeByKey];
+
+    if (isScannerCode(code)) {
+      codes.push(code);
+    }
+  }
+
+  return [...new Set(codes)];
+}
+
 function toScanSignalRecord(row: ScanSignalRow): ScanSignalRecord {
+  // The physical column names below are legacy, but their semantic values are
+  // scanner codes only for rows written by the current scanner pipeline.
+  const codeFields = getStoredSignalCodeFields({
+    signalLabel: row.signal_label,
+    actionBias: row.action_bias,
+    primaryStructure: row.primary_structure,
+    detectedRiskTypes: row.detected_risk_types,
+    factors: row.factors,
+    rawMetrics: row.raw_metrics,
+    scannerVersion: row.scanner_version,
+  });
+
   return {
     id: row.id,
     scanRunId: row.scan_run_id,
@@ -977,6 +1051,17 @@ function toScanSignalRecord(row: ScanSignalRow): ScanSignalRecord {
     signalLabel: row.signal_label,
     actionBias: row.action_bias,
     primaryStructure: row.primary_structure,
+    groupCode: codeFields.groupCode,
+    actionCode: codeFields.actionCode,
+    riskCode: codeFields.riskCode,
+    riskCodes: codeFields.riskCodes,
+    setupCode: codeFields.setupCode,
+    phaseCode: codeFields.phaseCode,
+    reasonCodes: codeFields.reasonCodes,
+    signalCodes: codeFields.signalCodes,
+    qualityCodes: codeFields.qualityCodes,
+    codeSchemaVersion: codeFields.codeSchemaVersion,
+    dictionaryVersion: codeFields.dictionaryVersion,
     secondaryStructures: row.secondary_structures ?? [],
     detectedRiskTypes: row.detected_risk_types ?? [],
     factors: row.factors ?? {},
@@ -984,7 +1069,7 @@ function toScanSignalRecord(row: ScanSignalRow): ScanSignalRecord {
     invalidation: row.invalidation,
     rawMetrics: row.raw_metrics ?? {},
     scoringVersion: row.scoring_version,
-    scannerVersion: row.scanner_version,
+    scannerVersion: codeFields.scannerVersion,
     createdAt: new Date(row.created_at).toISOString(),
   };
 }

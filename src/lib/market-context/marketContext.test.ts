@@ -1,6 +1,14 @@
 import { describe, expect, it } from "vitest";
 import type { ScanResultGroup } from "@/lib/scanner/scanResultGroups";
 import {
+  actionCodeByBias,
+  groupCodeByResultGroup,
+  riskCodeByType,
+  scannerCodeVersions,
+  signalCodeByLabel,
+  setupCodeByPrimaryStructure,
+} from "@/lib/scanner-codebook/codeRegistry";
+import {
   buildMarketContextResponse,
   createUnavailableMarketContextProxy,
   type AvailableMarketContextProxy,
@@ -366,17 +374,37 @@ function signal({
   primaryStructure?: string | null;
   detectedRiskTypes?: string[];
 }): AvailableMarketContextProxy {
+  const riskCodes = detectedRiskTypes.map(
+    (riskType) => riskCodeByType[riskType as keyof typeof riskCodeByType] ?? "RK_201",
+  );
+
   return {
     available: true,
     timeframe,
-    group,
-    signalLabel,
-    rankScore,
-    actionBias,
-    primaryStructure,
-    detectedRiskTypes,
-    statusNote: "Manual review",
-    cautionLevel: "none",
+    groupCode: groupCodeByResultGroup[group],
+    actionCode:
+      actionCodeByBias[actionBias as keyof typeof actionCodeByBias] ?? "NX_801",
+    riskCode: riskCodes[0] ?? null,
+    riskCodes,
+    setupCode:
+      setupCodeByPrimaryStructure[
+        primaryStructure as keyof typeof setupCodeByPrimaryStructure
+      ] ?? "NX_801",
+    phaseCode:
+      setupCodeByPrimaryStructure[
+        primaryStructure as keyof typeof setupCodeByPrimaryStructure
+      ] ?? "NX_801",
+    reasonCodes: riskCodes,
+    signalCodes: [
+      signalCodeByLabel[signalLabel as keyof typeof signalCodeByLabel] ?? "NX_801",
+    ],
+    qualityCodes: ["QH_001"],
+    metrics: {
+      rankScore,
+    },
+    scannerVersion: scannerCodeVersions.scannerVersion,
+    codeSchemaVersion: scannerCodeVersions.codeSchemaVersion,
+    dictionaryVersion: scannerCodeVersions.dictionaryVersion,
     scanTime: "2026-05-31T00:00:01.000Z",
     candleOpenTime: "2026-05-30T20:00:00.000Z",
     runContext: "selected_full_universe",

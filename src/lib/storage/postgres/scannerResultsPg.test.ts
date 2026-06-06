@@ -641,7 +641,7 @@ describe("PgScannerResultsStore latest scan queries", () => {
     expect(normalizeHistoricalSnapshotObservationWindow(2)).toBeNull();
   });
 
-  it("stores scanner observations instead of display strings on insert", async () => {
+  it("stores scanner codes instead of display strings on insert", async () => {
     const paramsList: unknown[][] = [];
     const store = new PgScannerResultsStore(
       makePool((_sql, params) => {
@@ -663,26 +663,41 @@ describe("PgScannerResultsStore latest scan queries", () => {
     ]);
 
     const params = paramsList[0];
+    const signalLabel = params[16];
+    const actionBias = params[17];
+    const primaryStructure = params[18];
+    const detectedRiskTypes = JSON.parse(params[20] as string);
     const factors = JSON.parse(params[21] as string);
     const nextConfirmation = JSON.parse(params[22] as string);
     const invalidation = JSON.parse(params[23] as string);
+    const rawMetrics = JSON.parse(params[24] as string);
 
-    expect(factors.bullish).toEqual([
-      { key: "factor.priceAboveMa20", severity: "positive", scope: "trend" },
-    ]);
-    expect(factors.risk).toEqual([
-      { key: "risk.overheat", severity: "risk", scope: "risk" },
-    ]);
-    expect(nextConfirmation).toEqual([
-      { key: "confirmation.reclaimMa50", severity: "neutral", scope: "confirmation" },
-    ]);
-    expect(invalidation).toEqual([
-      {
-        key: "invalidation.loseMa20Repair",
-        severity: "warning",
-        scope: "invalidation",
-      },
-    ]);
+    expect(signalLabel).toBe("PX_501");
+    expect(actionBias).toBe("AC_501");
+    expect(primaryStructure).toBe("TR_601");
+    expect(detectedRiskTypes).toEqual(["RK_301"]);
+    expect(factors).toMatchObject({
+      groupCode: "GR_101",
+      actionCode: "AC_501",
+      riskCode: "RK_301",
+      riskCodes: ["RK_301"],
+      setupCode: "TR_601",
+      signalCodes: ["PX_501", "TR_501"],
+      reasonCodes: ["RK_301", "TR_603", "TR_304"],
+    });
+    expect(nextConfirmation).toEqual(["TR_603"]);
+    expect(invalidation).toEqual(["TR_304"]);
+    expect(rawMetrics.codeContract).toMatchObject(factors);
+    expect([
+      signalLabel,
+      actionBias,
+      primaryStructure,
+      ...detectedRiskTypes,
+      ...nextConfirmation,
+      ...invalidation,
+      ...factors.signalCodes,
+      ...factors.reasonCodes,
+    ]).toEqual(expect.not.arrayContaining([undefined]));
   });
 });
 

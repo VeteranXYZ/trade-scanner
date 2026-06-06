@@ -1,41 +1,11 @@
 import { formatDisplayDateTime } from "@/lib/utils/format";
-import { dictionaries } from "@/lib/i18n/dictionaries";
-import { formatScannerReviewValue } from "@/lib/i18n/formatScannerObservation";
-import {
-  formatActionBias,
-  formatGroupLabel,
-  formatPrimaryStructure,
-  formatUnknownScannerResultValue,
-  getDetectedRiskTypeLabels,
-  normalizeGroupKey,
-} from "@/components/scanner/latestScanUi";
-import type { ScannerReviewText } from "@/lib/shared/scannerTypes";
+import type { Language } from "@/lib/i18n/dictionaries";
+import { resultGroupByGroupCode } from "@/lib/scanner-codebook/codeRegistry";
+import { explainCode, explainCodes } from "@/lib/scanner-codebook/explainCode";
+import type { PublicStoredScannerSignal } from "@/lib/scanner-codebook/serializeStoredSignal";
 import { formatSymbolResearchRunContext } from "./symbolResearchUi";
 
-export type TimelineDisplayDictionary = (typeof dictionaries)[keyof typeof dictionaries];
-
-export type RawSymbolTimelineSignal = {
-  id?: string | null;
-  scanRunId?: string | null;
-  symbol?: string | null;
-  timeframe?: string | null;
-  scanTime?: string | null;
-  candleOpenTime?: string | null;
-  resultGroup?: string | null;
-  signalLabel?: string | null;
-  actionBias?: string | null;
-  statusNoteKey?: string | null;
-  statusNote?: string | null;
-  reviewTier?: string | null;
-  cautionLevel?: string | null;
-  statusReasonKeys?: ScannerReviewText[] | null;
-  statusReasons?: string[] | null;
-  primaryStructure?: string | null;
-  rankScore?: number | null;
-  opportunityScore?: number | null;
-  confirmationScore?: number | null;
-  riskScore?: number | null;
-  detectedRiskTypes?: unknown;
+export type RawSymbolTimelineSignal = Partial<PublicStoredScannerSignal> & {
   sourceRunIsLikelyFullUniverse?: boolean | null;
   isSelectedCurrentRun?: boolean | null;
   isNewerThanSelectedCurrentRun?: boolean | null;
@@ -83,7 +53,7 @@ const groupDescriptions: Record<string, string> = {
 
 export function normalizeSignalHistory(
   history: RawSymbolTimelineSignal[] | null | undefined,
-  dictionary: TimelineDisplayDictionary = dictionaries.en,
+  language: Language = "en",
 ): NormalizedSymbolTimelineSignal[] {
   if (!Array.isArray(history) || history.length === 0) {
     return [];
@@ -91,7 +61,7 @@ export function normalizeSignalHistory(
 
   return dedupeSignalHistory(history)
     .map((item, index) => {
-      const group = normalizeGroup(item.resultGroup);
+      const group = normalizeGroup(item.groupCode);
       const scanTimeMs = parseDateMs(item.scanTime);
       const candleOpenTimeMs = parseDateMs(item.candleOpenTime);
 
@@ -102,17 +72,17 @@ export function normalizeSignalHistory(
         scanTimeMs,
         candleOpenTimeMs,
         group,
-        groupLabel: getTimelineGroupLabel(group, dictionary),
-        groupDescription: getTimelineGroupDescription(group, dictionary),
-        signalLabel: getTimelineSignalLabel(item.signalLabel, dictionary),
-        actionText: getTimelineActionText(item, dictionary),
-        setupText: getTimelineSetupText(item.primaryStructure, dictionary),
-        rankScore: formatTimelineScore(item.rankScore),
-        opportunityScore: formatTimelineScore(item.opportunityScore),
-        confirmationScore: formatTimelineScore(item.confirmationScore),
-        riskScore: formatTimelineScore(item.riskScore),
-        riskText: getTimelineRiskText(item.detectedRiskTypes, dictionary),
-        statusText: getTimelineStatusText(item, dictionary),
+        groupLabel: getTimelineGroupLabel(item.groupCode, language),
+        groupDescription: getTimelineGroupDescription(item.groupCode, language),
+        signalLabel: getTimelineSignalLabel(item, language),
+        actionText: getTimelineActionText(item, language),
+        setupText: getTimelineSetupText(item.setupCode, language),
+        rankScore: formatTimelineScore(item.metrics?.rankScore),
+        opportunityScore: formatTimelineScore(item.metrics?.opportunityScore),
+        confirmationScore: formatTimelineScore(item.metrics?.confirmationScore),
+        riskScore: formatTimelineScore(item.metrics?.riskScore),
+        riskText: getTimelineRiskText(item.riskCodes, language),
+        statusText: getTimelineStatusText(item, language),
         runContextText: formatSymbolResearchRunContext(item),
         isSelectedCurrentRun: item.isSelectedCurrentRun === true,
         isNewerThanSelectedCurrentRun: item.isNewerThanSelectedCurrentRun === true,
@@ -194,99 +164,73 @@ export function formatTimelineScore(value: number | null | undefined) {
 
 export function getTimelineGroupLabel(
   value: string | null | undefined,
-  dictionary: TimelineDisplayDictionary = dictionaries.en,
+  language: Language = "en",
 ) {
-  return formatGroupLabel(normalizeGroup(value), dictionary);
+  return explainCode(normalizeGroupCode(value), language).label;
 }
 
 export function getTimelineGroupDescription(
   value: string | null | undefined,
-  dictionary: TimelineDisplayDictionary = dictionaries.en,
+  language: Language = "en",
 ) {
-  const group = normalizeGroup(value);
+  const groupCode = normalizeGroupCode(value);
 
-  return dictionary === dictionaries.en
-    ? groupDescriptions[group]
-    : formatGroupLabel(group, dictionary);
+  if (language !== "en") {
+    return explainCode(groupCode, language).short;
+  }
+
+  return groupDescriptions[normalizeGroup(groupCode)];
 }
 
 export function getTimelineStatusText(
   item: RawSymbolTimelineSignal,
-  dictionary: TimelineDisplayDictionary = dictionaries.en,
+  language: Language = "en",
 ) {
-  if (item.statusNoteKey) {
-    return formatScannerReviewValue(item.statusNoteKey, dictionary);
-  }
+  const statusCode =
+    item.reasonCodes?.[0] ??
+    item.qualityCodes?.[0] ??
+    item.actionCode ??
+    "NX_801";
 
-  if (item.statusNote) {
-    return formatScannerReviewValue(item.statusNote, dictionary);
-  }
-
-  if (item.reviewTier) {
-    return formatScannerReviewValue(item.reviewTier, dictionary);
-  }
-
-  if (item.cautionLevel) {
-    return formatScannerReviewValue(item.cautionLevel, dictionary);
-  }
-
-  const firstReason =
-    item.statusReasonKeys?.find((reason) => reason.key.length > 0) ??
-    item.statusReasons?.find((reason) => reason.trim().length > 0);
-
-  if (firstReason) {
-    return formatScannerReviewValue(firstReason, dictionary);
-  }
-
-  return dictionary.scannerResultFallback.noStatusNote;
+  return explainCode(statusCode, language).short;
 }
 
 export function getTimelineRiskText(
   value: unknown,
-  dictionary: TimelineDisplayDictionary = dictionaries.en,
+  language: Language = "en",
 ) {
   if (!Array.isArray(value) || value.length === 0) {
-    return dictionary.scannerResultFallback.noSpecificRiskTypes;
+    return getNoSpecificRiskText(language);
   }
 
-  const risks = getDetectedRiskTypeLabels(value, dictionary);
+  const risks = explainCodes(value as Array<string | null | undefined>, language).map(
+    (entry) => entry.label,
+  );
 
-  return risks.length > 0
-    ? risks.join(", ")
-    : dictionary.scannerResultFallback.noSpecificRiskTypes;
+  return risks.length > 0 ? risks.join(", ") : getNoSpecificRiskText(language);
 }
 
 function getTimelineActionText(
   item: RawSymbolTimelineSignal,
-  dictionary: TimelineDisplayDictionary,
+  language: Language,
 ) {
-  if (item.actionBias) {
-    return formatActionBias(item.actionBias, dictionary);
-  }
-
-  if (item.statusNote) {
-    return formatScannerReviewValue(item.statusNote, dictionary);
-  }
-
-  return dictionary.scannerReview["review.status.needsConfirmation"];
+  return explainCode(item.actionCode, language).label;
 }
 
 function getTimelineSignalLabel(
-  value: string | null | undefined,
-  dictionary: TimelineDisplayDictionary,
+  item: RawSymbolTimelineSignal,
+  language: Language,
 ) {
-  return value && value in dictionary.signalLabel
-    ? dictionary.signalLabel[value as keyof typeof dictionary.signalLabel]
-    : value
-      ? formatUnknownScannerResultValue(value, dictionary)
-      : dictionary.scannerResultFallback.unknown;
+  const signalCode = item.signalCodes?.[0] ?? item.phaseCode ?? item.setupCode ?? "NX_801";
+
+  return explainCode(signalCode, language).label;
 }
 
 function getTimelineSetupText(
   value: string | null | undefined,
-  dictionary: TimelineDisplayDictionary,
+  language: Language,
 ) {
-  return formatPrimaryStructure(value, dictionary);
+  return explainCode(value, language).label;
 }
 
 function dedupeSignalHistory(history: RawSymbolTimelineSignal[]) {
@@ -311,8 +255,8 @@ function getSignalHistoryDedupeKey(item: RawSymbolTimelineSignal) {
     item.symbol ?? "",
     item.timeframe ?? "",
     item.scanTime ?? "",
-    item.signalLabel ?? "",
-    item.rankScore ?? "",
+    item.signalCodes?.join(",") ?? "",
+    item.metrics?.rankScore ?? "",
   ].join("|");
 }
 
@@ -338,7 +282,21 @@ function getTimelineTone(
 }
 
 function normalizeGroup(value: string | null | undefined) {
-  return normalizeGroupKey(value);
+  const code = normalizeGroupCode(value);
+
+  return Object.prototype.hasOwnProperty.call(resultGroupByGroupCode, code)
+    ? resultGroupByGroupCode[code as keyof typeof resultGroupByGroupCode]
+    : "neutral";
+}
+
+function normalizeGroupCode(value: string | null | undefined) {
+  return value && Object.prototype.hasOwnProperty.call(resultGroupByGroupCode, value)
+    ? value
+    : "GR_001";
+}
+
+function getNoSpecificRiskText(language: Language) {
+  return language === "zh" ? "未记录具体风险代码。" : "No specific risk codes noted.";
 }
 
 function parseDateMs(value: string | null | undefined) {

@@ -36,6 +36,14 @@ import {
 } from "./symbolResearchLinks";
 import type { MarketContextResponse } from "@/components/market-context/marketContextUi";
 import type { WatchlistStorage } from "@/components/watchlist/watchlistUi";
+import {
+  actionCodeByBias,
+  groupCodeByResultGroup,
+  riskCodeByType,
+  scannerCodeVersions,
+  setupCodeByAliasOrStructure,
+  signalCodeByLabel,
+} from "@/lib/scanner-codebook/codeRegistry";
 import { buildSymbolResearchVisualCheckData } from "./symbolResearchPreviewData";
 
 const ORIGINAL_ENV = { ...process.env };
@@ -298,7 +306,7 @@ describe("symbol market context implication copy", () => {
         data: makeMarketContextResponse(),
         selectedGroup: "eligible",
         selectedTimeframe: "4h",
-        timeframeSnapshots: [{ timeframe: "1d", resultGroup: "risk" }],
+        timeframeSnapshots: [{ timeframe: "1d", groupCode: "GR_302" }],
       }),
     ).toContain("Higher-timeframe risk in the symbol snapshot");
 
@@ -744,8 +752,8 @@ describe("SymbolResearchPageClient success state", () => {
     expect(signalEvaluationCall?.[0].queryKey[1]).toMatchObject({
       timeframe: "4h",
       assetClass: "crypto",
-      group: "risk",
-      signalLabel: "breakdown_risk",
+      group: null,
+      signalLabel: null,
     });
     expect(signalEvaluationCall?.[0].queryKey[1]).not.toHaveProperty("symbol");
   });
@@ -884,14 +892,12 @@ function makeSuccessResponse({
       structureScore: 80,
     },
     interpretation: {
-      group: "eligible",
-      label: "Confirmed",
-      action: "Manual review",
-      setupType: "Strong Trend",
-      statusNote: "Manual review",
-      reasons: ["Clean candidate."],
-      nextConfirmation: ["Hold above range."],
-      invalidation: ["Loses recent support."],
+      groupCode: "GR_201",
+      actionCode: "AC_501",
+      setupCode: "TR_601",
+      phaseCode: "TR_601",
+      reasonCodes: [],
+      signalCodes: ["PX_501"],
     },
     history: [makeSymbolResearchSignal()],
     timeframes: [makeSymbolResearchSignal()],
@@ -962,50 +968,137 @@ function makeSuccessResponse({
 function makeSymbolResearchSignal(
   overrides: Partial<Record<string, unknown>> = {},
 ) {
+  const readableSignalLabel = stringOverride(overrides.signalLabel) ?? "confirmed";
+  const readableActionBias = stringOverride(overrides.actionBias) ?? "eligible";
+  const readablePrimaryStructure =
+    stringOverride(overrides.primaryStructure) ?? "strong_trend";
+  const readableGroup = stringOverride(overrides.resultGroup) ?? "eligible";
+  const riskCodes =
+    arrayOverride(overrides.riskCodes) ??
+    arrayOverride(overrides.detectedRiskTypes)?.map((risk) =>
+      typeof risk === "string"
+        ? riskCodeByType[risk as keyof typeof riskCodeByType] ?? risk
+        : "RK_201",
+    ) ??
+    [];
+  const signalCode =
+    stringOverride(overrides.signalCodes)
+      ? stringOverride(overrides.signalCodes)
+      : signalCodeByLabel[readableSignalLabel as keyof typeof signalCodeByLabel] ??
+        "PX_501";
+  const actionCode =
+    stringOverride(overrides.actionCode) ??
+    actionCodeByBias[readableActionBias as keyof typeof actionCodeByBias] ??
+    "AC_501";
+  const setupCode =
+    stringOverride(overrides.setupCode) ??
+    setupCodeByAliasOrStructure[
+      readablePrimaryStructure as keyof typeof setupCodeByAliasOrStructure
+    ] ??
+    "TR_601";
+  const groupCode =
+    stringOverride(overrides.groupCode) ??
+    groupCodeByResultGroup[readableGroup as keyof typeof groupCodeByResultGroup] ??
+    "GR_201";
+  const rankScore = numberOverride(overrides.rankScore) ?? 82;
+
   return {
     id: "signal-latest",
     scanRunId: "full-run",
-    symbolId: 1,
     exchange: "binance",
     market: "spot",
     symbol: "SEIUSDT",
+    assetClass: "crypto",
     timeframe: "4h",
     scanTime: "2026-06-01T00:00:30.000Z",
     candleOpenTime: "2026-05-31T20:00:00.000Z",
-    priceAtSignal: 1.23,
-    rankScore: 82,
-    finalSignalScore: 76,
-    opportunityScore: 74,
-    confirmationScore: 68,
-    riskScore: 14,
-    trendScore: 72,
-    momentumScore: 64,
-    volumeScore: 54,
-    structureScore: 80,
-    signalLabel: "confirmed",
-    actionBias: "eligible",
-    resultGroup: "eligible",
-    reviewTier: "eligible",
-    statusNote: "Manual review",
-    cautionLevel: "none",
-    statusReasons: ["Clean candidate."],
-    primaryStructure: "strong_trend",
-    secondaryStructures: [],
-    detectedRiskTypes: [],
-    nextConfirmation: ["Hold above range."],
-    invalidation: ["Loses recent support."],
-    factors: {},
-    rawMetrics: {},
-    scoringVersion: "test",
-    scannerVersion: "test",
-    createdAt: "2026-06-01T00:00:31.000Z",
+    groupCode,
+    actionCode,
+    riskCode: riskCodes[0] ?? null,
+    riskCodes,
+    setupCode,
+    phaseCode: setupCode,
+    reasonCodes: riskCodes,
+    signalCodes: [signalCode],
+    qualityCodes: ["QH_601"],
+    metrics: {
+      score: rankScore,
+      rankScore,
+      finalSignalScore: numberOverride(overrides.finalSignalScore) ?? 76,
+      opportunityScore: numberOverride(overrides.opportunityScore) ?? 74,
+      confirmationScore: numberOverride(overrides.confirmationScore) ?? 68,
+      riskScore: numberOverride(overrides.riskScore) ?? 14,
+      qualityScore: null,
+      trendScore: numberOverride(overrides.trendScore) ?? 72,
+      momentumScore: numberOverride(overrides.momentumScore) ?? 64,
+      volumeScore: numberOverride(overrides.volumeScore) ?? 54,
+      structureScore: numberOverride(overrides.structureScore) ?? 80,
+      volumeRank: null,
+      historyBars: null,
+      price: 1.23,
+      rsi14: null,
+      bbPercent: null,
+      bbWidthPercentile: null,
+      volumeRatio: null,
+    },
+    ...scannerCodeVersions,
     scanRunStartedAt: "2026-06-01T00:00:00.000Z",
     scanRunFinishedAt: "2026-06-01T00:01:00.000Z",
     sourceRunIsLikelyFullUniverse: true,
     isSelectedCurrentRun: true,
     isNewerThanSelectedCurrentRun: false,
-    ...overrides,
+    ...pickPublicSignalOverrides(overrides),
   };
+}
+
+function pickPublicSignalOverrides(overrides: Partial<Record<string, unknown>>) {
+  const allowedKeys = [
+    "id",
+    "scanRunId",
+    "exchange",
+    "market",
+    "symbol",
+    "assetClass",
+    "timeframe",
+    "scanTime",
+    "candleOpenTime",
+    "groupCode",
+    "actionCode",
+    "riskCode",
+    "riskCodes",
+    "setupCode",
+    "phaseCode",
+    "reasonCodes",
+    "signalCodes",
+    "qualityCodes",
+    "metrics",
+    "scannerVersion",
+    "codeSchemaVersion",
+    "dictionaryVersion",
+    "scanRunStartedAt",
+    "scanRunFinishedAt",
+    "sourceRunIsLikelyFullUniverse",
+    "isSelectedCurrentRun",
+    "isNewerThanSelectedCurrentRun",
+  ] as const;
+
+  return Object.fromEntries(
+    allowedKeys
+      .filter((key) => Object.prototype.hasOwnProperty.call(overrides, key))
+      .map((key) => [key, overrides[key]]),
+  );
+}
+
+function stringOverride(value: unknown) {
+  return typeof value === "string" ? value : null;
+}
+
+function numberOverride(value: unknown) {
+  return typeof value === "number" && Number.isFinite(value) ? value : null;
+}
+
+function arrayOverride(value: unknown) {
+  return Array.isArray(value) ? value : null;
 }
 
 function makeSignalEvaluationResponse() {

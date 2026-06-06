@@ -1,16 +1,14 @@
 import {
-  formatGroupLabel,
   formatScore,
-  formatSignalLabel,
-  getDetectedRiskTypeLabels,
-  normalizeGroupKey,
   type LatestScanGroupKey,
-  type ScannerDisplayDictionary,
+  normalizeGroupKey,
 } from "@/components/scanner/latestScanUi";
 import { shortResearchDisclaimer } from "@/components/researchCopy";
 import { buildSymbolResearchHref } from "@/components/symbol/symbolResearchLinks";
-import { dictionaries } from "@/lib/i18n/dictionaries";
-import type { ScannerReviewText } from "@/lib/shared/scannerTypes";
+import type { Language } from "@/lib/i18n/dictionaries";
+import { explainCode, explainCodes } from "@/lib/scanner-codebook/explainCode";
+import { resultGroupByGroupCode } from "@/lib/scanner-codebook/codeRegistry";
+import type { PublicStoredScannerSignal } from "@/lib/scanner-codebook/serializeStoredSignal";
 
 export const MTF_SCREENER_TIMEFRAMES = ["1h", "4h", "1d", "1w"] as const;
 export type MtfScreenerTimeframe = (typeof MTF_SCREENER_TIMEFRAMES)[number];
@@ -81,30 +79,7 @@ export type MtfLatestScanSummary = {
   lowQualityExcluded?: number | null;
 };
 
-export type MtfLatestScanItem = {
-  id: string;
-  scanRunId?: string;
-  exchange?: string | null;
-  market?: string | null;
-  assetClass?: string | null;
-  symbol: string;
-  timeframe: string;
-  group?: string | null;
-  resultGroup?: string | null;
-  rankScore: number | null;
-  signalLabel?: string | null;
-  action?: string | null;
-  actionBias?: string | null;
-  reviewTier?: string | null;
-  statusNoteKey?: string | null;
-  statusNote?: string | null;
-  statusReasonKeys?: ScannerReviewText[];
-  statusReasons?: string[];
-  setupType?: string | null;
-  primaryStructure?: string | null;
-  scanTime?: string | null;
-  detectedRiskTypes?: unknown;
-};
+export type MtfLatestScanItem = PublicStoredScannerSignal;
 
 export type MtfLatestScanResponse = {
   ok: boolean;
@@ -278,7 +253,7 @@ export function buildMtfScreenerRows(
         ...item,
         symbol,
         timeframe,
-        resultGroup: normalizeGroupKey(item.resultGroup),
+        resultGroup: getMtfGroupFromCode(item.groupCode),
       };
       rowsBySymbol.set(symbol, existing);
     }
@@ -319,7 +294,7 @@ export function buildMtfScreenerRowsFromResponse(
         exchange: snapshot.exchange ?? apiRow.exchange ?? "binance",
         market: snapshot.market ?? apiRow.market ?? "spot",
         timeframe,
-        resultGroup: normalizeGroupKey(snapshot.resultGroup ?? snapshot.group),
+        resultGroup: getMtfGroupFromCode(snapshot.groupCode),
       };
     }
 
@@ -392,8 +367,8 @@ export function doesMtfRowMatchFilters(
       Number.isFinite(minRank) &&
       minRank > 0 &&
       (!snapshot ||
-        typeof snapshot.rankScore !== "number" ||
-        snapshot.rankScore < minRank)
+        typeof snapshot.metrics.rankScore !== "number" ||
+        snapshot.metrics.rankScore < minRank)
     ) {
       return false;
     }
@@ -485,15 +460,15 @@ export function buildMtfSymbolResearchHref({
 
 export function formatMtfGroup(
   snapshot: MtfScreenerSnapshot | undefined,
-  dictionary: ScannerDisplayDictionary = dictionaries.en,
+  language: Language = "en",
 ) {
   return snapshot
-    ? formatGroupLabel(normalizeGroupKey(snapshot.resultGroup), dictionary)
-    : dictionary.scannerResultFallback.notReturned;
+    ? explainCode(snapshot.groupCode, language).label
+    : "Not returned";
 }
 
 export function formatMtfRank(snapshot: MtfScreenerSnapshot | undefined) {
-  return snapshot ? formatScore(snapshot.rankScore) : "-";
+  return snapshot ? formatScore(snapshot.metrics.rankScore) : "-";
 }
 
 export function getMtfCombinedRank(row: MtfScreenerRow) {
@@ -501,7 +476,7 @@ export function getMtfCombinedRank(row: MtfScreenerRow) {
   let weightTotal = 0;
 
   for (const timeframe of MTF_SCREENER_TIMEFRAMES) {
-    const rankScore = row.snapshots[timeframe]?.rankScore;
+    const rankScore = row.snapshots[timeframe]?.metrics.rankScore;
 
     if (typeof rankScore !== "number" || !Number.isFinite(rankScore)) {
       continue;
@@ -568,7 +543,7 @@ export function getMtfHigherTimeframeHealth(
 
 export function getMtfPrimarySignal(
   row: MtfScreenerRow,
-  dictionary: ScannerDisplayDictionary = dictionaries.en,
+  language: Language = "en",
 ) {
   const preferredTimeframes: MtfScreenerTimeframe[] = ["4h", "1h", "1d", "1w"];
   const snapshot =
@@ -580,18 +555,20 @@ export function getMtfPrimarySignal(
       .find(Boolean);
 
   if (!snapshot) {
-    return dictionary.scannerResultFallback.noLatestSignal;
+    return "No latest signal";
   }
 
-  return `${snapshot.timeframe} ${formatSignalLabel(
-    snapshot.signalLabel,
-    dictionary,
-  )} / ${formatGroupLabel(normalizeGroupKey(snapshot.resultGroup), dictionary)}`;
+  const signalCode = snapshot.signalCodes[0] ?? snapshot.phaseCode;
+
+  return `${snapshot.timeframe} ${explainCode(signalCode, language).label} / ${explainCode(
+    snapshot.groupCode,
+    language,
+  ).label}`;
 }
 
 export function getMtfRiskNoteItems(
   row: MtfScreenerRow,
-  dictionary: ScannerDisplayDictionary = dictionaries.en,
+  language: Language = "en",
 ) {
   const noteItems: Array<{
     note: string;
@@ -607,9 +584,8 @@ export function getMtfRiskNoteItems(
       return;
     }
 
-    const riskLabels = getDetectedRiskTypeLabels(
-      snapshot.detectedRiskTypes,
-      dictionary,
+    const riskLabels = explainCodes(snapshot.riskCodes, language).map(
+      (entry) => entry.label,
     );
     const timeframeRank = getMtfRiskNoteTimeframeRank(timeframe);
 
@@ -625,14 +601,14 @@ export function getMtfRiskNoteItems(
 
     if (snapshot.resultGroup === "risk") {
       noteItems.push({
-        note: `${timeframe}: ${formatGroupLabel("risk", dictionary)}`,
+        note: `${timeframe}: ${explainCode(snapshot.groupCode, language).label}`,
         severityRank: 1,
         timeframeRank,
         order,
       });
     } else if (snapshot.resultGroup === "overheated") {
       noteItems.push({
-        note: `${timeframe}: ${formatGroupLabel("overheated", dictionary)}`,
+        note: `${timeframe}: ${explainCode(snapshot.groupCode, language).label}`,
         severityRank: 2,
         timeframeRank,
         order,
@@ -655,9 +631,9 @@ export function getMtfRiskNoteItems(
 export function getMtfRiskNotesSummary(
   row: MtfScreenerRow,
   visibleCount = 3,
-  dictionary: ScannerDisplayDictionary = dictionaries.en,
+  language: Language = "en",
 ) {
-  const notes = getMtfRiskNoteItems(row, dictionary);
+  const notes = getMtfRiskNoteItems(row, language);
   const safeVisibleCount = Math.max(1, Math.floor(visibleCount));
   const visibleNotes = notes.slice(0, safeVisibleCount);
   const hiddenNotes = notes.slice(safeVisibleCount);
@@ -672,11 +648,39 @@ export function getMtfRiskNotesSummary(
 
 export function getMtfRiskNotes(
   row: MtfScreenerRow,
-  dictionary: ScannerDisplayDictionary = dictionaries.en,
+  language: Language = "en",
 ) {
-  const { notes } = getMtfRiskNotesSummary(row, 4, dictionary);
+  const { notes } = getMtfRiskNotesSummary(row, 4, language);
 
   return notes.length > 0 ? notes.slice(0, 4).join("; ") : "-";
+}
+
+function getMtfPrimarySignalCode(row: MtfScreenerRow) {
+  const snapshot = getMtfPrimarySignalSnapshot(row);
+
+  return snapshot ? (snapshot.signalCodes[0] ?? snapshot.phaseCode) : "";
+}
+
+function getMtfRiskCodes(row: MtfScreenerRow) {
+  return uniqueStrings(
+    MTF_SCREENER_TIMEFRAMES.flatMap(
+      (timeframe) => row.snapshots[timeframe]?.riskCodes ?? [],
+    ),
+  );
+}
+
+function getMtfPrimarySignalSnapshot(row: MtfScreenerRow) {
+  const preferredTimeframes: MtfScreenerTimeframe[] = ["4h", "1h", "1d", "1w"];
+
+  return (
+    preferredTimeframes
+      .map((timeframe) => row.snapshots[timeframe])
+      .find((item) => item && item.resultGroup !== "neutral") ??
+    preferredTimeframes
+      .map((timeframe) => row.snapshots[timeframe])
+      .find(Boolean) ??
+    null
+  );
 }
 
 export function getMtfRunFinishedAt(response: MtfLatestScanResponse | undefined) {
@@ -711,11 +715,17 @@ export function formatMtfScreenerRowsCsv({
     "market",
     "research_timeframe",
     "overall_rank",
-    "primary_signal",
-    "risk_notes",
+    "primary_signal_code",
+    "risk_codes",
     "symbol_research_href",
     ...MTF_SCREENER_TIMEFRAMES.flatMap((timeframe) => [
-      `${timeframe}_group`,
+      `${timeframe}_group_code`,
+      `${timeframe}_action_code`,
+      `${timeframe}_setup_code`,
+      `${timeframe}_signal_codes`,
+      `${timeframe}_risk_codes`,
+      `${timeframe}_reason_codes`,
+      `${timeframe}_quality_codes`,
       `${timeframe}_rank`,
       `${timeframe}_missing`,
       `${timeframe}_run_id`,
@@ -734,15 +744,21 @@ export function formatMtfScreenerRowsCsv({
       row.market,
       getMtfSymbolResearchTimeframe(row),
       formatMtfCombinedRank(row),
-      getMtfPrimarySignal(row),
-      getMtfRiskNotes(row),
+      getMtfPrimarySignalCode(row),
+      getMtfRiskCodes(row).join("|"),
       buildMtfSymbolResearchHref({ row, assetClass }),
       ...MTF_SCREENER_TIMEFRAMES.flatMap((timeframe) => {
         const snapshot = row.snapshots[timeframe];
         const run = runs[timeframe] ?? null;
 
         return [
-          snapshot ? formatMtfGroup(snapshot) : "",
+          snapshot?.groupCode ?? "",
+          snapshot?.actionCode ?? "",
+          snapshot?.setupCode ?? "",
+          snapshot?.signalCodes.join("|") ?? "",
+          snapshot?.riskCodes.join("|") ?? "",
+          snapshot?.reasonCodes.join("|") ?? "",
+          snapshot?.qualityCodes.join("|") ?? "",
           snapshot ? formatMtfRank(snapshot) : "",
           snapshot ? "false" : "true",
           snapshot?.scanRunId ?? run?.id ?? "",
@@ -779,6 +795,14 @@ function hasMtfGroup(
   const group = row.snapshots[timeframe]?.resultGroup;
 
   return group ? groups.includes(group) : false;
+}
+
+function getMtfGroupFromCode(code: MtfLatestScanItem["groupCode"]) {
+  return normalizeGroupKey(
+    Object.prototype.hasOwnProperty.call(resultGroupByGroupCode, code)
+      ? resultGroupByGroupCode[code as keyof typeof resultGroupByGroupCode]
+      : null,
+  );
 }
 
 function isMtfRisk(row: MtfScreenerRow, timeframe: MtfScreenerTimeframe) {
@@ -824,13 +848,13 @@ function getMtfSortValue(
     case "combined_rank":
       return getMtfCombinedRank(row);
     case "1h_rank":
-      return row.snapshots["1h"]?.rankScore ?? null;
+      return row.snapshots["1h"]?.metrics.rankScore ?? null;
     case "4h_rank":
-      return row.snapshots["4h"]?.rankScore ?? null;
+      return row.snapshots["4h"]?.metrics.rankScore ?? null;
     case "1d_rank":
-      return row.snapshots["1d"]?.rankScore ?? null;
+      return row.snapshots["1d"]?.metrics.rankScore ?? null;
     case "1w_rank":
-      return row.snapshots["1w"]?.rankScore ?? null;
+      return row.snapshots["1w"]?.metrics.rankScore ?? null;
     case "higher_timeframe_safety":
       return getMtfHigherTimeframeHealth(row).sortRank;
     case "symbol":

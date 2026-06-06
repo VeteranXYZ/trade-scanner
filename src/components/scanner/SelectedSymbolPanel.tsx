@@ -1,30 +1,19 @@
 import Link from "next/link";
 import { useLanguage } from "@/components/providers/LanguageProvider";
 import { useAppLanguage } from "@/lib/i18n/AppLanguageProvider";
-import { PhaseBadge } from "./PhaseBadge";
-import { ReasonList } from "./ReasonList";
-import { RiskBadge } from "./RiskBadge";
-import { SignalBadge } from "./SignalBadge";
-import { StrategyReadPanel } from "./StrategyReadPanel";
+import { explainCode, explainCodes } from "@/lib/scanner-codebook/explainCode";
+import type { ScannerCodeContractResult } from "@/lib/scanner-codebook/serializeScanResult";
+import type { Timeframe } from "@/lib/shared/timeframes";
 import { HistoricalBehaviorPanel } from "./HistoricalBehaviorPanel";
-import type { ScannerObservation, ScanResult } from "@/lib/shared/scannerTypes";
-import { formatScannerExplanation } from "@/lib/i18n/formatScannerExplanation";
-import { formatScannerObservation } from "@/lib/i18n/formatScannerObservation";
-import {
-  formatActionBias,
-  formatPrimaryStructure,
-  formatSignalLabel,
-  getDetectedRiskTypeLabels,
-} from "@/components/scanner/latestScanUi";
 import type { ReactNode } from "react";
 
 type SelectedSymbolPanelProps = {
-  result: ScanResult | null;
+  result: ScannerCodeContractResult | null;
 };
 
 export function SelectedSymbolPanel({ result }: SelectedSymbolPanelProps) {
   const { dictionary: t } = useLanguage();
-  const { dictionary: scannerDictionary } = useAppLanguage();
+  const { language } = useAppLanguage();
 
   if (!result) {
     return (
@@ -37,6 +26,23 @@ export function SelectedSymbolPanel({ result }: SelectedSymbolPanelProps) {
     );
   }
 
+  const group = explainCode(result.groupCode, language);
+  const action = explainCode(result.actionCode, language);
+  const setup = explainCode(result.setupCode, language);
+  const phase = explainCode(result.phaseCode, language);
+  const signalLabels = explainCodes(result.signalCodes, language).map(
+    (entry) => entry.label,
+  );
+  const riskLabels = explainCodes(result.riskCodes, language).map(
+    (entry) => entry.label,
+  );
+  const reasonLines = explainCodes(result.reasonCodes, language).map(
+    (entry) => `${entry.label}: ${entry.short}`,
+  );
+  const qualityLabels = explainCodes(result.qualityCodes, language).map(
+    (entry) => entry.label,
+  );
+
   return (
     <aside className="xl:h-full xl:overflow-y-auto">
       <section className="border border-[var(--border)] bg-[var(--panel)] p-2.5">
@@ -44,13 +50,9 @@ export function SelectedSymbolPanel({ result }: SelectedSymbolPanelProps) {
           <div>
             <h2 className="text-base font-semibold leading-tight">{result.symbol}</h2>
             <div className="mt-1 flex flex-wrap gap-1">
-              <PhaseBadge phase={result.phase} />
-              <SignalBadge signal={result.signal} />
-              {result.multiTimeframe && (
-                <span className="inline-flex h-5 items-center border border-[var(--border)] bg-[var(--control)] px-1.5 text-[11px] font-semibold text-[var(--foreground)]">
-                  {t.alignment[result.multiTimeframe.alignment]}
-                </span>
-              )}
+              <CodeChip code={result.groupCode} label={group.label} />
+              <CodeChip code={result.actionCode} label={action.label} />
+              <CodeChip code={result.setupCode} label={setup.label} />
             </div>
           </div>
           <Link
@@ -62,239 +64,79 @@ export function SelectedSymbolPanel({ result }: SelectedSymbolPanelProps) {
         </div>
 
         <div className="mb-2 grid grid-cols-4 gap-1">
-          <Metric label="Final" value={formatSigned(result.finalSignalScore, 1)} />
-          <Metric label="O" value={formatSigned(result.opportunityScore, 0)} />
-          <Metric label="C" value={formatSigned(result.confirmationScore, 0)} />
-          <Metric label="R" value={formatSigned(result.riskScore, 0)} />
+          <Metric label="Rank" value={formatSigned(result.metrics.rankScore, 1)} />
+          <Metric label="O" value={formatSigned(result.metrics.opportunityScore, 0)} />
+          <Metric label="C" value={formatSigned(result.metrics.confirmationScore, 0)} />
+          <Metric label="R" value={formatSigned(result.metrics.riskScore, 0)} />
         </div>
 
         <p className="mb-2 border-l-2 border-[var(--border)] bg-[var(--panel-2)] px-2 py-1 text-[11px] leading-5 text-[var(--muted)]">
-          {formatSignalLabel(result.signalLabel, scannerDictionary)} /{" "}
-          {formatActionBias(result.actionBias, scannerDictionary)}
+          {group.short} {action.short}
         </p>
+
+        <InspectorSection title="Code Contract">
+          <div className="space-y-1">
+            <KeyValue label="Group" value={`${result.groupCode} · ${group.label}`} />
+            <KeyValue label="Action" value={`${result.actionCode} · ${action.label}`} />
+            <KeyValue label="Setup" value={`${result.setupCode} · ${setup.label}`} />
+            <KeyValue label="Phase" value={`${result.phaseCode} · ${phase.label}`} />
+            <TagList label="Signals" items={signalLabels} />
+            <TagList label="Risks" items={riskLabels} />
+            <TagList label="Quality" items={qualityLabels} />
+          </div>
+        </InspectorSection>
 
         <InspectorSection title="Score Breakdown">
           <div className="grid grid-cols-2 gap-1">
-            <Metric
-              label="Setup Score"
-              value={formatSigned(result.opportunityScore, 0)}
-            />
-            <Metric
-              label="Confirmation"
-              value={formatSigned(result.confirmationScore, 0)}
-            />
-            <Metric
-              label="Risk"
-              value={formatSigned(result.riskScore, 0)}
-            />
-            <Metric label="Trend" value={formatSigned(result.trendScore, 0)} />
-            <Metric
-              label="Momentum"
-              value={formatSigned(result.momentumScore, 0)}
-            />
-            <Metric label="Volume" value={formatSigned(result.volumeScore, 0)} />
-            <Metric
-              label="Structure"
-              value={formatSigned(result.structureScore, 0)}
-            />
-            <Metric
-              label="Final"
-              value={formatSigned(result.finalSignalScore, 1)}
-            />
+            <Metric label="Final" value={formatSigned(result.metrics.finalSignalScore, 1)} />
+            <Metric label="Setup" value={formatSigned(result.metrics.opportunityScore, 0)} />
+            <Metric label="Confirm" value={formatSigned(result.metrics.confirmationScore, 0)} />
+            <Metric label="Risk" value={formatSigned(result.metrics.riskScore, 0)} />
+            <Metric label="Trend" value={formatSigned(result.metrics.trendScore, 0)} />
+            <Metric label="Momentum" value={formatSigned(result.metrics.momentumScore, 0)} />
+            <Metric label="Volume" value={formatSigned(result.metrics.volumeScore, 0)} />
+            <Metric label="Structure" value={formatSigned(result.metrics.structureScore, 0)} />
           </div>
         </InspectorSection>
 
-        <InspectorSection title="Structure Diagnosis">
+        <InspectorSection title="Market Metrics">
           <div className="space-y-1">
-            <KeyValue
-              label="Primary"
-              value={formatPrimaryStructure(
-                result.primaryStructure,
-                scannerDictionary,
-              )}
-            />
-            <KeyValue
-              label="Signal"
-              value={formatSignalLabel(result.signalLabel, scannerDictionary)}
-            />
-            <KeyValue
-              label="Review State"
-              value={formatActionBias(result.actionBias, scannerDictionary)}
-            />
-            <TagList
-              label="Secondary"
-              items={result.secondaryStructures}
-            />
-            <TagList
-              label="Risk Types"
-              items={getDetectedRiskTypeLabels(
-                result.detectedRiskTypes,
-                scannerDictionary,
-              )}
-            />
+            <KeyValue label={t.common.price} value={formatPrice(result.metrics.price)} />
+            <KeyValue label={t.scanner.columns.rsi} value={formatNullable(result.metrics.rsi14, 1)} />
+            <KeyValue label={t.common.volume} value={formatNullable(result.metrics.volumeRatio, 2)} />
+            <KeyValue label="History Bars" value={formatInteger(result.metrics.historyBars)} />
           </div>
         </InspectorSection>
 
-        {result.multiTimeframe && (
-          <div className="mb-2 border-t border-[var(--border)] pt-2 text-xs leading-5 text-[var(--muted)]">
-            <div className="font-semibold text-[var(--foreground)]">
-              {t.alignment[result.multiTimeframe.alignment]}
-            </div>
-            <p className="mt-1">
-              {t.alignmentSummary[result.multiTimeframe.alignment]}
-            </p>
-            <div className="mt-1.5 grid grid-cols-3 gap-1">
-              <Metric
-                label={t.scanner.mtfRank}
-                value={result.multiTimeframe.rankScore.toFixed(1)}
-              />
-              <Metric
-                label={t.scanner.constructive}
-                value={String(result.multiTimeframe.constructiveCount)}
-              />
-              <Metric
-                label={t.common.risk}
-                value={String(result.multiTimeframe.riskCount)}
-              />
-            </div>
-            <div className="mt-1.5 space-y-1">
-              {result.multiTimeframe.timeframeResults.map((timeframeResult) => (
-                <div
-                  key={timeframeResult.timeframe}
-                  className="border border-[var(--border)] bg-[var(--panel-2)] px-2 py-1"
-                >
-                  <div className="mb-1.5 flex items-center justify-between gap-2">
-                    <span className="text-xs font-semibold text-[var(--foreground)]">
-                      {t.timeframe[timeframeResult.timeframe]}
-                    </span>
-                    <span className="text-xs tabular-nums">
-                      {timeframeResult.rankScore.toFixed(1)}
-                    </span>
-                  </div>
-                  <div className="flex flex-wrap gap-1.5">
-                    <SignalBadge signal={timeframeResult.signal} />
-                    <PhaseBadge phase={timeframeResult.phase} />
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
+        <InspectorSection title="Reason Codes">
+          <TextList values={reasonLines} />
+        </InspectorSection>
 
-        <InspectorSection title={t.scanner.marketMetrics}>
+        <InspectorSection title="Versions">
           <div className="space-y-1">
-            <KeyValue label={t.common.price} value={formatPrice(result.price)} />
-            <KeyValue
-              label={t.scanner.columns.rsi}
-              value={formatNullable(result.rsi14, 1)}
-            />
-            <KeyValue
-              label={t.common.volume}
-              value={formatNullable(result.volumeRatio, 2)}
-            />
-            <KeyValue label={t.scanner.macd} value={formatMacdStatus(result, t)} />
+            <KeyValue label="Scanner" value={result.scannerVersion} />
+            <KeyValue label="Code Schema" value={result.codeSchemaVersion} />
+            <KeyValue label="Dictionary" value={result.dictionaryVersion} />
           </div>
         </InspectorSection>
-
-        <InspectorSection title={t.scanner.volumeDetails}>
-          <div className="space-y-1">
-            <KeyValue
-              label={t.scanner.volumeLatest}
-              value={formatCompactNumber(result.volume.latest)}
-            />
-            <KeyValue
-              label={t.scanner.volumeMa20}
-              value={formatNullable(result.volume.ma20, 0)}
-            />
-            <KeyValue
-              label={t.scanner.volumeRatio20}
-              value={formatNullable(result.volume.ratio20, 2)}
-            />
-            <KeyValue
-              label={t.scanner.volumeState}
-              value={formatVolumeState(result, t)}
-            />
-          </div>
-        </InspectorSection>
-
-        <InspectorSection title="Reasons">
-          <FactorList
-            title="Constructive Factors"
-            items={result.bullishObservations}
-            dictionary={t}
-          />
-          <FactorList
-            title="Weakness Factors"
-            items={result.bearishObservations}
-            dictionary={t}
-          />
-          <FactorList
-            title="Risk Factors"
-            items={result.riskObservations}
-            dictionary={t}
-          />
-          <FactorList
-            title="Neutral Factors"
-            items={result.neutralObservations}
-            dictionary={t}
-          />
-        </InspectorSection>
-
-        <InspectorSection title="Next Confirmation">
-          <ObservationList
-            items={result.nextConfirmationObservations}
-            dictionary={t}
-          />
-        </InspectorSection>
-
-        <InspectorSection title="Invalidation">
-          <ObservationList
-            items={result.invalidationObservations}
-            dictionary={t}
-          />
-        </InspectorSection>
-
-        <div className="space-y-2 border-t border-[var(--border)] pt-2">
-          <ReasonList title={t.scanner.reasons} items={result.reasons} />
-          {result.warnings.length > 0 && (
-            <div>
-              <h3 className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-[var(--muted)]">
-                {t.scanner.warnings}
-              </h3>
-              <div className="space-y-1">
-                {result.warnings.map((warning) => (
-                  <RiskBadge
-                    key={`${warning.key}-${JSON.stringify(warning.params ?? {})}`}
-                    label={formatScannerExplanation(warning, t)}
-                  />
-                ))}
-              </div>
-            </div>
-          )}
-          <ReasonList
-            title={t.scanner.nextConfirmation}
-            items={result.nextConfirmation}
-          />
-          <ReasonList title={t.scanner.invalidation} items={result.invalidation} />
-        </div>
 
         <div className="mt-2">
           <HistoricalBehaviorPanel
             symbol={result.symbol}
-            timeframe={result.timeframe}
+            timeframe={normalizeTimeframe(result.timeframe)}
           />
         </div>
-
-        <details className="mt-2 border-t border-[var(--border)] pt-2">
-          <summary className="cursor-pointer list-none text-[10px] font-semibold uppercase tracking-wide text-[var(--info)]">
-            {t.strategy.title}
-          </summary>
-          <div className="mt-2">
-            <StrategyReadPanel result={result} />
-          </div>
-        </details>
       </section>
     </aside>
+  );
+}
+
+function CodeChip({ code, label }: { code: string; label: string }) {
+  return (
+    <span className="inline-flex h-5 items-center border border-[var(--border)] bg-[var(--control)] px-1.5 text-[11px] font-semibold text-[var(--foreground)]">
+      {label}
+      <span className="ml-1 font-mono text-[9px] text-[var(--muted)]">{code}</span>
+    </span>
   );
 }
 
@@ -363,48 +205,16 @@ function TagList({ label, items }: { label: string; items: string[] }) {
   );
 }
 
-function FactorList({
-  title,
-  items,
-  dictionary,
-}: {
-  title: string;
-  items: ScannerObservation[];
-  dictionary: ReturnType<typeof useLanguage>["dictionary"];
-}) {
-  if (items.length === 0) {
-    return null;
-  }
-
-  return (
-    <div className="mb-2 last:mb-0">
-      <h4 className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-[var(--muted)]">
-        {title}
-      </h4>
-      <ObservationList items={items} dictionary={dictionary} />
-    </div>
-  );
-}
-
-function ObservationList({
-  items,
-  dictionary,
-}: {
-  items: ScannerObservation[];
-  dictionary: ReturnType<typeof useLanguage>["dictionary"];
-}) {
-  if (items.length === 0) {
+function TextList({ values }: { values: string[] }) {
+  if (values.length === 0) {
     return <span className="text-xs text-[var(--muted)]">n/a</span>;
   }
 
   return (
     <ul className="space-y-1 text-xs leading-5 text-[var(--foreground)]">
-      {items.map((item) => (
-        <li
-          key={`${item.key}-${JSON.stringify(item.params ?? {})}`}
-          className="border-l-2 border-[var(--border)] pl-2"
-        >
-          {formatScannerObservation(item, dictionary)}
+      {values.map((item) => (
+        <li key={item} className="border-l-2 border-[var(--border)] pl-2">
+          {item}
         </li>
       ))}
     </ul>
@@ -415,12 +225,24 @@ function formatNullable(value: number | null, decimals: number) {
   return value === null ? "n/a" : value.toFixed(decimals);
 }
 
-function formatSigned(value: number, decimals: number) {
+function formatSigned(value: number | null, decimals: number) {
+  if (value === null) {
+    return "n/a";
+  }
+
   const formatted = value.toFixed(decimals);
   return value > 0 ? `+${formatted}` : formatted;
 }
 
-function formatPrice(value: number) {
+function formatInteger(value: number | null) {
+  return value === null ? "n/a" : new Intl.NumberFormat().format(value);
+}
+
+function formatPrice(value: number | null) {
+  if (value === null) {
+    return "n/a";
+  }
+
   if (value >= 100) {
     return value.toFixed(2);
   }
@@ -432,67 +254,12 @@ function formatPrice(value: number) {
   return value.toFixed(6);
 }
 
-function formatCompactNumber(value: number | null | undefined) {
-  if (value === null || value === undefined) {
-    return "n/a";
-  }
-
-  return new Intl.NumberFormat(undefined, {
-    notation: "compact",
-    maximumFractionDigits: 2,
-  }).format(value);
-}
-
-function formatMacdStatus(
-  result: ScanResult,
-  dictionary: ReturnType<typeof useLanguage>["dictionary"],
-) {
-  if (!result.macd) {
-    return dictionary.scanner.macdUnavailable;
-  }
-
-  if (result.macd.bearishCross || !result.macd.histogramRising) {
-    return dictionary.scanner.macdWeakening;
-  }
-
-  if (result.macd.bullishCross) {
-    return dictionary.scanner.macdBullishCross;
-  }
-
-  if (result.macd.aboveZero) {
-    return dictionary.scanner.macdAboveZero;
-  }
-
-  return dictionary.scanner.macdImproving;
-}
-
-function formatVolumeState(
-  result: ScanResult,
-  dictionary: ReturnType<typeof useLanguage>["dictionary"],
-) {
-  if (result.volume.distributionWarning) {
-    return dictionary.scanner.volumeDistributionWarning;
-  }
-
-  if (result.volume.abnormalSpike) {
-    return dictionary.scanner.volumeAbnormalSpike;
-  }
-
-  if (result.volume.breakoutConfirmed) {
-    return dictionary.scanner.volumeBreakoutConfirmed;
-  }
-
-  if (result.volume.pullbackHealthy) {
-    return dictionary.scanner.volumePullbackHealthy;
-  }
-
-  if (result.volume.expanding) {
-    return dictionary.scanner.volumeExpanding;
-  }
-
-  if (result.volume.dryUp) {
-    return dictionary.scanner.volumeDryUp;
-  }
-
-  return dictionary.scanner.volumeNeutral;
+function normalizeTimeframe(value: string): Timeframe {
+  return value === "1h" ||
+    value === "4h" ||
+    value === "1d" ||
+    value === "1w" ||
+    value === "1M"
+    ? value
+    : "4h";
 }

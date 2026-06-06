@@ -1,5 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { dictionaries } from "@/lib/i18n/dictionaries";
+import {
+  actionCodeByBias,
+  groupCodeByResultGroup,
+  riskCodeByType,
+  scannerCodeVersions,
+  signalCodeByLabel,
+  setupCodeByAliasOrStructure,
+} from "@/lib/scanner-codebook/codeRegistry";
 import {
   buildMtfScreenerRows,
   buildMtfScreenerRowsFromResponse,
@@ -373,7 +380,7 @@ describe("multi-timeframe screener helpers", () => {
 
     expect(formatMtfGroup(row.snapshots["4h"])).toBe("Not returned");
     expect(formatMtfRank(row.snapshots["4h"])).toBe("-");
-    expect(getMtfPrimarySignal(row)).toBe("1h Breakdown Risk / Risk");
+    expect(getMtfPrimarySignal(row)).toBe("1h Trend Breakdown Risk / Risk");
     expect(getMtfRiskNotes(row)).toBe("1h: Distribution Risk");
   });
 
@@ -413,7 +420,7 @@ describe("multi-timeframe screener helpers", () => {
       "4h: Overheated",
     ]);
 
-    const chineseSummary = getMtfRiskNotesSummary(row, 4, dictionaries.zh);
+    const chineseSummary = getMtfRiskNotesSummary(row, 4, "zh");
 
     expect(chineseSummary.notes).toContain("1d: 风险");
     expect(chineseSummary.notes).toContain("4h: 过热");
@@ -475,12 +482,14 @@ describe("multi-timeframe screener helpers", () => {
     });
 
     expect(csv.split("\n")[0]).toContain("export_type,exported_at,asset_class");
-    expect(csv.split("\n")[0]).toContain("1h_group,1h_rank,1h_missing");
+    expect(csv.split("\n")[0]).toContain(
+      "1h_group_code,1h_action_code,1h_setup_code",
+    );
     expect(csv.split("\n")[0]).toContain("4h_run_id,4h_scan_time");
     expect(csv).toContain("visible_rows,2026-06-02T15:00:00.000Z,crypto");
     expect(csv).toContain("BTCUSDT");
-    expect(csv).toContain("4h Watch / Risk");
-    expect(csv).toContain("4h: Distribution Risk");
+    expect(csv).toContain("PX_501");
+    expect(csv).toContain("RK_302");
     expect(csv).toContain("/symbol/binance/BTCUSDT?timeframe=4h&assetClass=crypto&from=screener");
     expect(csv).toContain("Research-only. Not financial advice.");
   });
@@ -500,7 +509,6 @@ describe("multi-timeframe screener helpers", () => {
           }),
           timeframe: "1h",
           resultGroup: "risk",
-          statusNote: 'Needs "manual" review',
         },
       },
     };
@@ -513,7 +521,7 @@ describe("multi-timeframe screener helpers", () => {
     expect(csv).toContain('"QUOTE""USDT"');
     expect(csv).toContain('"binance,spot"');
     expect(csv).toContain('"spot\nmarket"');
-    expect(csv).toContain('"1h: Distribution Risk, Failed Breakout Risk"');
+    expect(csv).toContain("RK_302|RK_305");
   });
 
   it("selects visible or all joined rows for export without changing row order", () => {
@@ -604,8 +612,8 @@ function makeHealthRow({
   oneDayGroup,
   oneWeekGroup,
 }: {
-  oneDayGroup?: MtfLatestScanItem["resultGroup"];
-  oneWeekGroup?: MtfLatestScanItem["resultGroup"];
+  oneDayGroup?: "eligible" | "watch" | "risk" | "overheated" | "neutral";
+  oneWeekGroup?: "eligible" | "watch" | "risk" | "overheated" | "neutral";
 }) {
   const [row] = buildMtfScreenerRows({
     ...(oneDayGroup
@@ -695,24 +703,72 @@ function makeItem(
   overrides: Partial<MtfLatestScanItem> & {
     symbol: string;
     timeframe: MtfScreenerTimeframe;
+    group?: MtfLatestScanItem["groupCode"] | "eligible" | "watch" | "risk" | "overheated" | "neutral" | null;
+    resultGroup?: "eligible" | "watch" | "risk" | "overheated" | "neutral" | null;
+    rankScore?: number | null;
+    signalLabel?: keyof typeof signalCodeByLabel;
+    actionBias?: keyof typeof actionCodeByBias;
+    primaryStructure?: keyof typeof setupCodeByAliasOrStructure;
+    detectedRiskTypes?: Array<keyof typeof riskCodeByType>;
   },
 ): MtfLatestScanItem {
+  const resultGroup = overrides.resultGroup ?? normalizeFixtureGroup(overrides.group) ?? "neutral";
+  const riskCodes = (overrides.detectedRiskTypes ?? []).map(
+    (risk) => riskCodeByType[risk] ?? "RK_201",
+  );
+  const rankScore =
+    overrides.metrics?.rankScore ??
+    (Object.prototype.hasOwnProperty.call(overrides, "rankScore")
+      ? overrides.rankScore ?? null
+      : 0);
+
   return {
     id: `${overrides.timeframe}-${overrides.symbol}`,
     scanRunId: `run-${overrides.timeframe}`,
     exchange: "binance",
     market: "spot",
+    assetClass: "crypto",
     symbol: overrides.symbol,
     timeframe: overrides.timeframe,
-    group: overrides.group,
-    resultGroup: overrides.resultGroup === undefined ? "neutral" : overrides.resultGroup,
-    rankScore: overrides.rankScore === undefined ? 0 : overrides.rankScore,
-    signalLabel: overrides.signalLabel ?? "watch",
-    actionBias: overrides.actionBias ?? "watch_only",
-    reviewTier: "watch_high",
-    statusNote: null,
-    statusReasons: [],
-    primaryStructure: overrides.primaryStructure ?? "strong_trend",
-    detectedRiskTypes: overrides.detectedRiskTypes ?? [],
+    scanTime: "2026-06-03T12:00:00.000Z",
+    candleOpenTime: "2026-06-03T08:00:00.000Z",
+    groupCode: groupCodeByResultGroup[resultGroup],
+    actionCode: actionCodeByBias[overrides.actionBias ?? "watch_only"],
+    riskCode: riskCodes[0] ?? null,
+    riskCodes,
+    setupCode:
+      setupCodeByAliasOrStructure[overrides.primaryStructure ?? "strong_trend"],
+    phaseCode:
+      setupCodeByAliasOrStructure[overrides.primaryStructure ?? "strong_trend"],
+    reasonCodes: riskCodes,
+    signalCodes: [signalCodeByLabel[overrides.signalLabel ?? "watch"]],
+    qualityCodes: ["QH_001"],
+    metrics: {
+      score: rankScore,
+      rankScore,
+      finalSignalScore: rankScore,
+      opportunityScore: null,
+      confirmationScore: null,
+      riskScore: null,
+      qualityScore: null,
+      trendScore: null,
+      momentumScore: null,
+      volumeScore: null,
+      structureScore: null,
+      volumeRank: null,
+      historyBars: null,
+      price: null,
+      rsi14: null,
+      bbPercent: null,
+      bbWidthPercentile: null,
+      volumeRatio: null,
+    },
+    ...scannerCodeVersions,
   };
+}
+
+function normalizeFixtureGroup(value: unknown) {
+  return typeof value === "string" && value in groupCodeByResultGroup
+    ? (value as keyof typeof groupCodeByResultGroup)
+    : null;
 }

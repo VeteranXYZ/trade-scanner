@@ -6,7 +6,10 @@ import {
   getTimelineGroupLabel,
   getTimelineRiskText,
   normalizeSignalHistory,
+  type RawSymbolTimelineSignal,
 } from "./symbolTimelineUi";
+
+type TimelineMetrics = NonNullable<RawSymbolTimelineSignal["metrics"]>;
 
 describe("symbol timeline UI helpers", () => {
   it("normalizes empty history safely", () => {
@@ -48,14 +51,14 @@ describe("symbol timeline UI helpers", () => {
   });
 
   it("formats risk types readably", () => {
-    expect(getTimelineRiskText(["weak_bounce_risk", "failed_breakout_risk"])).toBe(
+    expect(getTimelineRiskText(["RK_303", "RK_305"])).toBe(
       "Weak Bounce Risk, Failed Breakout Risk",
     );
-    expect(getTimelineRiskText([{ risk: true }])).toBe("No specific risk types noted.");
+    expect(getTimelineRiskText([{ risk: true }])).toBe("No specific risk codes noted.");
   });
 
   it("uses a safe group label fallback", () => {
-    expect(getTimelineGroupLabel("eligible")).toBe("Eligible");
+    expect(getTimelineGroupLabel("GR_201")).toBe("Eligible");
     expect(getTimelineGroupLabel("unknown_group")).toBe("Neutral");
   });
 
@@ -107,15 +110,15 @@ describe("symbol timeline UI helpers", () => {
         scanRunId: "run-1",
         symbol: "SEIUSDT",
         timeframe: "4h",
-        signalLabel: "confirmed",
-        rankScore: 82,
+        signalCodes: ["PX_501"],
+        metrics: makeMetrics({ rankScore: 82 }),
       }),
       makeHistoryRow("duplicate-b", "2026-05-31T20:00:00.000Z", "eligible", {
         scanRunId: "run-1",
         symbol: "SEIUSDT",
         timeframe: "4h",
-        signalLabel: "confirmed",
-        rankScore: 82,
+        signalCodes: ["PX_501"],
+        metrics: makeMetrics({ rankScore: 82 }),
       }),
     ]);
 
@@ -128,8 +131,8 @@ describe("symbol timeline UI helpers", () => {
         scanRunId: "limited-run",
         symbol: "SEIUSDT",
         timeframe: "4h",
-        signalLabel: "confirmed",
-        rankScore: 90,
+        signalCodes: ["PX_501"],
+        metrics: makeMetrics({ rankScore: 90 }),
         isNewerThanSelectedCurrentRun: true,
         sourceRunIsLikelyFullUniverse: false,
       }),
@@ -137,8 +140,8 @@ describe("symbol timeline UI helpers", () => {
         scanRunId: "limited-run",
         symbol: "SEIUSDT",
         timeframe: "4h",
-        signalLabel: "confirmed",
-        rankScore: 90,
+        signalCodes: ["PX_501"],
+        metrics: makeMetrics({ rankScore: 90 }),
         isNewerThanSelectedCurrentRun: true,
         sourceRunIsLikelyFullUniverse: false,
       }),
@@ -166,10 +169,59 @@ function makeHistoryRow(
   resultGroup: string,
   overrides: Record<string, unknown> = {},
 ) {
+  const groupCodeByGroup = {
+    eligible: "GR_201",
+    watch: "GR_101",
+    overheated: "GR_301",
+    risk: "GR_302",
+    neutral: "GR_001",
+  } as const;
+  const groupCode =
+    groupCodeByGroup[resultGroup as keyof typeof groupCodeByGroup] ?? "GR_001";
+
   return {
     id,
     scanTime,
-    resultGroup,
+    groupCode,
+    actionCode: "AC_101",
+    setupCode: "TR_601",
+    phaseCode: "NX_801",
+    riskCode: null,
+    riskCodes: [],
+    reasonCodes: [],
+    signalCodes: ["MO_202"],
+    qualityCodes: [],
+    metrics: makeMetrics(),
     ...overrides,
+  } as RawSymbolTimelineSignal;
+}
+
+function makeMetrics(overrides: Partial<TimelineMetrics> = {}): TimelineMetrics {
+  return {
+    ...makeMetricsBase(),
+    ...overrides,
+  };
+}
+
+function makeMetricsBase(): TimelineMetrics {
+  return {
+    score: null,
+    rankScore: null,
+    finalSignalScore: null,
+    opportunityScore: null,
+    confirmationScore: null,
+    riskScore: null,
+    qualityScore: null,
+    trendScore: null,
+    momentumScore: null,
+    volumeScore: null,
+    structureScore: null,
+    volumeRank: null,
+    historyBars: null,
+    price: null,
+    rsi14: null,
+    bbPercent: null,
+    bbWidthPercentile: null,
+    volumeRatio: null,
   };
 }

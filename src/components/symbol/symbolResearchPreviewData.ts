@@ -9,6 +9,14 @@ import type {
   SymbolResearchSuccessResponse,
   SymbolResearchVisualCheckData,
 } from "./SymbolResearchPageClient";
+import {
+  actionCodeByBias,
+  groupCodeByResultGroup,
+  riskCodeByType,
+  scannerCodeVersions,
+  setupCodeByAliasOrStructure,
+  signalCodeByLabel,
+} from "@/lib/scanner-codebook/codeRegistry";
 
 const scanFinishedAt = "2026-06-04T16:00:00.000Z";
 const scanStartedAt = "2026-06-04T15:58:00.000Z";
@@ -156,25 +164,26 @@ export function buildSymbolResearchVisualCheckData(): SymbolResearchVisualCheckD
       fallbackUsed: false,
     },
     scoreBreakdown: {
-      rankScore: latestSignal.rankScore,
-      finalSignalScore: latestSignal.finalSignalScore ?? null,
-      opportunityScore: latestSignal.opportunityScore ?? null,
-      confirmationScore: latestSignal.confirmationScore ?? null,
-      riskScore: latestSignal.riskScore ?? null,
-      trendScore: latestSignal.trendScore ?? null,
-      momentumScore: latestSignal.momentumScore ?? null,
-      volumeScore: latestSignal.volumeScore ?? null,
-      structureScore: latestSignal.structureScore ?? null,
+      rankScore: latestSignal.metrics.rankScore,
+      finalSignalScore: latestSignal.metrics.finalSignalScore,
+      opportunityScore: latestSignal.metrics.opportunityScore,
+      confirmationScore: latestSignal.metrics.confirmationScore,
+      riskScore: latestSignal.metrics.riskScore,
+      trendScore: latestSignal.metrics.trendScore,
+      momentumScore: latestSignal.metrics.momentumScore,
+      volumeScore: latestSignal.metrics.volumeScore,
+      structureScore: latestSignal.metrics.structureScore,
     },
     interpretation: {
-      group: "eligible",
-      label: "Confirmed trend continuation",
-      action: "eligible",
-      setupType: "trend_continuation",
-      statusNote: "Manual review",
-      reasons: latestSignal.statusReasons ?? [],
-      nextConfirmation: latestSignal.nextConfirmation,
-      invalidation: latestSignal.invalidation,
+      groupCode: latestSignal.groupCode,
+      actionCode: latestSignal.actionCode,
+      riskCode: latestSignal.riskCode,
+      riskCodes: latestSignal.riskCodes,
+      setupCode: latestSignal.setupCode,
+      phaseCode: latestSignal.phaseCode,
+      reasonCodes: latestSignal.reasonCodes,
+      signalCodes: latestSignal.signalCodes,
+      qualityCodes: latestSignal.qualityCodes,
     },
     history,
     timeframes: [
@@ -240,53 +249,114 @@ export function buildSymbolResearchVisualCheckData(): SymbolResearchVisualCheckD
   };
 }
 
-function buildPreviewSignal(
-  overrides: Partial<SymbolResearchSignal> = {},
-): SymbolResearchSignal {
+type PreviewSignalOverrides = Partial<SymbolResearchSignal> & {
+  priceAtSignal?: number | null;
+  rankScore?: number | null;
+  finalSignalScore?: number | null;
+  opportunityScore?: number | null;
+  confirmationScore?: number | null;
+  riskScore?: number | null;
+  trendScore?: number | null;
+  momentumScore?: number | null;
+  volumeScore?: number | null;
+  structureScore?: number | null;
+  signalLabel?: string | null;
+  actionBias?: string | null;
+  resultGroup?: keyof typeof groupCodeByResultGroup;
+  primaryStructure?: string | null;
+  detectedRiskTypes?: string[];
+  statusNote?: string | null;
+  statusReasons?: string[];
+  nextConfirmation?: string[];
+  invalidation?: string[];
+  factors?: Record<string, unknown>;
+  rawMetrics?: Record<string, unknown>;
+};
+
+function buildPreviewSignal(overrides: PreviewSignalOverrides = {}): SymbolResearchSignal {
+  const resultGroup = overrides.resultGroup ?? "eligible";
+  const signalLabel = overrides.signalLabel ?? "confirmed";
+  const primaryStructure = overrides.primaryStructure ?? "trend_continuation";
+  const riskCodes = (overrides.detectedRiskTypes ?? []).map(
+    (risk) => riskCodeByType[risk as keyof typeof riskCodeByType] ?? "RK_201",
+  );
+  const setupCode =
+    setupCodeByAliasOrStructure[
+      primaryStructure as keyof typeof setupCodeByAliasOrStructure
+    ] ?? "ST_001";
+  const rankScore = overrides.metrics?.rankScore ?? overrides.rankScore ?? 88.2;
+
   return {
-    id: "visual-signal",
-    scanRunId: "visual-full-run-4h",
-    symbolId: 1,
-    exchange: "binance",
-    market: "spot",
-    symbol: "BTCUSDT",
-    timeframe: "4h",
-    scanTime,
-    candleOpenTime: "2026-06-04T12:00:00.000Z",
-    priceAtSignal: 102320,
-    rankScore: 88.2,
-    finalSignalScore: 83.4,
-    opportunityScore: 86.1,
-    confirmationScore: 82.6,
-    riskScore: 18.3,
-    trendScore: 91.4,
-    momentumScore: 77.8,
-    volumeScore: 68.5,
-    structureScore: 89.7,
-    signalLabel: "confirmed",
-    actionBias: "eligible",
-    resultGroup: "eligible",
-    reviewTier: "eligible",
-    statusNote: "Manual review",
-    cautionLevel: "No extra risk flag",
-    statusReasons: ["Constructive trend continuation candidate."],
-    primaryStructure: "trend_continuation",
-    secondaryStructures: ["ma_reclaim", "higher_low"],
-    detectedRiskTypes: [],
-    nextConfirmation: ["Hold above reclaimed support."],
-    invalidation: ["Lose the recent higher low."],
-    factors: {},
-    rawMetrics: {},
-    scoringVersion: "visual-check",
-    scannerVersion: "visual-check",
-    createdAt: scanTime,
-    scanRunStartedAt: scanStartedAt,
-    scanRunFinishedAt: scanFinishedAt,
-    sourceRunIsLikelyFullUniverse: true,
-    isSelectedCurrentRun: true,
-    isNewerThanSelectedCurrentRun: false,
-    ...overrides,
+    id: overrides.id ?? "visual-signal",
+    scanRunId: overrides.scanRunId ?? "visual-full-run-4h",
+    symbolId: overrides.symbolId ?? 1,
+    exchange: overrides.exchange ?? "binance",
+    market: overrides.market ?? "spot",
+    symbol: overrides.symbol ?? "BTCUSDT",
+    timeframe: overrides.timeframe ?? "4h",
+    assetClass: overrides.assetClass ?? "crypto",
+    scanTime: overrides.scanTime ?? scanTime,
+    candleOpenTime: overrides.candleOpenTime ?? "2026-06-04T12:00:00.000Z",
+    groupCode: groupCodeByResultGroup[resultGroup],
+    actionCode: getPreviewActionCode(overrides.actionBias ?? "eligible"),
+    riskCode: riskCodes[0] ?? null,
+    riskCodes,
+    setupCode,
+    phaseCode: setupCode,
+    reasonCodes: riskCodes,
+    signalCodes: [
+      signalCodeByLabel[signalLabel as keyof typeof signalCodeByLabel] ?? "NX_801",
+    ],
+    qualityCodes: ["QH_601"],
+    metrics: {
+      score: rankScore,
+      rankScore,
+      finalSignalScore:
+        overrides.metrics?.finalSignalScore ?? overrides.finalSignalScore ?? 83.4,
+      opportunityScore:
+        overrides.metrics?.opportunityScore ?? overrides.opportunityScore ?? 86.1,
+      confirmationScore:
+        overrides.metrics?.confirmationScore ?? overrides.confirmationScore ?? 82.6,
+      riskScore: overrides.metrics?.riskScore ?? overrides.riskScore ?? 18.3,
+      qualityScore: overrides.metrics?.qualityScore ?? 92,
+      trendScore: overrides.metrics?.trendScore ?? overrides.trendScore ?? 91.4,
+      momentumScore:
+        overrides.metrics?.momentumScore ?? overrides.momentumScore ?? 77.8,
+      volumeScore: overrides.metrics?.volumeScore ?? overrides.volumeScore ?? 68.5,
+      structureScore:
+        overrides.metrics?.structureScore ?? overrides.structureScore ?? 89.7,
+      volumeRank: overrides.metrics?.volumeRank ?? null,
+      historyBars: overrides.metrics?.historyBars ?? 720,
+      price: overrides.metrics?.price ?? overrides.priceAtSignal ?? 102320,
+      rsi14: overrides.metrics?.rsi14 ?? null,
+      bbPercent: overrides.metrics?.bbPercent ?? null,
+      bbWidthPercentile: overrides.metrics?.bbWidthPercentile ?? null,
+      volumeRatio: overrides.metrics?.volumeRatio ?? null,
+    },
+    scoringVersion: overrides.scoringVersion ?? "visual-check",
+    scannerVersion: scannerCodeVersions.scannerVersion,
+    codeSchemaVersion: scannerCodeVersions.codeSchemaVersion,
+    dictionaryVersion: scannerCodeVersions.dictionaryVersion,
+    createdAt: overrides.createdAt ?? scanTime,
+    scanRunStartedAt: overrides.scanRunStartedAt ?? scanStartedAt,
+    scanRunFinishedAt: overrides.scanRunFinishedAt ?? scanFinishedAt,
+    sourceRunIsLikelyFullUniverse: overrides.sourceRunIsLikelyFullUniverse ?? true,
+    isSelectedCurrentRun: overrides.isSelectedCurrentRun ?? true,
+    isNewerThanSelectedCurrentRun:
+      overrides.isNewerThanSelectedCurrentRun ?? false,
   };
+}
+
+function getPreviewActionCode(value: string | null | undefined) {
+  if (value === "watch" || value === "research") {
+    return "AC_201";
+  }
+
+  if (value === "risk") {
+    return "AC_302";
+  }
+
+  return actionCodeByBias[value as keyof typeof actionCodeByBias] ?? "NX_801";
 }
 
 function buildPreviewCandles(): RawSymbolChartCandle[] {

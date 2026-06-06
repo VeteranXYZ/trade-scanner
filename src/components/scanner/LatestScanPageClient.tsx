@@ -26,29 +26,18 @@ import {
 } from "@/components/ui/workspace";
 import { formatDisplayDateTime } from "@/lib/utils/format";
 import { useAppLanguage } from "@/lib/i18n/AppLanguageProvider";
-import { dictionaries } from "@/lib/i18n/dictionaries";
-import { formatScannerObservation } from "@/lib/i18n/formatScannerObservation";
-import type {
-  ScannerObservation,
-  ScannerReviewText,
-} from "@/lib/shared/scannerTypes";
+import type { Language } from "@/lib/i18n/dictionaries";
+import { explainCode, explainCodes } from "@/lib/scanner-codebook/explainCode";
+import { groupCodeByResultGroup } from "@/lib/scanner-codebook/codeRegistry";
+import type { PublicStoredScannerSignal } from "@/lib/scanner-codebook/serializeStoredSignal";
 import {
   formatDateTime,
-  formatGroupLabel,
   formatPrice,
-  formatPrimaryStructure,
-  formatQualityTier,
   formatScore,
-  formatSignalLabel,
-  getDetectedRiskTypeLabels,
-  getLatestScanGroupSummaryChips,
+  getLatestScanGroupCount,
   getLatestScanScoreRows,
-  getLatestScanActionDisplay,
-  getReviewStatusNote,
-  getReviewStatusReasons,
   latestScanGroupOrder,
   normalizeGroupKey,
-  toTitleCase,
   type LatestScanGroupKey,
   type ScannerDisplayDictionary,
 } from "./latestScanUi";
@@ -109,36 +98,26 @@ export type LatestScanItem = {
   market?: string | null;
   symbol: string;
   timeframe: string;
-  resultGroup?: string | null;
-  rankScore: number | null;
-  signalLabel: string | null;
-  actionBias: string | null;
-  reviewTier?: string | null;
-  statusNoteKey?: string | null;
-  statusNote?: string | null;
-  cautionLevel?: string | null;
-  statusReasonKeys?: ScannerReviewText[];
-  statusReasons?: string[];
-  primaryStructure: string | null;
-  qualityTier: string | null;
-  isLowQuality: boolean;
-  qualityFlags: string[];
-  candleCount: number;
-  priceAtSignal: number | null;
+  assetClass?: string | null;
+  scanTime?: string | null;
+  groupCode: string;
+  actionCode: string;
+  riskCode: string | null;
+  riskCodes: string[];
+  setupCode: string;
+  phaseCode: string;
+  reasonCodes: string[];
+  signalCodes: string[];
+  qualityCodes: string[];
+  metrics: PublicStoredScannerSignal["metrics"];
+  scannerVersion: string;
+  codeSchemaVersion: string;
+  dictionaryVersion: string;
   candleOpenTime: string | null;
-  opportunityScore: number | null;
-  confirmationScore: number | null;
-  riskScore: number | null;
-  trendScore: number | null;
-  momentumScore: number | null;
-  volumeScore: number | null;
-  structureScore: number | null;
-  secondaryStructures?: unknown[];
-  detectedRiskTypes?: unknown[];
-  nextConfirmation?: unknown;
-  invalidation?: unknown;
-  factors?: Record<string, unknown>;
-  rawMetrics?: Record<string, unknown>;
+};
+
+type LatestScanRowItem = LatestScanItem & {
+  resultGroup: LatestScanGroupKey;
 };
 
 export type LatestScanGroups = Partial<
@@ -220,7 +199,7 @@ type LatestScanSortKey =
   | "quality"
   | "price";
 type LatestScanTableRow = {
-  item: LatestScanItem;
+  item: LatestScanRowItem;
   sourceIndex: number;
 };
 type LatestScanTerminalTone =
@@ -242,7 +221,7 @@ export function LatestScanPageClient({
   initialQueryState?: LatestScanQueryStateInput;
   visualCheckData?: LatestScanResponse;
 } = {}) {
-  const { dictionary } = useAppLanguage();
+  const { dictionary, language } = useAppLanguage();
   const isVisualCheck = Boolean(visualCheckData);
   const initialFilters = getLatestScanInitialFilters(initialQueryState);
   const [timeframe, setTimeframe] = useState<LatestScanTimeframe>(
@@ -303,7 +282,7 @@ export function LatestScanPageClient({
       return;
     }
 
-    const blob = new Blob([formatLatestScanCsv(visibleItems, dictionary)], {
+    const blob = new Blob([formatLatestScanCsv(visibleItems, language)], {
       type: "text/csv;charset=utf-8",
     });
     const url = URL.createObjectURL(blob);
@@ -385,8 +364,9 @@ export function LatestScanPageClient({
               assetClass={assetClass}
               includeLowQuality={includeLowQuality}
               limit={limit}
-              dictionary={dictionary}
-            />
+                dictionary={dictionary}
+                language={language}
+              />
           )}
         </main>
       </div>
@@ -697,12 +677,16 @@ function ControlSection({
 
 function LatestScanGroupSummaryChips({
   summary,
-  dictionary,
+  language,
 }: {
   summary: LatestScanSummary;
-  dictionary: ScannerDisplayDictionary;
+  language: Language;
 }) {
-  const chips = getLatestScanGroupSummaryChips(summary, dictionary);
+  const chips = latestScanGroupOrder.map((group) => ({
+    group,
+    label: explainCode(groupCodeByResultGroup[group], language).label,
+    count: getLatestScanGroupCount(summary, group),
+  }));
 
   if (chips.length === 0) {
     return null;
@@ -732,6 +716,7 @@ function LatestScanResultsTable({
   includeLowQuality,
   limit,
   dictionary,
+  language,
 }: {
   rows: LatestScanTableRow[];
   summary: LatestScanSummary | null;
@@ -745,6 +730,7 @@ function LatestScanResultsTable({
   includeLowQuality: boolean;
   limit: LatestScanLimit;
   dictionary: ScannerDisplayDictionary;
+  language: Language;
 }) {
   const [expandedItemId, setExpandedItemId] = useState<string | null>(null);
   const sharedCandleTime = getSharedLatestScanCandleTime(rows);
@@ -758,7 +744,7 @@ function LatestScanResultsTable({
           {summary ? (
             <LatestScanGroupSummaryChips
               summary={summary}
-              dictionary={dictionary}
+              language={language}
             />
           ) : null}
         </div>
@@ -872,12 +858,14 @@ function LatestScanResultsTable({
                     limit={limit}
                     showCandleTimeColumn={showCandleTimeColumn}
                     dictionary={dictionary}
+                    language={language}
                   />
                   {isExpanded ? (
                     <LatestScanDetailsRow
                       item={item}
                       colSpan={tableColumnCount}
                       dictionary={dictionary}
+                      language={language}
                     />
                   ) : null}
                 </Fragment>
@@ -900,8 +888,9 @@ function LatestScanRow({
   limit,
   showCandleTimeColumn,
   dictionary,
+  language,
 }: {
-  item: LatestScanItem;
+  item: LatestScanRowItem;
   isExpanded: boolean;
   onToggleDetails: () => void;
   timeframe: LatestScanTimeframe;
@@ -910,13 +899,15 @@ function LatestScanRow({
   limit: LatestScanLimit;
   showCandleTimeColumn: boolean;
   dictionary: ScannerDisplayDictionary;
+  language: Language;
 }) {
-  const group = normalizeGroupKey(item.resultGroup);
+  const group = item.resultGroup;
   const groupTone = getLatestScanGroupTone(group);
-  const signalLabel = formatSignalLabel(item.signalLabel, dictionary);
-  const actionLabel = getLatestScanActionDisplay(item, dictionary);
-  const statusNote = getReviewStatusNote(item, dictionary);
-  const structureLabel = formatStructure(item.primaryStructure, dictionary);
+  const groupText = explainCode(item.groupCode, language);
+  const signalText = explainCode(item.signalCodes[0] ?? item.phaseCode, language);
+  const actionText = explainCode(item.actionCode, language);
+  const setupText = explainCode(item.setupCode, language);
+  const qualityText = explainCode(getPrimaryLatestScanQualityCode(item), language);
 
   return (
     <tr
@@ -943,47 +934,47 @@ function LatestScanRow({
         </Link>
       </DataTableCell>
       <DataTableCell align="right" className="font-mono tabular-nums text-[var(--foreground)]">
-        {formatScore(item.rankScore)}
+        {formatScore(item.metrics.rankScore)}
       </DataTableCell>
       <DataTableCell>
         <div
           className="flex min-w-0 items-center gap-1.5"
-          title={`${formatGroupLabel(group, dictionary)} · ${signalLabel}`}
+          title={`${groupText.label} · ${signalText.short}`}
         >
           <DataTableChip tone={groupTone} className="shrink-0">
-            {formatGroupLabel(group, dictionary)}
+            {groupText.label}
           </DataTableChip>
           <span className="min-w-0 truncate text-[10px] font-semibold text-[var(--muted)]">
-            {signalLabel}
+            {signalText.label}
           </span>
         </div>
       </DataTableCell>
       <DataTableCell>
         <div
           className="flex min-w-0 items-center gap-1.5"
-          title={`${actionLabel} · ${statusNote}`}
+          title={`${actionText.label} · ${actionText.short}`}
         >
           <DataTableChip tone={groupTone} className="shrink-0">
-            {actionLabel}
+            {actionText.label}
           </DataTableChip>
           <span className="min-w-0 truncate text-[10px] font-semibold text-[var(--muted)]">
-            {statusNote}
+            {actionText.short}
           </span>
         </div>
       </DataTableCell>
-      <DataTableCell truncate title={structureLabel}>
-        {structureLabel}
+      <DataTableCell truncate title={setupText.short}>
+        {setupText.label}
       </DataTableCell>
       <DataTableCell>
         <DataTableChip
-          tone={item.isLowQuality ? "warning" : "neutral"}
-          title={item.isLowQuality ? "Low quality" : formatQualityTier(item.qualityTier)}
+          tone={getLatestScanQualityTone(item)}
+          title={`${qualityText.label} · ${qualityText.short}`}
         >
-          {formatQualityTier(item.qualityTier)}
+          {qualityText.label}
         </DataTableChip>
       </DataTableCell>
       <DataTableCell align="right" className="font-mono tabular-nums text-[var(--foreground)]">
-        {formatPrice(item.priceAtSignal)}
+        {formatPrice(item.metrics.price)}
       </DataTableCell>
       {showCandleTimeColumn ? (
         <DataTableCell className="text-[var(--muted)]">
@@ -1008,15 +999,17 @@ function LatestScanDetailsRow({
   item,
   colSpan,
   dictionary,
+  language,
 }: {
-  item: LatestScanItem;
+  item: LatestScanRowItem;
   colSpan: number;
   dictionary: ScannerDisplayDictionary;
+  language: Language;
 }) {
   return (
     <tr className="border-t border-[var(--border)] bg-[var(--panel-2)]">
       <td colSpan={colSpan} className="px-3 py-3">
-        <LatestScanDetails item={item} dictionary={dictionary} />
+        <LatestScanDetails item={item} dictionary={dictionary} language={language} />
       </td>
     </tr>
   );
@@ -1025,28 +1018,33 @@ function LatestScanDetailsRow({
 function LatestScanDetails({
   item,
   dictionary,
+  language,
 }: {
-  item: LatestScanItem;
+  item: LatestScanRowItem;
   dictionary: ScannerDisplayDictionary;
+  language: Language;
 }) {
-  const factors = normalizeFactors(item.factors, dictionary);
-  const rawMetrics = pickRawMetrics(item.rawMetrics);
-  const riskTypeLabels = getDetectedRiskTypeLabels(
-    item.detectedRiskTypes,
-    dictionary,
+  const reasonLines = formatCodeExplanationLines(item.reasonCodes, language);
+  const signalLabels = explainCodes(item.signalCodes, language).map(
+    (entry) => entry.label,
   );
-  const statusReasons = getReviewStatusReasons(item, dictionary);
-  const metricsAndFactors = [...factors, ...rawMetrics];
+  const riskLabels = explainCodes(item.riskCodes, language).map(
+    (entry) => entry.label,
+  );
+  const qualityLabels = explainCodes(item.qualityCodes, language).map(
+    (entry) => entry.label,
+  );
+  const metricLines = formatLatestScanMetricLines(item.metrics);
 
   return (
     <div className="grid gap-3 text-[11px] leading-5 text-[var(--muted)] md:grid-cols-2 xl:grid-cols-3">
-      <DetailBlock title="Grouping Reason">
-        <TextList values={statusReasons} />
+      <DetailBlock title="Reason Codes">
+        <TextList values={reasonLines} />
       </DetailBlock>
       <DetailBlock title="Candle Context">
         <TextList
           values={[
-            `Candles: ${formatInteger(item.candleCount)}`,
+            `Candles: ${formatInteger(item.metrics.historyBars)}`,
             `Candle Time: ${formatDateTime(item.candleOpenTime)}`,
           ]}
         />
@@ -1055,34 +1053,37 @@ function LatestScanDetails({
         <ScoreBreakdown item={item} />
       </DetailBlock>
       <DetailBlock title="Quality Flags">
-        <TokenList values={item.qualityFlags.map(formatQualityTier)} empty="None" />
+        <TokenList values={qualityLabels} empty="None" />
       </DetailBlock>
-      <DetailBlock title="Secondary Structures">
-        <TokenList
-          values={formatUnknownList(item.secondaryStructures, dictionary)}
-          empty="None"
+      <DetailBlock title="Signal Codes">
+        <TokenList values={signalLabels} empty="None" />
+      </DetailBlock>
+      <DetailBlock title="Risk Codes">
+        <TokenList values={riskLabels} empty="None" />
+      </DetailBlock>
+      <DetailBlock title="Quality Codes">
+        <TokenList values={qualityLabels} empty="None" />
+      </DetailBlock>
+      <DetailBlock title="Versions">
+        <TextList
+          values={[
+            `Scanner: ${item.scannerVersion}`,
+            `Code schema: ${item.codeSchemaVersion}`,
+            `Dictionary: ${item.dictionaryVersion}`,
+          ]}
         />
       </DetailBlock>
-      <DetailBlock title="Detected Risks">
-        <TokenList values={riskTypeLabels} empty="None" />
-      </DetailBlock>
-      <DetailBlock title="Next Confirmation">
-        <TextList values={formatUnknownList(item.nextConfirmation, dictionary)} />
-      </DetailBlock>
-      <DetailBlock title="Invalidation">
-        <TextList values={formatUnknownList(item.invalidation, dictionary)} />
-      </DetailBlock>
       <DetailBlock title="Selected Metrics / Factors">
-        <TextList values={metricsAndFactors} />
+        <TextList values={metricLines} />
       </DetailBlock>
     </div>
   );
 }
 
-function ScoreBreakdown({ item }: { item: LatestScanItem }) {
+function ScoreBreakdown({ item }: { item: LatestScanRowItem }) {
   return (
     <dl className="grid grid-cols-2 gap-x-3 gap-y-1">
-      {getLatestScanScoreRows(item).map((score) => (
+      {getLatestScanScoreRows(item.metrics).map((score) => (
         <div
           key={score.label}
           className="flex items-center justify-between gap-2 border-b border-[var(--border)] pb-0.5"
@@ -1170,6 +1171,30 @@ function TextList({ values }: { values: string[] }) {
   );
 }
 
+function formatCodeExplanationLines(codes: string[], language: Language) {
+  return explainCodes(codes, language).map(
+    (entry) => `${entry.label}: ${entry.short}`,
+  );
+}
+
+function formatLatestScanMetricLines(metrics: LatestScanItem["metrics"]) {
+  return [
+    ["Rank", formatScore(metrics.rankScore)],
+    ["Final", formatScore(metrics.finalSignalScore)],
+    ["Opportunity", formatScore(metrics.opportunityScore)],
+    ["Confirmation", formatScore(metrics.confirmationScore)],
+    ["Risk", formatScore(metrics.riskScore)],
+    ["Trend", formatScore(metrics.trendScore)],
+    ["Momentum", formatScore(metrics.momentumScore)],
+    ["Volume", formatScore(metrics.volumeScore)],
+    ["Structure", formatScore(metrics.structureScore)],
+    ["RSI", formatScore(metrics.rsi14)],
+    ["BB %", formatScore(metrics.bbPercent)],
+    ["BB Width", formatScore(metrics.bbWidthPercentile)],
+    ["Volume Ratio", formatScore(metrics.volumeRatio)],
+  ].map(([label, value]) => `${label}: ${value}`);
+}
+
 function getSharedLatestScanCandleTime(rows: LatestScanTableRow[]) {
   if (rows.length === 0) {
     return null;
@@ -1209,10 +1234,7 @@ function buildLatestScanTableRows(data: LatestScanResponse | null) {
   }
 
   return (data?.items ?? []).map((item, sourceIndex) => ({
-    item: {
-      ...item,
-      resultGroup: normalizeGroupKey(item.resultGroup),
-    },
+    item: withLatestScanResultGroup(item),
     sourceIndex,
   }));
 }
@@ -1223,10 +1245,27 @@ function getGroupItems(groups: LatestScanGroups, group: LatestScanGroupKey) {
       ? groups.insufficient_history ?? groups.insufficientHistory ?? []
       : groups[group] ?? [];
 
-  return items.map((item) => ({
+  return items.map((item) => withLatestScanResultGroup(item, group));
+}
+
+function withLatestScanResultGroup(
+  item: LatestScanItem,
+  group?: LatestScanGroupKey,
+): LatestScanRowItem {
+  return {
     ...item,
-    resultGroup: normalizeGroupKey(item.resultGroup ?? group),
-  }));
+    resultGroup: group ?? getLatestScanGroupFromCode(item.groupCode),
+  };
+}
+
+function getLatestScanGroupFromCode(
+  code: string | null | undefined,
+): LatestScanGroupKey {
+  const entry = Object.entries(groupCodeByResultGroup).find(
+    ([, groupCode]) => groupCode === code,
+  );
+
+  return normalizeGroupKey(entry?.[0]);
 }
 
 function getLatestScanSortValue(
@@ -1239,21 +1278,19 @@ function getLatestScanSortValue(
     case "symbol":
       return item.symbol;
     case "rank":
-      return item.rankScore;
+      return item.metrics.rankScore;
     case "signal":
       return `${getLatestScanGroupSortRank(
-        normalizeGroupKey(item.resultGroup),
-      )}-${formatSignalLabel(item.signalLabel)}`;
+        item.resultGroup,
+      )}-${explainCode(item.signalCodes[0] ?? item.phaseCode).label}`;
     case "action":
-      return getLatestScanActionDisplay(item);
+      return explainCode(item.actionCode).label;
     case "setup":
-      return formatStructure(item.primaryStructure);
+      return explainCode(item.setupCode).label;
     case "quality":
-      return `${getLatestScanQualitySortRank(item)}-${formatQualityTier(
-        item.qualityTier,
-      )}`;
+      return `${getLatestScanQualitySortRank(item)}-${getPrimaryLatestScanQualityCode(item)}`;
     case "price":
-      return item.priceAtSignal;
+      return item.metrics.price;
   }
 }
 
@@ -1264,46 +1301,66 @@ function getLatestScanGroupSortRank(group: LatestScanGroupKey) {
 }
 
 function getLatestScanQualitySortRank(item: LatestScanItem) {
-  if (item.isLowQuality) {
+  const qualityCodes = item.qualityCodes;
+
+  if (
+    qualityCodes.includes("QH_101") ||
+    qualityCodes.includes("QH_201") ||
+    qualityCodes.includes("QH_202")
+  ) {
     return 2;
   }
 
-  const tier = item.qualityTier?.trim().toLowerCase() ?? "";
-
-  if (tier.includes("high")) {
+  if (qualityCodes.includes("QH_601") || qualityCodes.includes("QH_501")) {
     return 0;
-  }
-
-  if (tier.includes("medium") || tier.includes("standard")) {
-    return 1;
   }
 
   return 1;
 }
 
+function getLatestScanQualityTone(item: LatestScanItem): ChipTone {
+  return getLatestScanQualitySortRank(item) >= 2 ? "warning" : "neutral";
+}
+
+function getPrimaryLatestScanQualityCode(item: LatestScanItem) {
+  return item.qualityCodes[0] ?? "QH_001";
+}
+
 function formatLatestScanCsv(
   items: LatestScanItem[],
-  dictionary: ScannerDisplayDictionary = dictionaries.en,
+  language: Language = "en",
 ) {
   const headers = [
     "Symbol",
     "Rank",
-    "Signal",
-    "Action",
-    "Setup Type",
-    "Quality",
+    "Group Code",
+    "Signal Codes",
+    "Action Code",
+    "Setup Code",
+    "Risk Codes",
+    "Reason Codes",
+    "Quality Codes",
     "Price",
     "Candle Time",
+    "Scanner Version",
+    "Code Schema Version",
+    "Dictionary Version",
   ];
   const rows = items.map((item) => [
     item.symbol,
-    formatScore(item.rankScore),
-    formatSignalLabel(item.signalLabel, dictionary),
-    getLatestScanActionDisplay(item, dictionary),
-    formatStructure(item.primaryStructure, dictionary),
-    formatQualityTier(item.qualityTier),
-    formatPrice(item.priceAtSignal),
+    formatScore(item.metrics.rankScore),
+    item.groupCode,
+    item.signalCodes.join("|"),
+    item.actionCode,
+    item.setupCode,
+    item.riskCodes.join("|"),
+    item.reasonCodes.join("|"),
+    item.qualityCodes.join("|"),
+    formatPrice(item.metrics.price),
     formatDateTime(item.candleOpenTime),
+    item.scannerVersion,
+    item.codeSchemaVersion,
+    item.dictionaryVersion,
   ]);
 
   return [headers, ...rows]
@@ -1568,144 +1625,10 @@ async function getLatestScanErrorMessage(response: Response, fallback: string) {
   return errorBody?.error?.message ?? errorBody?.message ?? fallback;
 }
 
-function formatStructure(
-  value: string | null | undefined,
-  dictionary: ScannerDisplayDictionary = dictionaries.en,
-) {
-  return formatPrimaryStructure(value, dictionary);
-}
-
 function formatInteger(value: number | null | undefined) {
   return value === null || value === undefined
     ? "0"
     : new Intl.NumberFormat().format(value);
-}
-
-function formatUnknownList(
-  value: unknown,
-  dictionary: ScannerDisplayDictionary = dictionaries.en,
-) {
-  if (Array.isArray(value)) {
-    return value.map((item) => formatUnknownValue(item, dictionary)).filter(Boolean);
-  }
-
-  if (typeof value === "string") {
-    return value ? [value] : [];
-  }
-
-  return [];
-}
-
-function formatUnknownValue(
-  value: unknown,
-  dictionary: ScannerDisplayDictionary,
-) {
-  if (typeof value === "string") {
-    return formatPrimaryStructure(value, dictionary);
-  }
-
-  if (typeof value === "number" || typeof value === "boolean") {
-    return String(value);
-  }
-
-  return "";
-}
-
-function normalizeFactors(
-  factors: Record<string, unknown> | undefined,
-  dictionary: ScannerDisplayDictionary,
-) {
-  const rows: string[] = [];
-
-  for (const key of ["bullish", "bearish", "risk", "neutral"]) {
-    const values = formatObservationList(factors?.[key], dictionary);
-
-    if (values.length > 0) {
-      rows.push(`${toTitleCase(key)}: ${values.slice(0, 3).join(", ")}`);
-    }
-  }
-
-  return rows;
-}
-
-function formatObservationList(
-  value: unknown,
-  dictionary: ScannerDisplayDictionary,
-) {
-  if (!Array.isArray(value)) {
-    return [];
-  }
-
-  return value
-    .map((item) => {
-      const observation = toScannerObservation(item);
-
-      return observation
-        ? formatScannerObservation(observation, dictionary)
-        : "";
-    })
-    .filter(Boolean);
-}
-
-function toScannerObservation(value: unknown): ScannerObservation | null {
-  if (
-    value &&
-    typeof value === "object" &&
-    "key" in value &&
-    typeof value.key === "string" &&
-    value.key in dictionaries.en.scannerObservation &&
-    "severity" in value &&
-    isScannerObservationSeverity(value.severity) &&
-    "scope" in value &&
-    isScannerObservationScope(value.scope)
-  ) {
-    return value as ScannerObservation;
-  }
-
-  return null;
-}
-
-function isScannerObservationSeverity(value: unknown) {
-  return (
-    value === "positive" ||
-    value === "neutral" ||
-    value === "warning" ||
-    value === "risk"
-  );
-}
-
-function isScannerObservationScope(value: unknown) {
-  return (
-    value === "trend" ||
-    value === "momentum" ||
-    value === "volume" ||
-    value === "structure" ||
-    value === "risk" ||
-    value === "quality" ||
-    value === "confirmation" ||
-    value === "invalidation" ||
-    value === "system"
-  );
-}
-
-function pickRawMetrics(metrics: Record<string, unknown> | undefined) {
-  if (!metrics) {
-    return [];
-  }
-
-  const keys = [
-    "rsi",
-    "bbPercent",
-    "volumeRatio",
-    "macdState",
-    "closeAboveMA20",
-    "closeAboveMA50",
-    "closeAboveMA200",
-  ];
-
-  return keys
-    .filter((key) => metrics[key] !== null && metrics[key] !== undefined)
-    .map((key) => `${toTitleCase(key)}: ${String(metrics[key])}`);
 }
 
 const controlClass =

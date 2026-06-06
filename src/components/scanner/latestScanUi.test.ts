@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { dictionaries } from "@/lib/i18n/dictionaries";
+import { explainCode } from "@/lib/scanner-codebook/explainCode";
+import { groupCodeByResultGroup } from "@/lib/scanner-codebook/codeRegistry";
 import { buildLatestScanPreviewResponse } from "./latestScanPreviewData";
 import {
   formatActionBias,
@@ -259,26 +261,29 @@ describe("latest scan UI helpers", () => {
   });
 
   it("formats visual-check preview rows in Chinese without mixed English result labels", () => {
-    const dictionary = dictionaries.zh;
     const preview = buildLatestScanPreviewResponse();
-    const items = Object.values(preview.groups ?? {}).flat();
+    const groupedItems = Object.entries(preview.groups ?? {});
     const forbiddenEnglishResultText =
       /\b(Manual review|Needs confirmation|Overheated review|Risk review|Low priority|Mixed research context|Not enough candles|Extended Breakout|Base Building|Distribution|Breakdown|Unknown)\b/i;
-    const renderedText = items
-      .map((item) =>
-        [
-          formatGroupLabel(normalizeGroupKey(item.resultGroup), dictionary),
-          formatSignalLabel(item.signalLabel, dictionary),
-          getLatestScanActionDisplay(item, dictionary),
-          getReviewStatusNote(item, dictionary),
-          formatPrimaryStructure(item.primaryStructure, dictionary),
-        ].join(" "),
+    const renderedText = groupedItems
+      .flatMap(([groupKey, items]) =>
+        items.map((item) =>
+          [
+            explainCode(
+              groupCodeByResultGroup[normalizeGroupKey(groupKey)],
+              "zh",
+            ).label,
+            explainCode(item.signalCodes[0], "zh").label,
+            explainCode(item.actionCode, "zh").label,
+            explainCode(item.setupCode, "zh").label,
+          ].join(" "),
+        ),
       )
       .join(" ");
 
     expect(renderedText).toContain("人工复核");
-    expect(renderedText).toContain("需要确认");
-    expect(renderedText).toContain("延伸突破");
+    expect(renderedText).toContain("观察");
+    expect(renderedText).toContain("过热");
     expect(renderedText).toContain("筑底");
     expect(renderedText).toContain("历史数据不足");
     expect(renderedText).not.toMatch(forbiddenEnglishResultText);

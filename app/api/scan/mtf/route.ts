@@ -20,6 +20,10 @@ import {
 import { scanMarketMultiTimeframe } from "@/lib/scanner/scanMarketMtf";
 import { SCORING_VERSION } from "@/lib/scanner/scoring";
 import type { ScanResult } from "@/lib/scanner/types";
+import {
+  serializeScanResultToCodeContract,
+  type ScannerCodeContractResult,
+} from "@/lib/scanner-codebook/serializeScanResult";
 import { getScannerStorageAdapter } from "@/lib/storage/storageAdapter";
 
 export const runtime = "nodejs";
@@ -70,7 +74,7 @@ type MtfScanPayload = {
   usesClosedCandles: true;
   lastClosedCandleTime: string | null;
   failureSummary: ScanFailureSummary;
-  results: ScanResult[];
+  results: ScannerCodeContractResult[];
   itemCount: number;
   errors?: ScanErrorSample[];
   batchMode?: true;
@@ -174,6 +178,7 @@ export async function GET(request: Request) {
     const results = successful
       .filter((result) => result.dataQuality.sufficientHistory)
       .sort((left, right) => right.rankScore - left.rankScore);
+    const publicResults = results.map(serializeScanResultToCodeContract);
     const errors = settled.flatMap((item) => (item.error ? [item.error] : []));
     const skippedCount = successful.length - results.length;
     const durationMs = Date.now() - startedAt;
@@ -213,7 +218,7 @@ export async function GET(request: Request) {
       usesClosedCandles: true,
       lastClosedCandleTime: getLatestClosedCandleTime(results),
       failureSummary,
-      results,
+      results: publicResults,
       itemCount: results.length,
       errors:
         errors.length > 0
@@ -238,6 +243,7 @@ export async function GET(request: Request) {
       const updatedAt = new Date().toISOString();
       await persistResearchSignals({
         payload,
+        results,
         updatedAt,
         source: useLocal ? "local" : "remote",
       });
@@ -252,6 +258,7 @@ export async function GET(request: Request) {
     const entry = setCached(cacheKey, payload, ttlMs);
     await persistResearchSignals({
       payload,
+      results,
       updatedAt: entry.updatedAt,
       source: "remote",
     });
@@ -290,10 +297,12 @@ export async function GET(request: Request) {
 
 async function persistResearchSignals({
   payload,
+  results,
   updatedAt,
   source,
 }: {
   payload: MtfScanPayload;
+  results: ScanResult[];
   updatedAt: string;
   source: Exclude<ScanSource, "cached">;
 }) {
@@ -311,7 +320,7 @@ async function persistResearchSignals({
     createdAt: updatedAt,
     timeframe: "mtf",
     source,
-    results: payload.results,
+    results,
     marketContext: {
       exchange: payload.exchange,
       universe: payload.universe,

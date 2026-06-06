@@ -3,6 +3,14 @@ import type {
   LatestScanResponse,
 } from "./LatestScanPageClient";
 import type { LatestScanGroupKey } from "./latestScanUi";
+import {
+  actionCodeByBias,
+  groupCodeByResultGroup,
+  riskCodeByType,
+  scannerCodeVersions,
+  setupCodeByAliasOrStructure,
+  signalCodeByLabel,
+} from "@/lib/scanner-codebook/codeRegistry";
 
 const previewRunId = "scan-preview-4h-20260605-1208";
 const previewCandleTime = "2026-06-05T12:00:00.000Z";
@@ -479,58 +487,163 @@ export function buildLatestScanPreviewResponse(): LatestScanResponse {
   };
 }
 
-function makePreviewItem(
-  overrides: Partial<LatestScanItem> & {
-    id: string;
-    symbol: string;
-    resultGroup: LatestScanGroupKey;
-  },
-): LatestScanItem {
-  const { id, symbol, resultGroup, ...optionalOverrides } = overrides;
+type PreviewItemInput = {
+  id: string;
+  symbol: string;
+  resultGroup: LatestScanGroupKey;
+  rankScore?: number | null;
+  signalLabel?: string | null;
+  actionBias?: string | null;
+  reviewTier?: string | null;
+  statusNote?: string | null;
+  statusReasons?: string[];
+  primaryStructure?: string | null;
+  qualityTier?: string | null;
+  isLowQuality?: boolean;
+  qualityFlags?: string[];
+  candleCount?: number | null;
+  priceAtSignal?: number | null;
+  opportunityScore?: number | null;
+  confirmationScore?: number | null;
+  riskScore?: number | null;
+  trendScore?: number | null;
+  momentumScore?: number | null;
+  volumeScore?: number | null;
+  structureScore?: number | null;
+  detectedRiskTypes?: string[];
+  nextConfirmation?: string[];
+  invalidation?: string[];
+  factors?: Record<string, unknown>;
+};
+
+function makePreviewItem(overrides: PreviewItemInput): LatestScanItem {
+  const signalCode = toSignalCode(overrides.signalLabel ?? "neutral");
+  const actionCode = toActionCode(overrides.actionBias ?? "ignore");
+  const setupCode = toSetupCode(overrides.primaryStructure ?? "neutral");
+  const riskCodes = toRiskCodes(overrides.detectedRiskTypes ?? []);
 
   return {
-    id,
+    id: overrides.id,
     scanRunId: previewRunId,
     exchange: "binance",
-    market: "crypto",
-    symbol,
+    market: "spot",
+    symbol: overrides.symbol,
     timeframe: "4h",
-    resultGroup,
-    rankScore: 0,
-    signalLabel: "neutral",
-    actionBias: "ignore",
-    reviewTier: "neutral",
-    statusNote: "Mixed research context",
-    cautionLevel: null,
-    statusReasons: [],
-    primaryStructure: "neutral",
-    qualityTier: "normal",
-    isLowQuality: false,
-    qualityFlags: [],
-    candleCount: 420,
-    priceAtSignal: 1,
-    candleOpenTime: previewCandleTime,
-    opportunityScore: 0,
-    confirmationScore: 0,
-    riskScore: 0,
-    trendScore: 0,
-    momentumScore: 0,
-    volumeScore: 0,
-    structureScore: 0,
-    secondaryStructures: [],
-    detectedRiskTypes: [],
-    nextConfirmation: [],
-    invalidation: [],
-    factors: {},
-    rawMetrics: {
-      rsi: 56,
+    assetClass: "crypto",
+    scanTime: "2026-06-05T12:08:00.000Z",
+    groupCode: groupCodeByResultGroup[overrides.resultGroup],
+    actionCode,
+    riskCode: riskCodes[0] ?? null,
+    riskCodes,
+    setupCode,
+    phaseCode: setupCode,
+    reasonCodes: riskCodes,
+    signalCodes: [signalCode],
+    qualityCodes: toQualityCodes({
+      resultGroup: overrides.resultGroup,
+      qualityTier: overrides.qualityTier,
+      qualityFlags: overrides.qualityFlags,
+      isLowQuality: overrides.isLowQuality,
+    }),
+    metrics: {
+      score: overrides.rankScore ?? null,
+      rankScore: overrides.rankScore ?? null,
+      finalSignalScore: overrides.rankScore ?? null,
+      opportunityScore: overrides.opportunityScore ?? 0,
+      confirmationScore: overrides.confirmationScore ?? 0,
+      riskScore: overrides.riskScore ?? 0,
+      qualityScore: null,
+      trendScore: overrides.trendScore ?? 0,
+      momentumScore: overrides.momentumScore ?? 0,
+      volumeScore: overrides.volumeScore ?? 0,
+      structureScore: overrides.structureScore ?? 0,
+      volumeRank: null,
+      historyBars: overrides.candleCount ?? 420,
+      price: overrides.priceAtSignal ?? 1,
+      rsi14: 56,
       bbPercent: 62,
+      bbWidthPercentile: null,
       volumeRatio: 1.4,
-      macdState: "improving",
-      closeAboveMA20: true,
-      closeAboveMA50: true,
-      closeAboveMA200: true,
     },
-    ...optionalOverrides,
+    scannerVersion: scannerCodeVersions.scannerVersion,
+    codeSchemaVersion: scannerCodeVersions.codeSchemaVersion,
+    dictionaryVersion: scannerCodeVersions.dictionaryVersion,
+    candleOpenTime: previewCandleTime,
   };
 }
+
+function toSignalCode(value: string | null | undefined) {
+  return (
+    signalCodeByLabel[value as keyof typeof signalCodeByLabel] ??
+    value ??
+    "NX_801"
+  );
+}
+
+function toActionCode(value: string | null | undefined) {
+  return (
+    actionCodeByBias[value as keyof typeof actionCodeByBias] ??
+    value ??
+    "NX_801"
+  );
+}
+
+function toSetupCode(value: string | null | undefined) {
+  return (
+    setupCodeByAliasOrStructure[
+      value as keyof typeof setupCodeByAliasOrStructure
+    ] ??
+    value ??
+    "NX_801"
+  );
+}
+
+function toRiskCodes(value: string[]) {
+  return value.map(
+    (risk) => riskCodeByType[risk as keyof typeof riskCodeByType] ?? "RK_201",
+  );
+}
+
+function toQualityCodes({
+  resultGroup,
+  qualityTier,
+  qualityFlags,
+  isLowQuality,
+}: {
+  resultGroup: LatestScanGroupKey;
+  qualityTier?: string | null;
+  qualityFlags?: string[];
+  isLowQuality?: boolean;
+}): LatestScanItem["qualityCodes"] {
+  if (resultGroup === "insufficient_history") {
+    return ["QH_201"];
+  }
+
+  const codes = [
+    qualityCodeByPreviewValue[qualityTier ?? ""],
+    ...(qualityFlags ?? []).map((flag) => qualityCodeByPreviewValue[flag]),
+  ].filter((code): code is LatestScanItem["qualityCodes"][number] =>
+    Boolean(code),
+  );
+
+  if (codes.length > 0) {
+    return [...new Set(codes)];
+  }
+
+  return isLowQuality ? ["QH_101"] : ["QH_001"];
+}
+
+const qualityCodeByPreviewValue: Partial<
+  Record<string, LatestScanItem["qualityCodes"][number]>
+> = {
+  core: "QH_601",
+  major: "QH_501",
+  normal: "QH_001",
+  new_listing: "QH_202",
+  low_history: "QH_201",
+  meme: "QH_101",
+  fan_token: "QH_101",
+  wrapped_or_staked: "QH_101",
+  stable_like: "QH_101",
+  special_or_suspicious: "QH_101",
+};

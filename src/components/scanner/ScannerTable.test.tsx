@@ -2,6 +2,10 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import { LanguageProvider } from "@/components/providers/LanguageProvider";
 import type { ScanResult } from "@/lib/shared/scannerTypes";
+import {
+  serializeScanResultToCodeContract,
+  type ScannerCodeContractResult,
+} from "@/lib/scanner-codebook/serializeScanResult";
 import { ScannerTable } from "./ScannerTable";
 
 describe("scanner compact table", () => {
@@ -34,13 +38,12 @@ describe("scanner compact table", () => {
     expect(html).toContain("C +88");
     expect(html).toContain("R +12");
     expect(html).toContain("W1");
-    expect(html).toContain("MACD");
-    expect(html).toContain("20");
-    expect(html).toContain("50");
-    expect(html).toContain("200");
+    expect(html).toContain("Breakout Attempt");
+    expect(html).toContain("Watch Momentum");
+    expect(html).toContain("Low Priority Review");
   });
 
-  it("renders localized MACD table labels", () => {
+  it("renders code contract rows without legacy signal text", () => {
     const englishHtml = renderToStaticMarkup(
       <LanguageProvider>
         <ScannerTable
@@ -79,14 +82,19 @@ describe("scanner compact table", () => {
       </LanguageProvider>,
     );
 
-    expect(englishHtml).toContain("Cross");
-    expect(englishHtml).toContain("Flat");
+    expect(englishHtml).toContain("BTCUSDT");
+    expect(englishHtml).toContain("ETHUSDT");
+    expect(englishHtml).toContain("Watch Momentum");
+    expect(englishHtml).not.toContain("watch_only");
+    expect(englishHtml).not.toContain("breakout_attempt");
     expect(englishHtml).not.toContain("+0");
   });
 });
 
-function makeResult(overrides: Partial<ScanResult> = {}): ScanResult {
-  return {
+function makeResult(
+  overrides: Partial<ScanResult> = {},
+): ScannerCodeContractResult {
+  const result: ScanResult = {
     exchange: "binance",
     symbol: "BTCUSDT",
     timeframe: "4h",
@@ -174,4 +182,6 @@ function makeResult(overrides: Partial<ScanResult> = {}): ScanResult {
     },
     ...overrides,
   };
+
+  return serializeScanResultToCodeContract(result);
 }

@@ -1,6 +1,14 @@
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
+import {
+  actionCodeByBias,
+  groupCodeByResultGroup,
+  riskCodeByType,
+  scannerCodeVersions,
+  signalCodeByLabel,
+  setupCodeByAliasOrStructure,
+} from "@/lib/scanner-codebook/codeRegistry";
 import { MarketContextPanel } from "@/components/market-context/MarketContextPanel";
 import { sortDataRows } from "@/components/table/dataTableSorting";
 import {
@@ -97,17 +105,14 @@ describe("MultiTimeframeScreenerTable", () => {
         summary: null,
         count: 1,
         items: [
-          {
+          makeItem({
             id: "signal-1h",
             symbol: "SEIUSDT",
-            exchange: "binance",
-            market: "spot",
             timeframe: "1h",
             resultGroup: "eligible",
             rankScore: 88.2,
             signalLabel: "confirmed",
-            detectedRiskTypes: [],
-          },
+          }),
         ],
       } satisfies MtfLatestScanResponse,
     });
@@ -357,7 +362,7 @@ describe("MultiTimeframeScreenerTable", () => {
           timeframe: "4h",
           resultGroup: "eligible",
           rankScore: 88,
-          signalLabel: "eligible pullback",
+          signalLabel: "confirmed",
         }),
         makeItem({
           symbol: "ETHUSDT",
@@ -541,17 +546,66 @@ function makeItem(
   overrides: Partial<MtfLatestScanResponse["items"][number]> & {
     symbol: string;
     timeframe: "1h" | "4h" | "1d" | "1w";
+    group?: "eligible" | "watch" | "risk" | "overheated" | "neutral" | null;
+    resultGroup?: "eligible" | "watch" | "risk" | "overheated" | "neutral" | null;
+    rankScore?: number | null;
+    signalLabel?: keyof typeof signalCodeByLabel;
+    actionBias?: keyof typeof actionCodeByBias;
+    primaryStructure?: keyof typeof setupCodeByAliasOrStructure;
+    detectedRiskTypes?: Array<keyof typeof riskCodeByType>;
   },
 ): MtfLatestScanResponse["items"][number] {
+  const resultGroup = overrides.resultGroup ?? overrides.group ?? "neutral";
+  const riskCodes = (overrides.detectedRiskTypes ?? []).map(
+    (risk) => riskCodeByType[risk] ?? "RK_201",
+  );
+  const rankScore =
+    overrides.metrics?.rankScore ??
+    (Object.prototype.hasOwnProperty.call(overrides, "rankScore")
+      ? overrides.rankScore ?? null
+      : 0);
+
   return {
     id: `${overrides.timeframe}-${overrides.symbol}`,
+    scanRunId: `run-${overrides.timeframe}`,
     symbol: overrides.symbol,
     exchange: "binance",
     market: "spot",
+    assetClass: "crypto",
     timeframe: overrides.timeframe,
-    resultGroup: overrides.resultGroup ?? "neutral",
-    rankScore: overrides.rankScore ?? 0,
-    signalLabel: overrides.signalLabel ?? "watch",
-    detectedRiskTypes: overrides.detectedRiskTypes ?? [],
+    scanTime: "2026-06-03T12:00:00.000Z",
+    candleOpenTime: "2026-06-03T08:00:00.000Z",
+    groupCode: groupCodeByResultGroup[resultGroup],
+    actionCode: actionCodeByBias[overrides.actionBias ?? "watch_only"],
+    riskCode: riskCodes[0] ?? null,
+    riskCodes,
+    setupCode:
+      setupCodeByAliasOrStructure[overrides.primaryStructure ?? "strong_trend"],
+    phaseCode:
+      setupCodeByAliasOrStructure[overrides.primaryStructure ?? "strong_trend"],
+    reasonCodes: riskCodes,
+    signalCodes: [signalCodeByLabel[overrides.signalLabel ?? "watch"]],
+    qualityCodes: ["QH_001"],
+    metrics: {
+      score: rankScore,
+      rankScore,
+      finalSignalScore: rankScore,
+      opportunityScore: null,
+      confirmationScore: null,
+      riskScore: null,
+      qualityScore: null,
+      trendScore: null,
+      momentumScore: null,
+      volumeScore: null,
+      structureScore: null,
+      volumeRank: null,
+      historyBars: null,
+      price: null,
+      rsi14: null,
+      bbPercent: null,
+      bbWidthPercentile: null,
+      volumeRatio: null,
+    },
+    ...scannerCodeVersions,
   };
 }

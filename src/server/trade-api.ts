@@ -25,6 +25,10 @@ import {
   getScanResultReview,
   type ScanResultGroup,
 } from "@/lib/scanner/scanResultGroups";
+import {
+  serializeStoredSignalToCodeContract,
+  type PublicStoredScannerSignal,
+} from "@/lib/scanner-codebook/serializeStoredSignal";
 import { PgMarketDataStore } from "@/lib/storage/postgres/marketDataPg";
 import {
   HISTORICAL_SNAPSHOT_OBSERVATION_WINDOWS,
@@ -702,14 +706,15 @@ async function handleSymbolResearch(response: http.ServerResponse, url: URL) {
         includeMarketContext,
       }),
     ]);
-    const latestSignal = enrichSymbolResearchSignal(latest.signal, {
+    const latestSignalInternal = enrichSymbolResearchSignal(latest.signal, {
       currentSignal: latest.signal,
       assetClass: assetClass.value,
     });
+    const latestSignal = toPublicSymbolResearchSignal(latestSignalInternal);
     const quality = getSymbolQuality(latest.symbol.symbol, {
       assetClass: latest.symbol.assetClass,
-      candleCount: latestSignal.candleCount,
-      firstOpenTime: latestSignal.firstOpenTime,
+      candleCount: latest.signal.candleCount,
+      firstOpenTime: latest.signal.firstOpenTime,
     });
 
     sendJson(response, 200, {
@@ -734,16 +739,20 @@ async function handleSymbolResearch(response: http.ServerResponse, url: URL) {
       scoreBreakdown: buildSymbolResearchScoreBreakdown(latestSignal),
       interpretation: buildSymbolResearchInterpretation(latestSignal),
       history: historySignals.map((signal) =>
-        enrichSymbolResearchSignal(signal, {
-          currentSignal: latest.signal,
-          assetClass: assetClass.value,
-        }),
+        toPublicSymbolResearchSignal(
+          enrichSymbolResearchSignal(signal, {
+            currentSignal: latest.signal,
+            assetClass: assetClass.value,
+          }),
+        ),
       ),
       timeframes: timeframeSignals.map((signal) =>
-        enrichSymbolResearchSignal(signal, {
-          currentSignal: latest.signal,
-          assetClass: assetClass.value,
-        }),
+        toPublicSymbolResearchSignal(
+          enrichSymbolResearchSignal(signal, {
+            currentSignal: latest.signal,
+            assetClass: assetClass.value,
+          }),
+        ),
       ),
       behavior: behaviorResult.behavior,
       behaviorDiagnostics: behaviorResult.behaviorDiagnostics,
@@ -1379,7 +1388,7 @@ async function handleMtfLatestScan(response: http.ServerResponse, url: URL) {
           symbol,
           exchange: item.exchange,
           market: item.market,
-          assetClass: item.assetClass,
+          assetClass: item.assetClass ?? assetClass.value,
           timeframes: createMtfTimeframeMap<MtfLatestSignalItem | null>(null),
         };
 
@@ -1506,18 +1515,12 @@ function buildMtfLatestSignalItem(
     candleCount: signal.candleCount,
     firstOpenTime: signal.firstOpenTime,
   });
-  const resultGroup = classifyScanResultGroup(signal);
-  const review = getScanResultReview({ ...signal, resultGroup });
-
   return {
-    ...signal,
-    ...quality,
+    ...serializeStoredSignalToCodeContract({
+      ...signal,
+      ...quality,
+    }),
     timeframe,
-    group: resultGroup,
-    resultGroup,
-    action: review.statusNoteKey,
-    setupType: signal.primaryStructure,
-    ...review,
   };
 }
 
@@ -1562,30 +1565,30 @@ function buildAvailableMarketContextProxy({
   timeframe: MarketContextTimeframe;
   runContext: MarketContextRunContext;
 }): AvailableMarketContextProxy {
-  const group = classifyScanResultGroup(signal);
-  const review = getScanResultReview({ ...signal, resultGroup: group });
+  const publicSignal = serializeStoredSignalToCodeContract(signal);
 
   return {
     available: true,
     timeframe,
-    group,
-    signalLabel: signal.signalLabel,
-    rankScore: signal.rankScore,
-    actionBias: signal.actionBias,
-    primaryStructure: signal.primaryStructure,
-    detectedRiskTypes: normalizeMarketContextRiskTypes(signal.detectedRiskTypes),
-    statusNote: review.statusNoteKey,
-    cautionLevel: review.cautionLevel,
+    groupCode: publicSignal.groupCode,
+    actionCode: publicSignal.actionCode,
+    riskCode: publicSignal.riskCode,
+    riskCodes: publicSignal.riskCodes,
+    setupCode: publicSignal.setupCode,
+    phaseCode: publicSignal.phaseCode,
+    reasonCodes: publicSignal.reasonCodes,
+    signalCodes: publicSignal.signalCodes,
+    qualityCodes: publicSignal.qualityCodes,
+    metrics: {
+      rankScore: publicSignal.metrics.rankScore,
+    },
+    scannerVersion: publicSignal.scannerVersion,
+    codeSchemaVersion: publicSignal.codeSchemaVersion,
+    dictionaryVersion: publicSignal.dictionaryVersion,
     scanTime: signal.scanTime,
     candleOpenTime: signal.candleOpenTime,
     runContext,
   };
-}
-
-function normalizeMarketContextRiskTypes(value: unknown[] | null | undefined) {
-  return (Array.isArray(value) ? value : []).filter(
-    (riskType): riskType is string => typeof riskType === "string",
-  );
 }
 
 function createMtfTimeframeMap<T>(value: T): MtfLatestTimeframeMap<T> {
@@ -1603,6 +1606,17 @@ type EnrichedSymbolResearchSignal = SymbolResearchSignalRecord & {
   isSelectedCurrentRun: boolean;
   isNewerThanSelectedCurrentRun: boolean;
 } & ReturnType<typeof getScanResultReview>;
+
+type PublicSymbolResearchSignal = PublicStoredScannerSignal & {
+  scanRunStartedAt: string | null;
+  scanRunFinishedAt: string | null;
+  scanRunSymbolsTotal: number | null;
+  scanRunSymbolsScanned: number | null;
+  scanRunSignalsCreated: number | null;
+  sourceRunIsLikelyFullUniverse: boolean | null;
+  isSelectedCurrentRun: boolean;
+  isNewerThanSelectedCurrentRun: boolean;
+};
 
 function enrichSymbolResearchSignal(
   signal: SymbolResearchSignalRecord,
@@ -1637,6 +1651,22 @@ function enrichSymbolResearchSignal(
       isSamePrimaryTimeframe &&
       !isSelectedCurrentRun &&
       isAfterDate(signal.scanTime, currentSignal?.scanTime),
+  };
+}
+
+function toPublicSymbolResearchSignal(
+  signal: EnrichedSymbolResearchSignal,
+): PublicSymbolResearchSignal {
+  return {
+    ...serializeStoredSignalToCodeContract(signal),
+    scanRunStartedAt: signal.scanRunStartedAt,
+    scanRunFinishedAt: signal.scanRunFinishedAt,
+    scanRunSymbolsTotal: signal.scanRunSymbolsTotal,
+    scanRunSymbolsScanned: signal.scanRunSymbolsScanned,
+    scanRunSignalsCreated: signal.scanRunSignalsCreated,
+    sourceRunIsLikelyFullUniverse: signal.sourceRunIsLikelyFullUniverse,
+    isSelectedCurrentRun: signal.isSelectedCurrentRun,
+    isNewerThanSelectedCurrentRun: signal.isNewerThanSelectedCurrentRun,
   };
 }
 
@@ -1953,35 +1983,32 @@ function isAfterDate(left: string | null | undefined, right: string | null | und
   return leftTime > rightTime;
 }
 
-function buildSymbolResearchScoreBreakdown(signal: SymbolResearchSignalRecord) {
+function buildSymbolResearchScoreBreakdown(signal: PublicStoredScannerSignal) {
   return {
-    rankScore: signal.rankScore,
-    finalSignalScore: signal.finalSignalScore,
-    opportunityScore: signal.opportunityScore,
-    confirmationScore: signal.confirmationScore,
-    riskScore: signal.riskScore,
-    trendScore: signal.trendScore,
-    momentumScore: signal.momentumScore,
-    volumeScore: signal.volumeScore,
-    structureScore: signal.structureScore,
+    rankScore: signal.metrics.rankScore,
+    finalSignalScore: signal.metrics.finalSignalScore,
+    opportunityScore: signal.metrics.opportunityScore,
+    confirmationScore: signal.metrics.confirmationScore,
+    riskScore: signal.metrics.riskScore,
+    trendScore: signal.metrics.trendScore,
+    momentumScore: signal.metrics.momentumScore,
+    volumeScore: signal.metrics.volumeScore,
+    structureScore: signal.metrics.structureScore,
   };
 }
 
-function buildSymbolResearchInterpretation(signal: EnrichedSymbolResearchSignal) {
+function buildSymbolResearchInterpretation(signal: PublicStoredScannerSignal) {
   return {
-    group: signal.resultGroup,
-    label: signal.signalLabel ?? "unknown",
-    action: getSymbolResearchActionLabel(signal),
-    setupType: signal.primaryStructure ?? "unknown",
-    statusNote: signal.statusNoteKey,
-    reasons: signal.statusReasonKeys.map((reason) => reason.key),
-    nextConfirmation: signal.nextConfirmation,
-    invalidation: signal.invalidation,
+    groupCode: signal.groupCode,
+    actionCode: signal.actionCode,
+    riskCode: signal.riskCode,
+    riskCodes: signal.riskCodes,
+    setupCode: signal.setupCode,
+    phaseCode: signal.phaseCode,
+    reasonCodes: signal.reasonCodes,
+    signalCodes: signal.signalCodes,
+    qualityCodes: signal.qualityCodes,
   };
-}
-
-function getSymbolResearchActionLabel(signal: EnrichedSymbolResearchSignal) {
-  return signal.statusNoteKey;
 }
 
 function buildSymbolResearchCandlesPayload({
@@ -2187,8 +2214,8 @@ async function handleHistorySnapshot(response: http.ServerResponse, url: URL) {
       includeMarketContext: false,
     });
     const rows = signals
-      .map(buildHistoricalSnapshotRow)
-      .sort(compareScanResultGroupItems);
+      .sort(compareScanResultGroupItems)
+      .map(buildHistoricalSnapshotRow);
     const scannerVersion = firstNonEmpty(rows.map((row) => row.scannerVersion));
     const scoringVersion = firstNonEmpty(rows.map((row) => row.scoringVersion));
 
@@ -2559,17 +2586,7 @@ function buildHistoricalSnapshotObservationRow(
   const snapshotRow = buildHistoricalSnapshotRow(signal);
 
   return {
-    id: snapshotRow.id,
-    scanRunId: snapshotRow.scanRunId,
-    symbol: snapshotRow.symbol,
-    exchange: snapshotRow.exchange,
-    market: snapshotRow.market,
-    timeframe: snapshotRow.timeframe,
-    group: snapshotRow.group,
-    resultGroup: snapshotRow.resultGroup,
-    label: snapshotRow.label,
-    primarySignal: snapshotRow.primarySignal,
-    rankScore: snapshotRow.rankScore,
+    ...snapshotRow,
     anchorTime: signal.anchorTime,
     anchorClose: signal.anchorClose,
     anchorSource: signal.anchorSource,
@@ -3111,45 +3128,10 @@ function getHistoryObservationTimeframeMs(timeframe: string) {
 }
 
 function buildHistoricalSnapshotRow(signal: LatestScanSignalRecord) {
-  const group = classifyScanResultGroup(signal);
-  const review = getScanResultReview({ ...signal, resultGroup: group });
-  const riskTypes = toStringArray(signal.detectedRiskTypes);
+  const publicSignal = serializeStoredSignalToCodeContract(signal);
 
   return {
-    id: signal.id,
-    scanRunId: signal.scanRunId,
-    symbol: signal.symbol,
-    exchange: signal.exchange,
-    market: signal.market,
-    timeframe: signal.timeframe,
-    scanTime: signal.scanTime,
-    candleOpenTime: signal.candleOpenTime,
-    priceAtSignal: signal.priceAtSignal,
-    assetClass: signal.assetClass,
-    group,
-    resultGroup: group,
-    label: signal.signalLabel,
-    primarySignal: review.statusNoteKey,
-    reviewTier: review.reviewTier,
-    riskNotes: review.statusReasonKeys.map((reason) => reason.key).join(" "),
-    riskTypes,
-    rankScore: signal.rankScore,
-    componentScores: {
-      finalSignalScore: signal.finalSignalScore,
-      opportunityScore: signal.opportunityScore,
-      confirmationScore: signal.confirmationScore,
-      riskScore: signal.riskScore,
-      trendScore: signal.trendScore,
-      momentumScore: signal.momentumScore,
-      volumeScore: signal.volumeScore,
-      structureScore: signal.structureScore,
-    },
-    actionBias: signal.actionBias,
-    primaryStructure: signal.primaryStructure,
-    secondaryStructures: signal.secondaryStructures,
-    factors: signal.factors,
-    rawMetrics: signal.rawMetrics,
-    scannerVersion: signal.scannerVersion,
+    ...publicSignal,
     scoringVersion: signal.scoringVersion,
     candleCount: signal.candleCount,
     firstOpenTime: signal.firstOpenTime,
@@ -3429,12 +3411,6 @@ function parseBooleanParam(value: string | null) {
 
 function firstNonEmpty(values: Array<string | null | undefined>) {
   return values.find((value) => typeof value === "string" && value.trim() !== "") ?? null;
-}
-
-function toStringArray(value: unknown[] | null | undefined) {
-  return Array.isArray(value)
-    ? value.filter((item): item is string => typeof item === "string")
-    : [];
 }
 
 function loadDotEnv() {

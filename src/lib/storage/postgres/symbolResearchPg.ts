@@ -4,6 +4,7 @@ import {
   type SymbolAssetClass,
   type SymbolAssetClassFilter,
 } from "@/lib/market-data/symbolClassification";
+import { getStoredSignalCodeFields } from "@/lib/scanner-codebook/serializeStoredSignal";
 import {
   LATEST_SCAN_FULL_UNIVERSE_MIN_SYMBOLS,
   PgScannerResultsStore,
@@ -621,6 +622,19 @@ function toSymbolResearchSymbolRecord(row: SymbolRow): SymbolResearchSymbolRecor
 function toSymbolResearchSignalRecord(
   row: ScanSignalRow,
 ): SymbolResearchSignalRecord {
+  // These scan_signals physical column names are legacy. Current scanner rows
+  // store semi-anonymous scanner codes in them; public responses must still pass
+  // through the scanner-code serializer before leaving the server.
+  const codeFields = getStoredSignalCodeFields({
+    signalLabel: row.signal_label,
+    actionBias: row.action_bias,
+    primaryStructure: row.primary_structure,
+    detectedRiskTypes: row.detected_risk_types,
+    factors: row.factors,
+    rawMetrics: row.raw_metrics,
+    scannerVersion: row.scanner_version,
+  });
+
   return {
     id: row.id,
     scanRunId: row.scan_run_id,
@@ -646,6 +660,17 @@ function toSymbolResearchSignalRecord(
     signalLabel: row.signal_label,
     actionBias: row.action_bias,
     primaryStructure: row.primary_structure,
+    groupCode: codeFields.groupCode,
+    actionCode: codeFields.actionCode,
+    riskCode: codeFields.riskCode,
+    riskCodes: codeFields.riskCodes,
+    setupCode: codeFields.setupCode,
+    phaseCode: codeFields.phaseCode,
+    reasonCodes: codeFields.reasonCodes,
+    signalCodes: codeFields.signalCodes,
+    qualityCodes: codeFields.qualityCodes,
+    codeSchemaVersion: codeFields.codeSchemaVersion,
+    dictionaryVersion: codeFields.dictionaryVersion,
     secondaryStructures: row.secondary_structures ?? [],
     detectedRiskTypes: row.detected_risk_types ?? [],
     factors: row.factors ?? {},
@@ -653,7 +678,7 @@ function toSymbolResearchSignalRecord(
     invalidation: row.invalidation,
     rawMetrics: row.raw_metrics ?? {},
     scoringVersion: row.scoring_version,
-    scannerVersion: row.scanner_version,
+    scannerVersion: codeFields.scannerVersion,
     createdAt: new Date(row.created_at).toISOString(),
     scanRunStartedAt: row.scan_run_started_at
       ? new Date(row.scan_run_started_at).toISOString()

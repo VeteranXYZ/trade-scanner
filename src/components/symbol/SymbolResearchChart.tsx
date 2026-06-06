@@ -30,8 +30,7 @@ type SymbolResearchChartProps = {
   density?: "normal" | "compact";
   latestSignal?: {
     candleOpenTime?: string | null;
-    resultGroup?: string | null;
-    statusNote?: string | null;
+    label?: string | null;
   };
 };
 
@@ -283,7 +282,7 @@ export function SymbolResearchChart({
           <LegendValue label="Last close" value={formatChartPrice(chartData.latestClose)} />
           <LegendValue
             label="Latest signal"
-            value={latestSignal?.statusNote || latestSignal?.resultGroup || "Not available"}
+            value={latestSignal?.label || "Not available"}
           />
           <LegendValue
             label="Candles"

@@ -25,10 +25,10 @@ export function SymbolSignalTimeline({
   variant = "default",
   maxItems = variant === "rail" ? 3 : 8,
 }: SymbolSignalTimelineProps) {
-  const { dictionary } = useAppLanguage();
+  const { language } = useAppLanguage();
   const items = useMemo(
-    () => normalizeSignalHistory(history, dictionary),
-    [history, dictionary],
+    () => normalizeSignalHistory(history, language),
+    [history, language],
   );
   const compactHistory = useMemo(
     () => getCompactSignalHistory(items, maxItems),

@@ -3,6 +3,14 @@ import type {
   LatestScanSignalRecord,
   ScanRunRecord,
 } from "@/lib/storage/postgres/scannerResultsPg";
+import {
+  actionCodeByBias,
+  groupCodeByResultGroup,
+  riskCodeByType,
+  scannerCodeVersions,
+  setupCodeByAliasOrStructure,
+  signalCodeByLabel,
+} from "@/lib/scanner-codebook/codeRegistry";
 import { buildLatestScanResponse } from "./latestScanResponse";
 
 describe("latest scan response", () => {
@@ -68,9 +76,10 @@ describe("latest scan response", () => {
     expect(response.summary.allocationStrategy).toBe("balanced_group_quota_v1");
     expect(response.items[0]).toMatchObject({
       symbol: "ETHUSDT",
-      reviewTier: "eligible",
-      statusNoteKey: "review.status.manualReview",
-      cautionLevel: "none",
+      groupCode: "GR_201",
+      actionCode: "AC_501",
+      setupCode: "TR_601",
+      signalCodes: ["PX_501"],
     });
   });
 
@@ -95,13 +104,14 @@ describe("latest scan response", () => {
     expect(response.groups.eligible).toHaveLength(0);
     expect(response.groups.watch.map((item) => item.symbol)).toEqual(["HBARUSDT"]);
     expect(response.groups.watch[0]).toMatchObject({
-      reviewTier: "watch_low",
-      statusNoteKey: "review.status.lowPriority",
+      groupCode: "GR_101",
+      actionCode: "AC_501",
+      setupCode: "ST_001",
     });
     expect(response.summary.watch).toBe(1);
   });
 
-  it("returns observation objects and review keys as the scanner API contract", () => {
+  it("returns code fields and versions as the scanner API contract", () => {
     const response = buildLatestScanResponse({
       run: makeRun("run-contract"),
       signals: [
@@ -150,27 +160,28 @@ describe("latest scan response", () => {
     const item = response.items[0];
 
     expect(item).toMatchObject({
-      statusNoteKey: "review.status.manualReview",
-      statusReasonKeys: [{ key: "review.reason.cleanCandidate" }],
-      factors: {
-        bullish: [
-          {
-            key: "factor.priceAboveMa20",
-            severity: "positive",
-            scope: "trend",
-          },
-        ],
+      symbol: "ETHUSDT",
+      groupCode: "GR_201",
+      actionCode: "AC_501",
+      setupCode: "TR_601",
+      signalCodes: ["PX_501"],
+      qualityCodes: ["QH_601"],
+      scannerVersion: scannerCodeVersions.scannerVersion,
+      codeSchemaVersion: scannerCodeVersions.codeSchemaVersion,
+      dictionaryVersion: scannerCodeVersions.dictionaryVersion,
+      metrics: {
+        rankScore: 50,
+        price: 1,
       },
-      nextConfirmation: [
-        {
-          key: "confirmation.reclaimMa50",
-          severity: "neutral",
-          scope: "confirmation",
-        },
-      ],
     });
+    expect(item).not.toHaveProperty("signalLabel");
+    expect(item).not.toHaveProperty("actionBias");
+    expect(item).not.toHaveProperty("primaryStructure");
     expect(item).not.toHaveProperty("statusNote");
     expect(item).not.toHaveProperty("statusReasons");
+    expect(item).not.toHaveProperty("statusNoteKey");
+    expect(item).not.toHaveProperty("statusReasonKeys");
+    expect(item).not.toHaveProperty("factors");
     expect(item).not.toHaveProperty("bullishFactors");
     expect(item).not.toHaveProperty("nextConfirmationText");
     expect(collectStrings(item).join("\n")).not.toMatch(/\p{Script=Han}/u);
@@ -293,6 +304,40 @@ function makeSignal(
     symbol: string;
   },
 ): LatestScanSignalRecord {
+  const signalCode = toSignalCode(overrides.signalLabel ?? "confirmed");
+  const actionCode = toActionCode(overrides.actionBias ?? "eligible");
+  const setupCode = toSetupCode(overrides.primaryStructure ?? "strong_trend");
+  const riskCodes = toRiskCodes(overrides.detectedRiskTypes ?? []);
+  const groupCode = toGroupCode({
+    signalLabel: overrides.signalLabel ?? "confirmed",
+    actionBias: overrides.actionBias ?? "eligible",
+    primaryStructure: overrides.primaryStructure ?? "strong_trend",
+    rankScore: overrides.rankScore ?? 50,
+    riskCodes,
+  });
+  const codeContract = {
+    groupCode,
+    actionCode,
+    riskCode: riskCodes[0] ?? null,
+    riskCodes,
+    setupCode,
+    phaseCode: "ST_201",
+    reasonCodes: [],
+    signalCodes: [signalCode],
+    qualityCodes: [],
+    scannerVersion: scannerCodeVersions.scannerVersion,
+    codeSchemaVersion: scannerCodeVersions.codeSchemaVersion,
+    dictionaryVersion: scannerCodeVersions.dictionaryVersion,
+  };
+  const factors =
+    overrides.factors && typeof overrides.factors === "object"
+      ? (overrides.factors as Record<string, unknown>)
+      : {};
+  const rawMetrics =
+    overrides.rawMetrics && typeof overrides.rawMetrics === "object"
+      ? (overrides.rawMetrics as Record<string, unknown>)
+      : {};
+
   return {
     id: overrides.id,
     scanRunId: overrides.scanRunId,
@@ -313,17 +358,34 @@ function makeSignal(
     momentumScore: 50,
     volumeScore: 50,
     structureScore: 50,
-    signalLabel: overrides.signalLabel ?? "confirmed",
-    actionBias: overrides.actionBias ?? "eligible",
-    primaryStructure: overrides.primaryStructure ?? "strong_trend",
+    signalLabel: signalCode,
+    actionBias: actionCode,
+    primaryStructure: setupCode,
+    groupCode,
+    actionCode,
+    riskCode: riskCodes[0] ?? null,
+    riskCodes,
+    setupCode,
+    phaseCode: codeContract.phaseCode,
+    reasonCodes: [],
+    signalCodes: [signalCode],
+    qualityCodes: [],
+    codeSchemaVersion: scannerCodeVersions.codeSchemaVersion,
+    dictionaryVersion: scannerCodeVersions.dictionaryVersion,
     secondaryStructures: [],
-    detectedRiskTypes: overrides.detectedRiskTypes ?? [],
-    factors: overrides.factors ?? {},
+    detectedRiskTypes: riskCodes,
+    factors: {
+      ...factors,
+      ...codeContract,
+    },
     nextConfirmation: overrides.nextConfirmation ?? null,
     invalidation: overrides.invalidation ?? null,
-    rawMetrics: {},
+    rawMetrics: {
+      ...rawMetrics,
+      codeContract,
+    },
     scoringVersion: "test",
-    scannerVersion: "test",
+    scannerVersion: scannerCodeVersions.scannerVersion,
     createdAt: "2026-05-31T00:00:00.000Z",
     assetClass: overrides.assetClass ?? "crypto",
     isScannerEligible: overrides.isScannerEligible ?? true,
@@ -332,6 +394,95 @@ function makeSignal(
     candleCount: overrides.candleCount ?? 1000,
     firstOpenTime: overrides.firstOpenTime ?? "2024-01-01T00:00:00.000Z",
   };
+}
+
+function toSignalCode(value: string | null | undefined) {
+  return (
+    signalCodeByLabel[value as keyof typeof signalCodeByLabel] ??
+    value ??
+    "NX_801"
+  );
+}
+
+function toActionCode(value: string | null | undefined) {
+  return (
+    actionCodeByBias[value as keyof typeof actionCodeByBias] ??
+    value ??
+    "NX_801"
+  );
+}
+
+function toSetupCode(value: string | null | undefined) {
+  return (
+    setupCodeByAliasOrStructure[
+      value as keyof typeof setupCodeByAliasOrStructure
+    ] ??
+    value ??
+    "NX_801"
+  );
+}
+
+function toRiskCodes(value: unknown[]) {
+  return value
+    .map((risk) =>
+      typeof risk === "string"
+        ? riskCodeByType[risk as keyof typeof riskCodeByType] ?? risk
+        : "",
+    )
+    .filter(Boolean);
+}
+
+function toGroupCode({
+  signalLabel,
+  actionBias,
+  primaryStructure,
+  rankScore,
+  riskCodes,
+}: {
+  signalLabel: string;
+  actionBias: string;
+  primaryStructure: string;
+  rankScore: number;
+  riskCodes: string[];
+}) {
+  if (
+    actionBias === "avoid" ||
+    signalLabel === "breakdown_risk" ||
+    signalLabel === "distribution_risk" ||
+    primaryStructure === "trend_breakdown" ||
+    primaryStructure === "distribution_risk" ||
+    riskCodes.length > 0
+  ) {
+    return groupCodeByResultGroup.risk;
+  }
+
+  if (
+    actionBias === "do_not_chase" ||
+    signalLabel === "overheated" ||
+    primaryStructure === "overextended"
+  ) {
+    return groupCodeByResultGroup.overheated;
+  }
+
+  if (
+    actionBias === "eligible" &&
+    (signalLabel === "confirmed" || signalLabel === "trend") &&
+    primaryStructure !== "neutral" &&
+    rankScore > 0
+  ) {
+    return groupCodeByResultGroup.eligible;
+  }
+
+  if (
+    actionBias === "eligible" ||
+    actionBias === "watch_only" ||
+    signalLabel === "watch" ||
+    signalLabel === "weak_bounce"
+  ) {
+    return groupCodeByResultGroup.watch;
+  }
+
+  return groupCodeByResultGroup.neutral;
 }
 
 function makeSignals({

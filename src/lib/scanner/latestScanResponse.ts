@@ -4,6 +4,10 @@ import type {
   ScanRunRecord,
 } from "@/lib/storage/postgres/scannerResultsPg";
 import {
+  serializeStoredSignalToCodeContract,
+  type PublicStoredScannerSignal,
+} from "@/lib/scanner-codebook/serializeStoredSignal";
+import {
   SCAN_RESULT_GROUPS,
   buildScanResultGroups,
   classifyScanResultGroup,
@@ -14,10 +18,12 @@ import {
   type ScanResultGroup,
 } from "./scanResultGroups";
 
-export type LatestScanItem = LatestScanSignalRecord &
+type EnrichedLatestScanItem = LatestScanSignalRecord &
   SymbolQuality & {
     resultGroup: ScanResultGroup;
   } & ScanResultReview;
+
+export type LatestScanItem = PublicStoredScannerSignal;
 
 const BALANCED_ALLOCATION_STRATEGY = "balanced_group_quota_v1" as const;
 
@@ -41,7 +47,7 @@ export type LatestScanResponse = {
     limitedGroups: ScanResultGroup[];
     allocationStrategy: typeof BALANCED_ALLOCATION_STRATEGY;
   };
-  groups: ReturnType<typeof buildScanResultGroups<LatestScanItem>>;
+  groups: ReturnType<typeof buildLatestScanPublicGroups>;
   items: LatestScanItem[];
 };
 
@@ -62,7 +68,7 @@ export function buildLatestScanResponse({
     : enriched.filter((signal) => !signal.isLowQuality);
   const sorted = [...qualityFiltered].sort(compareScanResultGroupItems);
   const allocation = allocateLatestScanItems(sorted, limit);
-  const items = allocation.items;
+  const items = allocation.items.map(toPublicLatestScanItem);
   const baseSummary = summarizeScanResultGroups(qualityFiltered);
 
   return {
@@ -77,12 +83,12 @@ export function buildLatestScanResponse({
       limitedGroups: allocation.limitedGroups,
       allocationStrategy: BALANCED_ALLOCATION_STRATEGY,
     },
-    groups: buildScanResultGroups(items),
+    groups: buildLatestScanPublicGroups(allocation.items),
     items,
   };
 }
 
-function allocateLatestScanItems(sorted: LatestScanItem[], limit: number) {
+function allocateLatestScanItems(sorted: EnrichedLatestScanItem[], limit: number) {
   const normalizedLimit = Math.max(0, Math.floor(limit));
   const totalByGroup = countItemsByGroup(sorted);
 
@@ -101,7 +107,7 @@ function allocateLatestScanItems(sorted: LatestScanItem[], limit: number) {
       sorted.filter((item) => item.resultGroup === group),
     ]),
   );
-  const selected: LatestScanItem[] = [];
+  const selected: EnrichedLatestScanItem[] = [];
   const selectedIds = new Set<string>();
 
   for (const group of SCAN_RESULT_GROUPS) {
@@ -140,9 +146,9 @@ function allocateLatestScanItems(sorted: LatestScanItem[], limit: number) {
 }
 
 function addItems(
-  selected: LatestScanItem[],
+  selected: EnrichedLatestScanItem[],
   selectedIds: Set<string>,
-  candidates: LatestScanItem[],
+  candidates: EnrichedLatestScanItem[],
   limit: number,
 ) {
   for (const item of candidates) {
@@ -158,8 +164,8 @@ function addItems(
 }
 
 function compareScanResultRankThenGroup(
-  left: LatestScanItem,
-  right: LatestScanItem,
+  left: EnrichedLatestScanItem,
+  right: EnrichedLatestScanItem,
 ) {
   const rankDelta =
     (right.rankScore ?? Number.NEGATIVE_INFINITY) -
@@ -172,7 +178,7 @@ function compareScanResultRankThenGroup(
   return compareScanResultGroupItems(left, right);
 }
 
-function countItemsByGroup(items: LatestScanItem[]) {
+function countItemsByGroup(items: EnrichedLatestScanItem[]) {
   const counts = emptyGroupCounts();
 
   for (const item of items) {
@@ -188,7 +194,7 @@ function emptyGroupCounts() {
   ) as Record<ScanResultGroup, number>;
 }
 
-function enrichLatestScanItem(signal: LatestScanSignalRecord): LatestScanItem {
+function enrichLatestScanItem(signal: LatestScanSignalRecord): EnrichedLatestScanItem {
   const quality = getSymbolQuality(signal.symbol, {
     assetClass: signal.assetClass,
     candleCount: signal.candleCount,
@@ -203,4 +209,21 @@ function enrichLatestScanItem(signal: LatestScanSignalRecord): LatestScanItem {
     resultGroup,
     ...review,
   };
+}
+
+function buildLatestScanPublicGroups(items: EnrichedLatestScanItem[]) {
+  const groups = buildScanResultGroups(items);
+
+  return {
+    eligible: groups.eligible.map(toPublicLatestScanItem),
+    watch: groups.watch.map(toPublicLatestScanItem),
+    overheated: groups.overheated.map(toPublicLatestScanItem),
+    risk: groups.risk.map(toPublicLatestScanItem),
+    neutral: groups.neutral.map(toPublicLatestScanItem),
+    insufficientHistory: groups.insufficientHistory.map(toPublicLatestScanItem),
+  };
+}
+
+function toPublicLatestScanItem(item: EnrichedLatestScanItem): LatestScanItem {
+  return serializeStoredSignalToCodeContract(item);
 }

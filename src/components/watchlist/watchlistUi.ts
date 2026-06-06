@@ -527,7 +527,7 @@ export function getWatchlistRank(
   row: WatchlistRow,
   timeframe: MtfScreenerTimeframe,
 ) {
-  const rankScore = row.mtfRow?.snapshots[timeframe]?.rankScore;
+  const rankScore = row.mtfRow?.snapshots[timeframe]?.metrics.rankScore;
 
   return typeof rankScore === "number" && Number.isFinite(rankScore)
     ? rankScore

@@ -237,6 +237,7 @@ describe("scan API remote market universe", () => {
     expect(body.updatedAt).toEqual(expect.any(String));
     expect(body.durationMs).toEqual(expect.any(Number));
     expect(body.results).toHaveLength(1);
+    expectPublicScannerResultItem(body.results[0]);
     expect(body.errors).toHaveLength(2);
   });
 
@@ -433,4 +434,52 @@ function makeVolume() {
     distributionWarning: false,
     quietCompression: false,
   };
+}
+
+const scannerCodePattern = /^(GR|QH|VL|PX|MO|TR|VO|RK|ST|AC|NX)_\d{3}$/;
+const legacyPublicFields = [
+  "signalLabel",
+  "actionBias",
+  "primaryStructure",
+  "detectedRiskTypes",
+  "factors",
+  "rawMetrics",
+  "observations",
+  "reviewReason",
+  "reviewStatus",
+  "nextConfirmation",
+  "invalidation",
+] as const;
+
+function expectPublicScannerResultItem(item: Record<string, unknown>) {
+  for (const field of legacyPublicFields) {
+    expect(item).not.toHaveProperty(field);
+  }
+
+  expect(item.groupCode).toMatch(scannerCodePattern);
+  expect(item.actionCode).toMatch(scannerCodePattern);
+  expect(item.setupCode).toMatch(scannerCodePattern);
+  expect(item.phaseCode).toMatch(scannerCodePattern);
+
+  if (item.riskCode !== null) {
+    expect(item.riskCode).toMatch(scannerCodePattern);
+  }
+
+  for (const field of [
+    "riskCodes",
+    "reasonCodes",
+    "signalCodes",
+    "qualityCodes",
+  ] as const) {
+    expect(Array.isArray(item[field])).toBe(true);
+    for (const code of item[field] as unknown[]) {
+      expect(code).not.toBeUndefined();
+      expect(code).toMatch(scannerCodePattern);
+    }
+  }
+
+  expect(item.metrics).toEqual(expect.any(Object));
+  expect(item.scannerVersion).toEqual(expect.any(String));
+  expect(item.codeSchemaVersion).toEqual(expect.any(String));
+  expect(item.dictionaryVersion).toEqual(expect.any(String));
 }

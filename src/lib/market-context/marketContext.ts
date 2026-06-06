@@ -1,4 +1,5 @@
 import type { ScanResultGroup } from "@/lib/scanner/scanResultGroups";
+import type { ActiveScannerCode } from "@/lib/scanner-codebook/codeRegistry";
 
 export const MARKET_CONTEXT_SYMBOLS = ["BTCUSDT", "ETHUSDT"] as const;
 export const MARKET_CONTEXT_TIMEFRAMES = ["1w", "1d", "4h"] as const;
@@ -57,14 +58,21 @@ export type ResearchPosture =
 export type AvailableMarketContextProxy = {
   available: true;
   timeframe: MarketContextTimeframe;
-  group: ScanResultGroup;
-  signalLabel: string | null;
-  rankScore: number | null;
-  actionBias: string | null;
-  primaryStructure: string | null;
-  detectedRiskTypes: string[];
-  statusNote: string | null;
-  cautionLevel: string | null;
+  groupCode: ActiveScannerCode;
+  actionCode: ActiveScannerCode;
+  riskCode: ActiveScannerCode | null;
+  riskCodes: ActiveScannerCode[];
+  setupCode: ActiveScannerCode;
+  phaseCode: ActiveScannerCode;
+  reasonCodes: ActiveScannerCode[];
+  signalCodes: ActiveScannerCode[];
+  qualityCodes: ActiveScannerCode[];
+  metrics: {
+    rankScore: number | null;
+  };
+  scannerVersion: string;
+  codeSchemaVersion: string;
+  dictionaryVersion: string;
   scanTime: string | null;
   candleOpenTime: string | null;
   runContext: MarketContextRunContext;
@@ -127,11 +135,11 @@ type EthConfirmation = {
   label: string;
 };
 
-const MAJOR_RISK_TYPES = new Set([
-  "distribution_risk",
-  "trend_breakdown_risk",
-  "liquidity_spike_risk",
-  "failed_breakout_risk",
+const MAJOR_RISK_CODES = new Set<ActiveScannerCode>([
+  "RK_302",
+  "RK_304",
+  "VL_304",
+  "RK_305",
 ]);
 
 export function createUnavailableMarketContextProxy(
@@ -223,11 +231,13 @@ function classifyStructuralContext(proxy: MarketContextProxy): StructuralContext
     return "insufficient_data";
   }
 
-  if (proxy.group === "risk") {
+  const group = getProxyGroup(proxy);
+
+  if (group === "risk") {
     return "long_term_risk_off";
   }
 
-  if (proxy.group === "eligible" || proxy.group === "watch") {
+  if (group === "eligible" || group === "watch") {
     return isConstructiveProxy(proxy)
       ? "long_term_risk_on"
       : "long_term_mixed";
@@ -244,15 +254,17 @@ function classifyDailyMarketContext(
     return "insufficient_data";
   }
 
-  if (btcProxy.group === "risk") {
+  const group = getProxyGroup(btcProxy);
+
+  if (group === "risk") {
     return "risk_off";
   }
 
-  if (btcProxy.group === "eligible") {
+  if (group === "eligible") {
     return "risk_on";
   }
 
-  if (btcProxy.group === "watch") {
+  if (group === "watch") {
     if (!isConstructiveProxy(btcProxy)) {
       return "mixed";
     }
@@ -260,7 +272,7 @@ function classifyDailyMarketContext(
     return getProxyDirection(ethProxy) === "risk_on" ? "risk_on" : "mixed";
   }
 
-  if (btcProxy.group === "overheated") {
+  if (group === "overheated") {
     return "unstable";
   }
 
@@ -273,17 +285,17 @@ function classifyTacticalContext(proxy: MarketContextProxy): TacticalContext {
   }
 
   if (
-    (proxy.group === "eligible" || proxy.group === "watch") &&
+    (getProxyGroup(proxy) === "eligible" || getProxyGroup(proxy) === "watch") &&
     isPositiveRank(proxy)
   ) {
     return "short_term_repair";
   }
 
-  if (proxy.group === "risk") {
+  if (getProxyGroup(proxy) === "risk") {
     return "short_term_weakness";
   }
 
-  if (proxy.group === "overheated") {
+  if (getProxyGroup(proxy) === "overheated") {
     return "short_term_overextended";
   }
 
@@ -670,16 +682,18 @@ function getProxyDirection(proxy: MarketContextProxy): ProxyDirection {
     return "unavailable";
   }
 
-  if (proxy.group === "risk") {
+  const group = getProxyGroup(proxy);
+
+  if (group === "risk") {
     return "risk_off";
   }
 
-  if (proxy.group === "overheated") {
+  if (group === "overheated") {
     return "unstable";
   }
 
   if (
-    (proxy.group === "eligible" || proxy.group === "watch") &&
+    (group === "eligible" || group === "watch") &&
     isConstructiveProxy(proxy)
   ) {
     return "risk_on";
@@ -712,13 +726,28 @@ function isConstructiveProxy(proxy: AvailableMarketContextProxy) {
 }
 
 function isPositiveRank(proxy: AvailableMarketContextProxy) {
-  return (proxy.rankScore ?? Number.NEGATIVE_INFINITY) > 0;
+  return (proxy.metrics.rankScore ?? Number.NEGATIVE_INFINITY) > 0;
 }
 
 function hasMajorDetectedRisk(proxy: AvailableMarketContextProxy) {
-  return proxy.detectedRiskTypes.some((riskType) =>
-    MAJOR_RISK_TYPES.has(riskType),
-  );
+  return proxy.riskCodes.some((riskCode) => MAJOR_RISK_CODES.has(riskCode));
+}
+
+function getProxyGroup(proxy: AvailableMarketContextProxy): ScanResultGroup {
+  switch (proxy.groupCode) {
+    case "GR_201":
+      return "eligible";
+    case "GR_101":
+      return "watch";
+    case "GR_301":
+      return "overheated";
+    case "GR_302":
+      return "risk";
+    case "GR_401":
+      return "insufficient_history";
+    default:
+      return "neutral";
+  }
 }
 
 function hasUnavailableProxy(proxies: MarketContextProxyMap) {

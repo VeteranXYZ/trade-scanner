@@ -6,6 +6,10 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from "react";
 import { RefreshIconButton } from "@/components/ui/workspace";
 import { useAppLanguage } from "@/lib/i18n/AppLanguageProvider";
+import type { Language } from "@/lib/i18n/dictionaries";
+import { explainCode, explainCodes } from "@/lib/scanner-codebook/explainCode";
+import { resultGroupByGroupCode } from "@/lib/scanner-codebook/codeRegistry";
+import type { PublicStoredScannerSignal } from "@/lib/scanner-codebook/serializeStoredSignal";
 import { SymbolBehaviorPanel } from "./SymbolBehaviorPanel";
 import { SymbolResearchChart } from "./SymbolResearchChart";
 import { SymbolSignalTimeline } from "./SymbolSignalTimeline";
@@ -18,7 +22,6 @@ import {
   type WatchlistStorage,
 } from "@/components/watchlist/watchlistUi";
 import { MarketContextPanel } from "@/components/market-context/MarketContextPanel";
-import { formatSignalLabel } from "@/components/scanner/latestScanUi";
 import {
   fetchMarketContext,
   isMarketContextResponse,
@@ -127,42 +130,29 @@ export type SymbolResearchRun = {
 
 export type SymbolResearchSignal = {
   id: string;
-  scanRunId?: string;
+  scanRunId: string;
   symbolId?: number;
-  exchange?: string;
-  market?: string;
+  exchange: string;
+  market: string;
   symbol: string;
   timeframe: string;
-  scanTime: string;
-  candleOpenTime: string | null;
-  priceAtSignal: number | null;
-  rankScore: number | null;
-  finalSignalScore: number | null;
-  opportunityScore?: number | null;
-  confirmationScore?: number | null;
-  riskScore?: number | null;
-  trendScore?: number | null;
-  momentumScore?: number | null;
-  volumeScore?: number | null;
-  structureScore?: number | null;
-  signalLabel: string | null;
-  actionBias: string | null;
-  resultGroup?: string | null;
-  reviewTier?: string | null;
-  statusNoteKey?: string | null;
-  statusNote?: string | null;
-  cautionLevel?: string | null;
-  statusReasonKeys?: ScannerReviewText[];
-  statusReasons?: string[];
-  primaryStructure: string | null;
-  secondaryStructures?: unknown[];
-  detectedRiskTypes?: unknown[];
-  nextConfirmation?: unknown;
-  invalidation?: unknown;
-  factors?: Record<string, unknown>;
-  rawMetrics?: Record<string, unknown>;
+  assetClass?: string | null;
+  scanTime?: string | null;
+  candleOpenTime?: string | null;
+  groupCode: PublicStoredScannerSignal["groupCode"];
+  actionCode: PublicStoredScannerSignal["actionCode"];
+  riskCode: PublicStoredScannerSignal["riskCode"];
+  riskCodes: PublicStoredScannerSignal["riskCodes"];
+  setupCode: PublicStoredScannerSignal["setupCode"];
+  phaseCode: PublicStoredScannerSignal["phaseCode"];
+  reasonCodes: PublicStoredScannerSignal["reasonCodes"];
+  signalCodes: PublicStoredScannerSignal["signalCodes"];
+  qualityCodes: PublicStoredScannerSignal["qualityCodes"];
+  metrics: PublicStoredScannerSignal["metrics"];
+  scannerVersion: string;
+  codeSchemaVersion: string;
+  dictionaryVersion: string;
   scoringVersion?: string | null;
-  scannerVersion?: string | null;
   createdAt?: string;
   scanRunStartedAt?: string | null;
   scanRunFinishedAt?: string | null;
@@ -234,14 +224,15 @@ export type SymbolResearchSuccessResponse = {
     structureScore: number | null;
   };
   interpretation?: {
-    group: string;
-    label: string;
-    action: string;
-    setupType: string;
-    statusNote: string;
-    reasons: string[];
-    nextConfirmation: unknown;
-    invalidation: unknown;
+    groupCode: string;
+    actionCode: string;
+    riskCode?: string | null;
+    riskCodes: string[];
+    setupCode: string;
+    phaseCode?: string | null;
+    reasonCodes: string[];
+    signalCodes: string[];
+    qualityCodes: string[];
   };
   history?: SymbolResearchSignal[];
   timeframes?: SymbolResearchSignal[];
@@ -325,7 +316,7 @@ export function SymbolResearchPageClient({
   symbol,
   visualCheckData,
 }: SymbolResearchPageClientProps) {
-  const { dictionary } = useAppLanguage();
+  const { dictionary, language } = useAppLanguage();
   const router = useRouter();
   const searchParams = useSearchParams();
   const isVisualCheck = Boolean(visualCheckData);
@@ -647,7 +638,7 @@ export function SymbolResearchPageClient({
   const interpretation = getSymbolResearchInterpretation(
     data,
     latestSignal,
-    dictionary,
+    language,
   );
   const scoreBreakdown = getSymbolResearchScoreBreakdown(data, latestSignal);
   const candles = normalizeSymbolResearchCandles(data.candles);
@@ -707,15 +698,15 @@ export function SymbolResearchPageClient({
   const signalEvaluationReadout = buildSignalEvaluationReadout(
     signalEvaluationData,
     {
-      currentGroup: latestSignal.resultGroup,
-      currentSignalLabel: latestSignal.signalLabel,
+      currentGroup: getSymbolResearchGroup(latestSignal),
+      currentSignalLabel: null,
       timeframe: selectedTimeframe,
     },
   );
   const marketContextImplication = buildSymbolMarketContextImplication({
     data: marketContextData,
     isError: marketContextIsError,
-    selectedGroup: latestSignal.resultGroup ?? interpretation.group,
+    selectedGroup: getSymbolResearchGroup(latestSignal) ?? interpretation.group,
     selectedTimeframe,
     timeframeSnapshots,
   });
@@ -737,6 +728,7 @@ export function SymbolResearchPageClient({
     behaviorSampleQuality,
     showHistorySelectionNotice,
     dictionary,
+    language,
   });
   const nextCheckItems = buildSymbolResearchNextChecks({
     selectedTimeframe,
@@ -744,6 +736,7 @@ export function SymbolResearchPageClient({
     researchSummary,
     timeframeSnapshots,
     dictionary,
+    language,
   });
   const detailsDiagnosticsPanel = (
     <details
@@ -792,12 +785,9 @@ export function SymbolResearchPageClient({
             ]}
             rows={timeframeSnapshots.map((item) => [
               formatSelectedTimeframeLabel(item.timeframe, selectedTimeframe),
-              formatSymbolResearchGroup(item.resultGroup, dictionary),
-              formatSymbolResearchAction(
-                item.actionBias ?? item.statusNoteKey ?? item.statusNote,
-                dictionary,
-              ),
-              formatSymbolResearchScore(item.rankScore),
+              formatSymbolResearchGroup(getSymbolResearchGroup(item), dictionary),
+              explainCode(item.actionCode, language).label,
+              formatSymbolResearchScore(item.metrics.rankScore),
               formatSymbolResearchDateTime(item.scanTime),
               formatSymbolResearchRunContext(item),
             ])}
@@ -910,6 +900,7 @@ export function SymbolResearchPageClient({
             selectedTimeframe={selectedTimeframe}
             className="shrink-0"
             dictionary={dictionary}
+            language={language}
           />
           <SymbolResearchChart
             exchange={exchange}
@@ -921,8 +912,7 @@ export function SymbolResearchPageClient({
             density="compact"
             latestSignal={{
               candleOpenTime: latestSignal.candleOpenTime,
-              resultGroup: latestSignal.resultGroup,
-              statusNote: latestSignal.statusNote,
+              label: interpretation.label,
             }}
           />
         </div>
@@ -1100,7 +1090,7 @@ export function buildSymbolMarketContextImplication({
   selectedTimeframe?: string | null;
   timeframeSnapshots?: Array<{
     timeframe?: string | null;
-    resultGroup?: string | null;
+    groupCode?: SymbolResearchSignal["groupCode"];
   }> | null;
 }) {
   if (isError || !isMarketContextResponse(data)) {
@@ -1183,6 +1173,16 @@ function normalizeSymbolMarketContextGroup(value: string | null | undefined) {
   return normalized || "neutral";
 }
 
+function getSymbolResearchGroup(signal: {
+  groupCode?: SymbolResearchSignal["groupCode"] | string | null;
+}) {
+  const code = signal.groupCode;
+
+  return code && Object.prototype.hasOwnProperty.call(resultGroupByGroupCode, code)
+    ? resultGroupByGroupCode[code as keyof typeof resultGroupByGroupCode]
+    : "neutral";
+}
+
 function isRiskOrientedSymbolMarketContext(data: MarketContextResponse) {
   const { combinedContext, marketContext, tacticalContext } = data.context;
 
@@ -1219,7 +1219,7 @@ function hasHigherTimeframeRisk({
   selectedTimeframe: string;
   timeframeSnapshots?: Array<{
     timeframe?: string | null;
-    resultGroup?: string | null;
+    groupCode?: SymbolResearchSignal["groupCode"] | string | null;
   }> | null;
 }) {
   const selectedRank = getSymbolResearchTimeframeRank(selectedTimeframe);
@@ -1235,7 +1235,9 @@ function hasHigherTimeframeRisk({
       return (
         snapshotRank !== null &&
         snapshotRank > selectedRank &&
-        normalizeSymbolMarketContextGroup(snapshot.resultGroup) === "risk"
+        normalizeSymbolMarketContextGroup(
+          snapshot.groupCode ? getSymbolResearchGroup(snapshot) : null,
+        ) === "risk"
       );
     }),
   );
@@ -2027,15 +2029,17 @@ function MtfContextStrip({
   selectedTimeframe,
   className = "",
   dictionary,
+  language,
 }: {
   snapshots: Array<{
     timeframe?: string | null;
-    resultGroup?: string | null;
-    rankScore?: number | null;
+    groupCode: SymbolResearchSignal["groupCode"];
+    metrics: SymbolResearchSignal["metrics"];
   }>;
   selectedTimeframe: string;
   className?: string;
   dictionary: SymbolResearchDisplayDictionary;
+  language: Language;
 }) {
   const orderedSnapshots = orderTimeframeSnapshots(snapshots);
 
@@ -2055,9 +2059,9 @@ function MtfContextStrip({
 
             return (
               <div
-                key={`${timeframe}-${snapshot.resultGroup ?? "missing"}`}
+                key={`${timeframe}-${snapshot.groupCode}`}
                 className={`inline-flex h-6 shrink-0 items-center gap-1.5 border px-1.5 ${getMtfContextCellClassName(
-                  snapshot.resultGroup,
+                  getSymbolResearchGroup(snapshot),
                   isSelected,
                 )}`}
               >
@@ -2070,13 +2074,10 @@ function MtfContextStrip({
                   {timeframe}
                 </span>
                 <span className="text-[11px] font-semibold">
-                  {formatSymbolResearchGroupForDisplay(
-                    snapshot.resultGroup,
-                    dictionary,
-                  )}
+                  {explainCode(snapshot.groupCode, language).label}
                 </span>
                 <span className="font-mono text-[11px] font-semibold">
-                  {formatSymbolResearchScore(snapshot.rankScore)}
+                  {formatSymbolResearchScore(snapshot.metrics.rankScore)}
                 </span>
               </div>
             );
@@ -2319,7 +2320,7 @@ function getSymbolResearchPrimaryReason({
   const signal = formatSymbolSignalPhrase(interpretation.label);
   const signalSetup = formatSignalSetupPhrase(
     signal,
-    latestSignal.primaryStructure,
+    interpretation.setupType,
   );
   const higherTimeframeText = getHigherTimeframeReasonText({
     selectedTimeframe,
@@ -2359,6 +2360,7 @@ function buildSymbolResearchEvidence({
   behaviorSampleQuality,
   showHistorySelectionNotice,
   dictionary,
+  language,
 }: {
   selectedTimeframe: string;
   interpretation: ReturnType<typeof getSymbolResearchInterpretation>;
@@ -2369,6 +2371,7 @@ function buildSymbolResearchEvidence({
   behaviorSampleQuality?: BehaviorSampleQualityReadout | null;
   showHistorySelectionNotice: boolean;
   dictionary: SymbolResearchDisplayDictionary;
+  language: Language;
 }) {
   const positive = uniqueDisplayItems([
     `${selectedTimeframe.toUpperCase()} state is ${formatSymbolResearchGroupForDisplay(
@@ -2377,9 +2380,7 @@ function buildSymbolResearchEvidence({
     )}`,
     `Rank ${formatSymbolResearchScore(scoreBreakdown.rankScore)}`,
     `Confirmation ${formatSymbolResearchScore(scoreBreakdown.confirmationScore)}`,
-    latestSignal.primaryStructure
-      ? `${formatSymbolResearchSetup(latestSignal.primaryStructure, dictionary)} setup`
-      : null,
+    `${explainCode(latestSignal.setupCode, language).label} setup`,
     ...interpretation.reasons.slice(0, 2),
     decisionSummary.multiTimeframeAlignment,
     decisionSummary.behaviorSupport,
@@ -2390,7 +2391,9 @@ function buildSymbolResearchEvidence({
     marketContextImplication,
     behaviorSampleQuality?.sampleQualityLabel,
     showHistorySelectionNotice ? "Newer secondary rows exist" : null,
-    ...formatSymbolResearchList(latestSignal.detectedRiskTypes, dictionary).slice(0, 2),
+    ...explainCodes(latestSignal.riskCodes, language)
+      .map((entry) => entry.label)
+      .slice(0, 2),
   ]);
 
   return {
@@ -2411,6 +2414,7 @@ function buildSymbolResearchNextChecks({
   researchSummary: ReturnType<typeof buildSymbolResearchSummary>;
   timeframeSnapshots: SymbolResearchSignal[];
   dictionary: SymbolResearchDisplayDictionary;
+  language: Language;
 }) {
   const higherTimeframeChecks = buildHigherTimeframeChecks(timeframeSnapshots);
 
@@ -2519,7 +2523,7 @@ function buildHigherTimeframeChecks(timeframeSnapshots: SymbolResearchSignal[]) 
   }
 
   if (oneWeek) {
-    const group = normalizeSymbolMarketContextGroup(oneWeek.resultGroup);
+    const group = normalizeSymbolMarketContextGroup(getSymbolResearchGroup(oneWeek));
     checks.push(
       group === "watch"
         ? "1W remains Watch or improves"
@@ -2547,7 +2551,7 @@ function getHigherTimeframeReasonText({
       selectedRank !== null &&
       rank !== null &&
       rank > selectedRank &&
-      normalizeSymbolMarketContextGroup(snapshot.resultGroup) === "risk"
+      normalizeSymbolMarketContextGroup(getSymbolResearchGroup(snapshot)) === "risk"
     );
   });
 
@@ -2660,43 +2664,31 @@ function ResponsiveTable({
 function getSymbolResearchInterpretation(
   data: SymbolResearchSuccessResponse,
   latestSignal: SymbolResearchSignal,
-  dictionary: SymbolResearchDisplayDictionary = dictionaries.en,
+  language: Language = "en",
 ) {
-  const rawLabel = data.interpretation?.label ?? latestSignal.signalLabel;
-  const rawAction =
-    data.interpretation?.action ??
-    latestSignal.actionBias ??
-    latestSignal.statusNote ??
-    "review_only";
-  const rawSetupType =
-    data.interpretation?.setupType ?? latestSignal.primaryStructure ?? "unknown";
+  const groupCode = data.interpretation?.groupCode ?? latestSignal.groupCode;
+  const actionCode = data.interpretation?.actionCode ?? latestSignal.actionCode;
+  const setupCode = data.interpretation?.setupCode ?? latestSignal.setupCode;
+  const signalCodes =
+    data.interpretation?.signalCodes?.length
+      ? data.interpretation.signalCodes
+      : latestSignal.signalCodes ?? [];
+  const reasonCodes =
+    data.interpretation?.reasonCodes?.length
+      ? data.interpretation.reasonCodes
+      : latestSignal.reasonCodes ?? [];
+  const signalCode = signalCodes[0] ?? latestSignal.phaseCode;
+  const actionExplanation = explainCode(actionCode, language);
 
   return {
-    group: data.interpretation?.group ?? latestSignal.resultGroup ?? "neutral",
-    label: formatSymbolResearchSignalLabel(rawLabel, dictionary),
-    action: formatSymbolResearchAction(rawAction, dictionary),
-    setupType: formatSymbolResearchSetup(rawSetupType, dictionary),
-    statusNote: formatScannerReviewValue(
-      data.interpretation?.statusNote ??
-        latestSignal.statusNoteKey ??
-        latestSignal.statusNote,
-      dictionary,
-      dictionary.scannerResultFallback.noStatusNote,
-    ),
-    reasons: (
-      data.interpretation?.reasons ??
-      latestSignal.statusReasonKeys ??
-      latestSignal.statusReasons ??
-      []
-    ).map((reason) => formatScannerReviewValue(reason, dictionary)),
+    group: getSymbolResearchGroup({ groupCode }),
+    groupCode,
+    label: explainCode(signalCode, language).label,
+    action: actionExplanation.label,
+    setupType: explainCode(setupCode, language).label,
+    statusNote: actionExplanation.short,
+    reasons: explainCodes(reasonCodes, language).map((reason) => reason.label),
   };
-}
-
-function formatSymbolResearchSignalLabel(
-  value: string | null | undefined,
-  dictionary: SymbolResearchDisplayDictionary,
-) {
-  return formatSignalLabel(value, dictionary);
 }
 
 function getSymbolResearchScoreBreakdown(
@@ -2704,20 +2696,20 @@ function getSymbolResearchScoreBreakdown(
   latestSignal: SymbolResearchSignal,
 ) {
   return {
-    rankScore: data.scoreBreakdown?.rankScore ?? latestSignal.rankScore,
+    rankScore: data.scoreBreakdown?.rankScore ?? latestSignal.metrics.rankScore,
     finalSignalScore:
-      data.scoreBreakdown?.finalSignalScore ?? latestSignal.finalSignalScore,
+      data.scoreBreakdown?.finalSignalScore ?? latestSignal.metrics.finalSignalScore,
     opportunityScore:
-      data.scoreBreakdown?.opportunityScore ?? latestSignal.opportunityScore,
+      data.scoreBreakdown?.opportunityScore ?? latestSignal.metrics.opportunityScore,
     confirmationScore:
-      data.scoreBreakdown?.confirmationScore ?? latestSignal.confirmationScore,
-    riskScore: data.scoreBreakdown?.riskScore ?? latestSignal.riskScore,
-    trendScore: data.scoreBreakdown?.trendScore ?? latestSignal.trendScore,
+      data.scoreBreakdown?.confirmationScore ?? latestSignal.metrics.confirmationScore,
+    riskScore: data.scoreBreakdown?.riskScore ?? latestSignal.metrics.riskScore,
+    trendScore: data.scoreBreakdown?.trendScore ?? latestSignal.metrics.trendScore,
     momentumScore:
-      data.scoreBreakdown?.momentumScore ?? latestSignal.momentumScore,
-    volumeScore: data.scoreBreakdown?.volumeScore ?? latestSignal.volumeScore,
+      data.scoreBreakdown?.momentumScore ?? latestSignal.metrics.momentumScore,
+    volumeScore: data.scoreBreakdown?.volumeScore ?? latestSignal.metrics.volumeScore,
     structureScore:
-      data.scoreBreakdown?.structureScore ?? latestSignal.structureScore,
+      data.scoreBreakdown?.structureScore ?? latestSignal.metrics.structureScore,
   };
 }
 
@@ -2752,8 +2744,8 @@ function buildSignalEvaluationParams(
     market,
     timeframe: data.timeframe ?? latestSignal.timeframe ?? fallbackTimeframe,
     assetClass: data.symbol.assetClass || fallbackAssetClass,
-    group: latestSignal.resultGroup ?? data.interpretation?.group ?? null,
-    signalLabel: latestSignal.signalLabel,
+    group: null,
+    signalLabel: null,
     tradeApiBaseUrl,
   };
 }

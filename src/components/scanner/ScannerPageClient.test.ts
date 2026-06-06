@@ -19,6 +19,10 @@ import type {
   ScannerSignalState,
   ScanResult,
 } from "@/lib/shared/scannerTypes";
+import {
+  serializeScanResultToCodeContract,
+  type ScannerCodeContractResult,
+} from "@/lib/scanner-codebook/serializeScanResult";
 
 describe("scanner result filtering", () => {
   it("defaults the display count to 50 rows", () => {
@@ -630,8 +634,9 @@ function makeResult({
   rsi14?: number;
   volumeRatio?: number;
   warningCount?: number;
-}): ScanResult {
-  return {
+}): ScannerCodeContractResult {
+  const signalSemantics = getSignalSemantics(signalState);
+  const result: ScanResult = {
     exchange: "binance",
     symbol,
     timeframe: "4h",
@@ -647,11 +652,11 @@ function makeResult({
     structureScore: 60,
     finalSignalScore: rankScore,
     rankScore,
-    signalLabel: "watch",
-    actionBias: "watch_only",
-    primaryStructure: "breakout_attempt",
+    signalLabel: signalSemantics.signalLabel,
+    actionBias: signalSemantics.actionBias,
+    primaryStructure: signalSemantics.primaryStructure,
     secondaryStructures: [],
-    detectedRiskTypes: [],
+    detectedRiskTypes: signalSemantics.detectedRiskTypes,
     bullishObservations: [],
     bearishObservations: [],
     riskObservations: [],
@@ -694,13 +699,15 @@ function makeResult({
       missingIndicators: [],
     },
   };
+
+  return serializeScanResultToCodeContract(result);
 }
 
 function makeBatchResponse(
   overrides: Partial<{
     mode: "mtf";
     preset: "short";
-    results: ScanResult[];
+    results: ScannerCodeContractResult[];
     hasMore: boolean;
     nextCursor: number | null;
     batchIndex: number;
@@ -739,6 +746,54 @@ function makeBatchResponse(
         }
       : {}),
   };
+}
+
+function getSignalSemantics(signalState: ScannerSignalState) {
+  switch (signalState) {
+    case "CONFIRMED":
+      return {
+        signalLabel: "confirmed" as const,
+        actionBias: "eligible" as const,
+        primaryStructure: "strong_trend" as const,
+        detectedRiskTypes: [],
+      };
+    case "TREND_CONTINUATION":
+      return {
+        signalLabel: "trend" as const,
+        actionBias: "eligible" as const,
+        primaryStructure: "strong_trend" as const,
+        detectedRiskTypes: [],
+      };
+    case "HIGH_RISK":
+      return {
+        signalLabel: "overheated" as const,
+        actionBias: "do_not_chase" as const,
+        primaryStructure: "overextended" as const,
+        detectedRiskTypes: ["overheat_risk" as const],
+      };
+    case "WEAK":
+      return {
+        signalLabel: "weak" as const,
+        actionBias: "avoid" as const,
+        primaryStructure: "trend_breakdown" as const,
+        detectedRiskTypes: ["trend_breakdown_risk" as const],
+      };
+    case "NEUTRAL":
+      return {
+        signalLabel: "neutral" as const,
+        actionBias: "ignore" as const,
+        primaryStructure: "neutral" as const,
+        detectedRiskTypes: [],
+      };
+    case "WATCHLIST":
+    default:
+      return {
+        signalLabel: "watch" as const,
+        actionBias: "watch_only" as const,
+        primaryStructure: "breakout_attempt" as const,
+        detectedRiskTypes: [],
+      };
+  }
 }
 
 function jsonResponse(body: unknown, status = 200) {
