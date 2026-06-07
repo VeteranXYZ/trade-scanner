@@ -6,6 +6,7 @@ import {
 } from "@/lib/market-data/symbolClassification";
 import { getStoredSignalCodeFields } from "@/lib/scanner-codebook/serializeStoredSignal";
 import {
+  currentScanSignalCodeContractCondition,
   LATEST_SCAN_FULL_UNIVERSE_MIN_SYMBOLS,
   PgScannerResultsStore,
   type LatestScanSignalRecord,
@@ -255,12 +256,13 @@ export class PgSymbolResearchStore {
       symbol.toUpperCase(),
       timeframe,
     ];
-    const filters = [
-      "s.exchange = $1",
-      "s.market = $2",
-      "s.symbol = $3",
-      "ss.timeframe = $4",
-    ];
+  const filters = [
+    "s.exchange = $1",
+    "s.market = $2",
+    "s.symbol = $3",
+    "ss.timeframe = $4",
+    currentScanSignalCodeContractCondition("ss"),
+  ];
 
     addSignalEligibilityFilters({
       filters,
@@ -309,12 +311,13 @@ export class PgSymbolResearchStore {
       symbol.toUpperCase(),
       timeframes,
     ];
-    const filters = [
-      "s.exchange = $1",
-      "s.market = $2",
-      "s.symbol = $3",
-      "ss.timeframe = ANY($4::text[])",
-    ];
+  const filters = [
+    "s.exchange = $1",
+    "s.market = $2",
+    "s.symbol = $3",
+    "ss.timeframe = ANY($4::text[])",
+    currentScanSignalCodeContractCondition("ss"),
+  ];
 
     addSignalEligibilityFilters({
       filters,
@@ -508,13 +511,14 @@ export class PgSymbolResearchStore {
       symbol.toUpperCase(),
       timeframe,
     ];
-    const filters = [
-      "ss.scan_run_id = $1",
-      "s.exchange = $2",
-      "s.market = $3",
-      "s.symbol = $4",
-      "ss.timeframe = $5",
-    ];
+  const filters = [
+    "ss.scan_run_id = $1",
+    "s.exchange = $2",
+    "s.market = $3",
+    "s.symbol = $4",
+    "ss.timeframe = $5",
+    currentScanSignalCodeContractCondition("ss"),
+  ];
 
     addSignalEligibilityFilters({
       filters,

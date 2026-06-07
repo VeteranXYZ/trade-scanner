@@ -5,6 +5,7 @@ import {
   type ScanResultGroup,
 } from "@/lib/scanner/scanResultGroups";
 import { createPostgresPool } from "./pool";
+import { currentScanSignalCodeContractCondition } from "./scannerResultsPg";
 
 export const SIGNAL_EVALUATION_DEFAULT_HORIZONS = [1, 3, 5, 10] as const;
 export const SIGNAL_EVALUATION_DEFAULT_LIMIT = 5000;
@@ -279,6 +280,7 @@ async function loadSignalEvaluationRowsPg(
     "ss.market = $2",
     "ss.timeframe = $3",
     "sr.status = 'success'",
+    currentScanSignalCodeContractCondition("ss"),
   ];
 
   if (input.assetClass !== "all") {

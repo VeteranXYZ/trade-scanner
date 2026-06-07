@@ -21,6 +21,18 @@ export const PG_SCANNER_VERSION = scannerCodeVersions.scannerVersion;
 export const LATEST_SCAN_FULL_UNIVERSE_MIN_SYMBOLS = 300;
 export const HISTORICAL_SNAPSHOT_OBSERVATION_WINDOWS = [1, 3, 5, 10] as const;
 
+export function currentScanSignalCodeContractCondition(alias = "ss") {
+  if (!/^[a-z_][a-z0-9_]*$/i.test(alias)) {
+    throw new Error("INVALID_SQL_ALIAS");
+  }
+
+  return `
+    ${alias}.raw_metrics ? 'codeContract'
+    AND ${alias}.raw_metrics->'codeContract'->>'scannerVersion' = ${sqlLiteral(PG_SCANNER_VERSION)}
+    AND ${alias}.raw_metrics->'codeContract'->>'codeSchemaVersion' = ${sqlLiteral(scannerCodeVersions.codeSchemaVersion)}
+  `;
+}
+
 export type HistoricalSnapshotObservationWindow =
   (typeof HISTORICAL_SNAPSHOT_OBSERVATION_WINDOWS)[number];
 export type HistoricalSnapshotObservationAnchorSource =
@@ -310,6 +322,44 @@ export class PgScannerResultsStore {
     }
   }
 
+  async countLegacyScanResults() {
+    const result = await this.pool.query<{ count: string }>(
+      `
+        SELECT COUNT(*) AS count
+        FROM scan_signals ss
+        WHERE NOT (${currentScanSignalCodeContractCondition("ss")})
+      `,
+    );
+
+    return Number(result.rows[0]?.count ?? 0);
+  }
+
+  async deleteLegacyScanResults() {
+    const deletedSignals = await this.pool.query<{ scan_run_id: string }>(
+      `
+        DELETE FROM scan_signals ss
+        WHERE NOT (${currentScanSignalCodeContractCondition("ss")})
+        RETURNING scan_run_id
+      `,
+    );
+    const deletedRuns = await this.pool.query<{ id: string }>(
+      `
+        DELETE FROM scan_runs sr
+        WHERE NOT EXISTS (
+          SELECT 1
+          FROM scan_signals ss
+          WHERE ss.scan_run_id = sr.id
+        )
+        RETURNING id
+      `,
+    );
+
+    return {
+      signalsDeleted: deletedSignals.rowCount ?? deletedSignals.rows.length,
+      scanRunsDeleted: deletedRuns.rowCount ?? deletedRuns.rows.length,
+    };
+  }
+
   async createScanRun(input: CreateScanRunInput) {
     const result = await this.pool.query<ScanRunRow>(
       `
@@ -467,6 +517,16 @@ export class PgScannerResultsStore {
           FROM scan_runs
           WHERE timeframe = $1
             AND status = 'success'
+            AND EXISTS (
+              SELECT 1
+              FROM scan_signals ss
+              JOIN symbols s
+                ON s.id = ss.symbol_id
+              WHERE ss.scan_run_id = scan_runs.id
+                AND ss.timeframe = scan_runs.timeframe
+                AND ${currentScanSignalCodeContractCondition("ss")}
+                AND s.asset_class = $3
+            )
             AND (
               symbols_total >= $2
               OR symbols_scanned >= $2
@@ -491,16 +551,35 @@ export class PgScannerResultsStore {
       }
     }
 
+    const fallbackParams: unknown[] = [timeframe];
+    const fallbackSignalFilters = [
+      "ss.scan_run_id = scan_runs.id",
+      "ss.timeframe = scan_runs.timeframe",
+      currentScanSignalCodeContractCondition("ss"),
+    ];
+
+    if (assetClass !== "all") {
+      fallbackParams.push(assetClass);
+      fallbackSignalFilters.push(`s.asset_class = $${fallbackParams.length}`);
+    }
+
     const result = await this.pool.query<ScanRunRow>(
       `
         SELECT *
         FROM scan_runs
         WHERE timeframe = $1
           AND status = 'success'
+          AND EXISTS (
+            SELECT 1
+            FROM scan_signals ss
+            JOIN symbols s
+              ON s.id = ss.symbol_id
+            WHERE ${fallbackSignalFilters.join("\n              AND ")}
+          )
         ORDER BY finished_at DESC NULLS LAST, started_at DESC
         LIMIT 1
       `,
-      [timeframe],
+      fallbackParams,
     );
 
     return result.rows[0] ? toScanRunRecord(result.rows[0]) : null;
@@ -520,7 +599,11 @@ export class PgScannerResultsStore {
     includeMarketContext?: boolean;
   }): Promise<LatestScanSignalRecord[]> {
     const params: unknown[] = [scanRunId, timeframe];
-    const filters = ["ss.scan_run_id = $1", "ss.timeframe = $2"];
+    const filters = [
+      "ss.scan_run_id = $1",
+      "ss.timeframe = $2",
+      currentScanSignalCodeContractCondition("ss"),
+    ];
 
     if (assetClass !== "all") {
       params.push(assetClass);
@@ -590,27 +673,26 @@ export class PgScannerResultsStore {
   }) {
     const params: unknown[] = [timeframe, limit];
     const filters = ["sr.timeframe = $1", "sr.status = 'success'"];
+    const currentSignalFilters = [
+      "ss.scan_run_id = sr.id",
+      "ss.timeframe = sr.timeframe",
+      currentScanSignalCodeContractCondition("ss"),
+    ];
 
     if (assetClass !== "all") {
       params.push(assetClass);
-      filters.push(`
-        (
-          lower(sr.params->>'assetClass') = $${params.length}
-          OR (
-            NOT (sr.params ? 'assetClass')
-            AND EXISTS (
-              SELECT 1
-              FROM scan_signals ss
-              JOIN symbols s
-                ON s.id = ss.symbol_id
-              WHERE ss.scan_run_id = sr.id
-                AND ss.timeframe = sr.timeframe
-                AND s.asset_class = $${params.length}
-            )
-          )
-        )
-      `);
+      currentSignalFilters.push(`s.asset_class = $${params.length}`);
     }
+
+    filters.push(`
+      EXISTS (
+        SELECT 1
+        FROM scan_signals ss
+        JOIN symbols s
+          ON s.id = ss.symbol_id
+        WHERE ${currentSignalFilters.join("\n          AND ")}
+      )
+    `);
 
     const result = await this.pool.query<ScanRunRow>(
       `
@@ -637,6 +719,11 @@ export class PgScannerResultsStore {
   }) {
     const params: unknown[] = [scanRunId];
     const filters = ["sr.id = $1", "sr.status = 'success'"];
+    const currentSignalFilters = [
+      "ss.scan_run_id = sr.id",
+      "ss.timeframe = sr.timeframe",
+      currentScanSignalCodeContractCondition("ss"),
+    ];
 
     if (timeframe) {
       params.push(timeframe);
@@ -645,24 +732,18 @@ export class PgScannerResultsStore {
 
     if (assetClass !== "all") {
       params.push(assetClass);
-      filters.push(`
-        (
-          lower(sr.params->>'assetClass') = $${params.length}
-          OR (
-            NOT (sr.params ? 'assetClass')
-            AND EXISTS (
-              SELECT 1
-              FROM scan_signals ss
-              JOIN symbols s
-                ON s.id = ss.symbol_id
-              WHERE ss.scan_run_id = sr.id
-                AND ss.timeframe = sr.timeframe
-                AND s.asset_class = $${params.length}
-            )
-          )
-        )
-      `);
+      currentSignalFilters.push(`s.asset_class = $${params.length}`);
     }
+
+    filters.push(`
+      EXISTS (
+        SELECT 1
+        FROM scan_signals ss
+        JOIN symbols s
+          ON s.id = ss.symbol_id
+        WHERE ${currentSignalFilters.join("\n          AND ")}
+      )
+    `);
 
     const result = await this.pool.query<ScanRunRow>(
       `
@@ -799,7 +880,11 @@ export class PgScannerResultsStore {
     }
 
     const params: unknown[] = [scanRunId, timeframe, observationWindow];
-    const filters = ["ss.scan_run_id = $1", "ss.timeframe = $2"];
+    const filters = [
+      "ss.scan_run_id = $1",
+      "ss.timeframe = $2",
+      currentScanSignalCodeContractCondition("ss"),
+    ];
 
     if (assetClass !== "all") {
       params.push(assetClass);
@@ -840,9 +925,10 @@ export class PgScannerResultsStore {
           FROM market_candles
           WHERE timeframe = $2
             AND symbol_id IN (
-              SELECT symbol_id
-              FROM scan_signals
-              WHERE scan_run_id = $1
+              SELECT ss_coverage.symbol_id
+              FROM scan_signals ss_coverage
+              WHERE ss_coverage.scan_run_id = $1
+                AND ${currentScanSignalCodeContractCondition("ss_coverage")}
             )
           GROUP BY symbol_id
         ) coverage
@@ -946,9 +1032,10 @@ export class PgScannerResultsStore {
   }) {
     const result = await this.pool.query<ScanSignalRow>(
       `
-        SELECT *
-        FROM scan_signals
-        WHERE scan_run_id = $1
+        SELECT ss.*
+        FROM scan_signals ss
+        WHERE ss.scan_run_id = $1
+          AND ${currentScanSignalCodeContractCondition("ss")}
         ORDER BY rank_score DESC NULLS LAST, symbol ASC
         LIMIT $2
       `,
@@ -1317,4 +1404,8 @@ function roundObservationPercent(value: number) {
 
 function toNullableNumber(value: number | string | null) {
   return value === null ? null : Number(value);
+}
+
+function sqlLiteral(value: string) {
+  return `'${value.replace(/'/g, "''")}'`;
 }

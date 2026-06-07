@@ -161,6 +161,7 @@ export function serializeStoredSignalToCodeContract(
 ): PublicStoredScannerSignal {
   const codeFields = getStoredSignalCodeFields(source);
   const rawMetrics = source.rawMetrics ?? {};
+  const embeddedMetrics = getEmbeddedMetrics(rawMetrics);
   const qualityCodes = uniqueCodes([
     ...codeFields.qualityCodes,
     ...getSymbolQualityCodes(source),
@@ -179,33 +180,80 @@ export function serializeStoredSignalToCodeContract(
     ...codeFields,
     qualityCodes,
     metrics: {
-      score: source.rankScore ?? null,
-      rankScore: source.rankScore ?? null,
-      finalSignalScore: source.finalSignalScore ?? null,
-      opportunityScore: source.opportunityScore ?? null,
-      confirmationScore: source.confirmationScore ?? null,
-      riskScore: source.riskScore ?? null,
-      qualityScore: numberValue(rawMetrics.qualityScore),
-      trendScore: source.trendScore ?? null,
-      momentumScore: source.momentumScore ?? null,
-      volumeScore: source.volumeScore ?? null,
-      structureScore: source.structureScore ?? null,
-      volumeRank: numberValue(rawMetrics.volumeRank),
+      score:
+        numberValue(embeddedMetrics?.score) ??
+        numberValue(embeddedMetrics?.rankScore) ??
+        source.rankScore ??
+        null,
+      rankScore:
+        numberValue(embeddedMetrics?.rankScore) ?? source.rankScore ?? null,
+      finalSignalScore:
+        numberValue(embeddedMetrics?.finalSignalScore) ??
+        source.finalSignalScore ??
+        null,
+      opportunityScore:
+        numberValue(embeddedMetrics?.opportunityScore) ??
+        source.opportunityScore ??
+        null,
+      confirmationScore:
+        numberValue(embeddedMetrics?.confirmationScore) ??
+        source.confirmationScore ??
+        null,
+      riskScore:
+        numberValue(embeddedMetrics?.riskScore) ?? source.riskScore ?? null,
+      qualityScore:
+        numberValue(embeddedMetrics?.qualityScore) ??
+        numberValue(rawMetrics.qualityScore),
+      trendScore:
+        numberValue(embeddedMetrics?.trendScore) ?? source.trendScore ?? null,
+      momentumScore:
+        numberValue(embeddedMetrics?.momentumScore) ??
+        source.momentumScore ??
+        null,
+      volumeScore:
+        numberValue(embeddedMetrics?.volumeScore) ?? source.volumeScore ?? null,
+      structureScore:
+        numberValue(embeddedMetrics?.structureScore) ??
+        source.structureScore ??
+        null,
+      volumeRank:
+        numberValue(embeddedMetrics?.volumeRank) ??
+        numberValue(rawMetrics.volumeRank),
       historyBars:
-        typeof source.candleCount === "number"
+        numberValue(embeddedMetrics?.historyBars) ??
+        (typeof source.candleCount === "number"
           ? source.candleCount
-          : numberValue(rawMetrics.historyBars),
-      price: source.priceAtSignal ?? numberValue(rawMetrics.price),
-      rsi14: numberValue(rawMetrics.rsi14 ?? rawMetrics.rsi),
-      bbPercent: numberValue(rawMetrics.bbPercent),
-      bbWidthPercentile: numberValue(rawMetrics.bbWidthPercentile),
-      volumeRatio: numberValue(rawMetrics.volumeRatio),
+          : numberValue(rawMetrics.historyBars)),
+      price:
+        numberValue(embeddedMetrics?.price) ??
+        source.priceAtSignal ??
+        numberValue(rawMetrics.price),
+      rsi14:
+        numberValue(embeddedMetrics?.rsi14) ??
+        numberValue(rawMetrics.rsi14 ?? rawMetrics.rsi),
+      bbPercent:
+        numberValue(embeddedMetrics?.bbPercent) ??
+        numberValue(rawMetrics.bbPercent),
+      bbWidthPercentile:
+        numberValue(embeddedMetrics?.bbWidthPercentile) ??
+        numberValue(rawMetrics.bbWidthPercentile),
+      volumeRatio:
+        numberValue(embeddedMetrics?.volumeRatio) ??
+        numberValue(rawMetrics.volumeRatio),
     },
   };
 }
 
 function getEmbeddedCodeContract(rawMetrics: Record<string, unknown> | null | undefined) {
   const value = rawMetrics?.codeContract;
+
+  return value && typeof value === "object"
+    ? (value as Record<string, unknown>)
+    : null;
+}
+
+function getEmbeddedMetrics(rawMetrics: Record<string, unknown> | null | undefined) {
+  const value = getEmbeddedCodeContract(rawMetrics)?.metrics;
 
   return value && typeof value === "object"
     ? (value as Record<string, unknown>)

@@ -333,7 +333,9 @@ describe("PgScannerResultsStore latest scan queries", () => {
     expect(paramsList[0]).toEqual(["4h", 25, "crypto"]);
     expect(queries[0]).toContain("sr.timeframe = $1");
     expect(queries[0]).toContain("sr.status = 'success'");
-    expect(queries[0]).toContain("lower(sr.params->>'assetClass') = $3");
+    expect(queries[0]).toContain("EXISTS (");
+    expect(queries[0]).toContain("s.asset_class = $3");
+    expect(queries[0]).toContain("raw_metrics ? 'codeContract'");
     expect(queries[0]).toContain("LIMIT $2");
   });
 
@@ -360,7 +362,9 @@ describe("PgScannerResultsStore latest scan queries", () => {
     expect(queries[0]).toContain("sr.id = $1");
     expect(queries[0]).toContain("sr.status = 'success'");
     expect(queries[0]).toContain("sr.timeframe = $2");
-    expect(queries[0]).toContain("lower(sr.params->>'assetClass') = $3");
+    expect(queries[0]).toContain("EXISTS (");
+    expect(queries[0]).toContain("s.asset_class = $3");
+    expect(queries[0]).toContain("raw_metrics ? 'codeContract'");
     expect(queries[0]).toContain("LIMIT 1");
   });
 

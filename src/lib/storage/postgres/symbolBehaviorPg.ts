@@ -5,6 +5,7 @@ import {
   type ScanResultGroup,
 } from "@/lib/scanner/scanResultGroups";
 import { createPostgresPool } from "./pool";
+import { currentScanSignalCodeContractCondition } from "./scannerResultsPg";
 
 export const SYMBOL_BEHAVIOR_HORIZONS = [1, 3, 5] as const;
 export const SYMBOL_BEHAVIOR_DEFAULT_LIMIT = 80;
@@ -246,6 +247,7 @@ async function loadSymbolBehaviorRowsPg(
     "s.symbol = $3",
     "ss.timeframe = $4",
     "sr.status = 'success'",
+    currentScanSignalCodeContractCondition("ss"),
   ];
 
   if (currentSignal?.id) {
