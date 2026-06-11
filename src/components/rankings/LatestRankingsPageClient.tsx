@@ -19,8 +19,11 @@ import {
   type DataSortValue,
 } from "@/components/table/dataTableSorting";
 import {
+  FilterBar,
   PageShell,
   RefreshIconButton,
+  StatCell,
+  StatStrip,
   StatusBadge,
   type StatusTone,
 } from "@/components/ui/workspace";
@@ -278,6 +281,13 @@ export function LatestRankingsPageClient({
       getNextDataSortState({ current, key, defaultDirection }),
     );
   };
+  const clearFilters = () => {
+    setTimeframe("4h");
+    setAssetClass("crypto");
+    setLimit(100);
+    setIncludeLowQuality(false);
+    setTableSort({ key: "rank", direction: "desc" });
+  };
   const downloadVisibleCsv = () => {
     if (visibleItems.length === 0 || typeof document === "undefined") {
       return;
@@ -321,7 +331,18 @@ export function LatestRankingsPageClient({
         evidence quality, and risk context.
       </p>
 
-      <div className="grid min-h-0 flex-1 gap-2 xl:grid-cols-[208px_minmax(0,1fr)] xl:overflow-hidden 2xl:grid-cols-[216px_minmax(0,1fr)]">
+      <main className="min-h-0 min-w-0 flex-1 space-y-1.5 xl:flex xl:flex-col xl:overflow-hidden">
+        <LatestRankingsSummaryPanel
+          data={data}
+          timeframe={timeframe}
+          assetClass={assetClass}
+          includeLowQuality={includeLowQuality}
+          finishedAt={finishedAt}
+          totalSignals={totalSignals}
+          returnedItems={returnedItems}
+          lowQualityExcluded={lowQualityExcluded}
+        />
+
         <LatestRankingsControls
           timeframe={timeframe}
           assetClass={assetClass}
@@ -331,51 +352,39 @@ export function LatestRankingsPageClient({
           onAssetClassChange={setAssetClass}
           onLimitChange={setLimit}
           onIncludeLowQualityChange={setIncludeLowQuality}
+          onClear={clearFilters}
         />
 
-        <main className="min-h-0 min-w-0 space-y-1.5 xl:flex xl:flex-col xl:overflow-hidden">
-          <LatestRankingsSummaryPanel
-            data={data}
+        {hasUnavailableData ? (
+          <StatePanel
+            title="Unable to load rankings."
+            message="Try refreshing the page or adjusting filters."
+          />
+        ) : isLoading ? (
+          <StatePanel
+            title="Loading rankings..."
+            message="Loading the latest ranking results."
+          />
+        ) : !data?.run || returnedItems === 0 ? (
+          <StatePanel
+            title="No ranking results found."
+            message="No symbols match the current filters."
+          />
+        ) : (
+          <LatestRankingsResultsTable
+            rows={visibleRows}
+            summary={data.summary}
+            sortState={tableSort}
+            onSortChange={updateTableSort}
             timeframe={timeframe}
             assetClass={assetClass}
             includeLowQuality={includeLowQuality}
-            finishedAt={finishedAt}
-            totalSignals={totalSignals}
-            returnedItems={returnedItems}
-            lowQualityExcluded={lowQualityExcluded}
+            limit={limit}
+            dictionary={dictionary}
+            language={language}
           />
-
-          {hasUnavailableData ? (
-            <StatePanel
-              title="Unable to load rankings."
-              message="Try refreshing the page or adjusting filters."
-            />
-          ) : isLoading ? (
-            <StatePanel
-              title="Loading rankings..."
-              message="Loading the latest ranking results."
-            />
-          ) : !data?.run || returnedItems === 0 ? (
-            <StatePanel
-              title="No ranking results found."
-              message="No symbols match the current filters."
-            />
-          ) : (
-            <LatestRankingsResultsTable
-              rows={visibleRows}
-              summary={data.summary}
-              sortState={tableSort}
-              onSortChange={updateTableSort}
-              timeframe={timeframe}
-              assetClass={assetClass}
-              includeLowQuality={includeLowQuality}
-              limit={limit}
-                dictionary={dictionary}
-                language={language}
-              />
-          )}
-        </main>
-      </div>
+        )}
+      </main>
     </PageShell>
   );
 }
@@ -504,6 +513,7 @@ function LatestRankingsControls({
   onAssetClassChange,
   onLimitChange,
   onIncludeLowQualityChange,
+  onClear,
 }: {
   timeframe: LatestRankingsTimeframe;
   assetClass: LatestRankingsAssetClass;
@@ -513,89 +523,89 @@ function LatestRankingsControls({
   onAssetClassChange: (value: LatestRankingsAssetClass) => void;
   onLimitChange: (value: LatestRankingsLimit) => void;
   onIncludeLowQualityChange: (value: boolean) => void;
+  onClear: () => void;
+}) {
+  const hasActiveFilters =
+    timeframe !== "4h" ||
+    assetClass !== "crypto" ||
+    limit !== 100 ||
+    includeLowQuality;
+
+  return (
+    <FilterBar
+      label="Active Filters"
+      actions={
+        <button
+          type="button"
+          onClick={onClear}
+          disabled={!hasActiveFilters}
+          className="terminal-mini-action h-6 px-2 disabled:cursor-not-allowed disabled:opacity-55"
+        >
+          Clear Filters
+        </button>
+      }
+    >
+      <CompactSelect
+        label="Timeframe"
+        value={timeframe}
+        onChange={(value) => onTimeframeChange(value as LatestRankingsTimeframe)}
+        options={timeframeOptions}
+      />
+      <CompactSelect
+        label="Asset Class"
+        value={assetClass}
+        onChange={(value) => onAssetClassChange(value as LatestRankingsAssetClass)}
+        options={assetClassOptions}
+      />
+      <CompactSelect
+        label="Rows"
+        value={String(limit)}
+        onChange={(value) => onLimitChange(Number(value) as LatestRankingsLimit)}
+        options={limitOptions.map(String)}
+      />
+      <label className="flex h-7 items-center gap-1.5 border border-[var(--border-medium)] bg-[var(--control)] px-2 text-[10px] font-semibold uppercase text-[var(--muted)]">
+        <input
+          type="checkbox"
+          checked={includeLowQuality}
+          onChange={(event) => onIncludeLowQualityChange(event.target.checked)}
+          className="h-3 w-3 shrink-0 accent-[var(--accent)]"
+        />
+        <span className="whitespace-nowrap text-[var(--foreground)]">
+          Show Low Quality
+        </span>
+      </label>
+    </FilterBar>
+  );
+}
+
+function CompactSelect({
+  label,
+  value,
+  options,
+  onChange,
+}: {
+  label: string;
+  value: string;
+  options: string[];
+  onChange: (value: string) => void;
 }) {
   return (
-    <aside className="terminal-rail p-2 xl:h-full xl:min-h-0 xl:overflow-y-auto">
-      <h2 className="terminal-panel-title mb-2">
-        Active Filters
-      </h2>
-      <div className="grid gap-2 text-xs text-[var(--muted)] sm:grid-cols-2 xl:grid-cols-1">
-        <ControlSection title="Scope">
-          <label className="block">
-            <span className="mb-1 block text-[11px] uppercase tracking-wide">
-              Timeframe
-            </span>
-            <select
-              value={timeframe}
-              onChange={(event) =>
-                onTimeframeChange(event.target.value as LatestRankingsTimeframe)
-              }
-              className={controlClass}
-            >
-              {timeframeOptions.map((option) => (
-                <option key={option} value={option}>
-                  {option}
-                </option>
-              ))}
-            </select>
-          </label>
-
-          <label className="block">
-            <span className="mb-1 block text-[11px] uppercase tracking-wide">
-              Asset Class
-            </span>
-            <select
-              value={assetClass}
-              onChange={(event) =>
-                onAssetClassChange(event.target.value as LatestRankingsAssetClass)
-              }
-              className={controlClass}
-            >
-              {assetClassOptions.map((option) => (
-                <option key={option} value={option}>
-                  {option}
-                </option>
-              ))}
-            </select>
-          </label>
-
-          <label className="block">
-            <span className="mb-1 block text-[11px] uppercase tracking-wide">
-              Result Limit
-            </span>
-            <select
-              value={limit}
-              onChange={(event) =>
-                onLimitChange(Number(event.target.value) as LatestRankingsLimit)
-              }
-              className={controlClass}
-            >
-              {limitOptions.map((option) => (
-                <option key={option} value={option}>
-                  {option}
-                </option>
-              ))}
-            </select>
-          </label>
-        </ControlSection>
-
-        <ControlSection title="Quality">
-          <label className="flex items-center gap-2">
-            <input
-              type="checkbox"
-              checked={includeLowQuality}
-              onChange={(event) => onIncludeLowQualityChange(event.target.checked)}
-              className="h-3.5 w-3.5 accent-[var(--accent)]"
-            />
-            <span>
-              <span className="block text-[11px] font-semibold uppercase tracking-wide text-[var(--foreground)]">
-                Show Low Quality
-              </span>
-            </span>
-          </label>
-        </ControlSection>
-      </div>
-    </aside>
+    <label className="flex min-w-[116px] items-center gap-1.5">
+      <span className="shrink-0 text-[10px] font-semibold uppercase text-[var(--muted)]">
+        {label}
+      </span>
+      <select
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        className={`${controlClass} min-w-[64px]`}
+      >
+        {options.map((option) => (
+          <option key={option} value={option}>
+            {option}
+          </option>
+        ))}
+      </select>
+    </label>
   );
 }
 
@@ -624,59 +634,45 @@ function LatestRankingsSummaryPanel({
     symbolsTotal: run?.symbolsTotal,
   });
   return (
-    <section className="terminal-panel px-2 py-1">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <div className="flex min-w-0 flex-wrap items-center gap-1.5">
-          <span className="terminal-command-label">Ranking Summary</span>
-          <CompactMetric label="Universe" value={formatInteger(run?.symbolsTotal)} />
-          <CompactMetric label="Reviewed" value={formatInteger(run?.symbolsScanned)} />
-          <CompactMetric
-            label="Results"
-            value={formatInteger(run?.signalsCreated ?? totalSignals)}
-          />
-          <CompactMetric label="Skipped" value={formatInteger(run?.symbolsSkipped)} />
-          <CompactMetric label="Low-quality" value={formatInteger(lowQualityExcluded)} />
-          <CompactMetric
-            label="Limited"
-            value={`${formatInteger(returnedItems)}/${formatInteger(totalSignals)}`}
-          />
-        </div>
-        <div className="flex min-w-0 flex-wrap items-center justify-end gap-1">
-          <StatusBadge tone={run ? "complete" : "missing"}>
-            {run?.status ?? "No run"}
-          </StatusBadge>
-          <StatusBadge tone="accent">{timeframe.toUpperCase()}</StatusBadge>
-          <StatusBadge tone="neutral">{assetClass.toUpperCase()}</StatusBadge>
-          {!includeLowQuality ? (
-            <StatusBadge tone="neutral">Low Quality Excluded</StatusBadge>
-          ) : null}
-          <StatusBadge tone={finishedAt ? "neutral" : "missing"}>
-            Finished {formatCompactDateTime(finishedAt)}
-          </StatusBadge>
-        </div>
-      </div>
+    <section className="space-y-1">
+      <StatStrip
+        label="Ranking Summary"
+        actions={
+          <>
+            <StatusBadge tone={run ? "complete" : "missing"}>
+              {run?.status ?? "No run"}
+            </StatusBadge>
+            <StatusBadge tone="accent">{timeframe.toUpperCase()}</StatusBadge>
+            <StatusBadge tone="neutral">{assetClass.toUpperCase()}</StatusBadge>
+            {!includeLowQuality ? (
+              <StatusBadge tone="neutral">Low Quality Excluded</StatusBadge>
+            ) : null}
+            <StatusBadge tone={finishedAt ? "neutral" : "missing"}>
+              Finished {formatCompactDateTime(finishedAt)}
+            </StatusBadge>
+          </>
+        }
+      >
+        <StatCell label="Universe" value={formatInteger(run?.symbolsTotal)} />
+        <StatCell label="Reviewed" value={formatInteger(run?.symbolsScanned)} />
+        <StatCell
+          label="Results"
+          value={formatInteger(run?.signalsCreated ?? totalSignals)}
+          tone="complete"
+        />
+        <StatCell label="Skipped" value={formatInteger(run?.symbolsSkipped)} />
+        <StatCell label="Low-quality" value={formatInteger(lowQualityExcluded)} />
+        <StatCell
+          label="Limited"
+          value={`${formatInteger(returnedItems)}/${formatInteger(totalSignals)}`}
+          tone={returnedItems < totalSignals ? "accent" : "neutral"}
+        />
+      </StatStrip>
       {showUniverseWarning ? (
         <p className="mt-1 inline-flex border border-[var(--warning-border)] bg-[var(--warning-bg)] px-1.5 py-0.5 text-[10px] font-semibold uppercase text-[var(--warning)]">
           Ranking universe incomplete: {formatInteger(run?.symbolsTotal)} crypto symbols.
         </p>
       ) : null}
-    </section>
-  );
-}
-
-function ControlSection({
-  title,
-  children,
-}: {
-  title: string;
-  children: ReactNode;
-}) {
-  return (
-    <section className="space-y-2 border-t border-[var(--border)] pt-2 first:border-t-0 first:pt-0">
-      <h3 className="text-[10px] font-semibold uppercase tracking-wide text-[var(--muted)]">
-        {title}
-      </h3>
-      {children}
     </section>
   );
 }
@@ -740,8 +736,7 @@ function LatestRankingsResultsTable({
 }) {
   const [expandedItemId, setExpandedItemId] = useState<string | null>(null);
   const sharedCandleTime = getSharedLatestRankingsCandleTime(rows);
-  const showCandleTimeColumn = sharedCandleTime === null;
-  const tableColumnCount = showCandleTimeColumn ? 9 : 8;
+  const tableColumnCount = 9;
 
   return (
     <section className="terminal-panel-data min-h-0 overflow-hidden xl:flex xl:flex-1 xl:flex-col">
@@ -773,7 +768,7 @@ function LatestRankingsResultsTable({
 
       <DataTableScroll className="!overflow-x-auto !overflow-y-auto xl:min-h-0 xl:flex-1">
         <DataTable
-          minWidth={showCandleTimeColumn ? "min-w-[900px]" : "min-w-[790px]"}
+          minWidth="min-w-[900px]"
           className="table-fixed"
         >
           <thead className="sticky top-0 z-20 bg-[var(--table-header)]">
@@ -838,11 +833,9 @@ function LatestRankingsResultsTable({
               >
                 Price
               </DataTableHeaderCell>
-              {showCandleTimeColumn ? (
-                <DataTableHeaderCell className="w-[154px]">
-                  Updated
-                </DataTableHeaderCell>
-              ) : null}
+              <DataTableHeaderCell className="w-[154px]">
+                Updated
+              </DataTableHeaderCell>
               <DataTableHeaderCell className="w-[96px]">View Details</DataTableHeaderCell>
             </tr>
           </thead>
@@ -862,7 +855,6 @@ function LatestRankingsResultsTable({
                     assetClass={assetClass}
                     includeLowQuality={includeLowQuality}
                     limit={limit}
-                    showCandleTimeColumn={showCandleTimeColumn}
                     dictionary={dictionary}
                     language={language}
                   />
@@ -892,7 +884,6 @@ function LatestRankingsRow({
   assetClass,
   includeLowQuality,
   limit,
-  showCandleTimeColumn,
   dictionary,
   language,
 }: {
@@ -903,7 +894,6 @@ function LatestRankingsRow({
   assetClass: LatestRankingsAssetClass;
   includeLowQuality: boolean;
   limit: LatestRankingsLimit;
-  showCandleTimeColumn: boolean;
   dictionary: ScannerDisplayDictionary;
   language: Language;
 }) {
@@ -982,11 +972,9 @@ function LatestRankingsRow({
       <DataTableCell align="right" className="font-mono tabular-nums text-[var(--foreground)]">
         {formatPrice(item.metrics.price)}
       </DataTableCell>
-      {showCandleTimeColumn ? (
-        <DataTableCell className="text-[var(--muted)]">
-          {formatDateTime(item.candleOpenTime)}
-        </DataTableCell>
-      ) : null}
+      <DataTableCell className="font-mono text-[var(--muted)]">
+        {formatDateTime(item.candleOpenTime)}
+      </DataTableCell>
       <DataTableCell>
         <button
           type="button"
@@ -1101,18 +1089,6 @@ function ScoreBreakdown({ item }: { item: LatestRankingsRowItem }) {
         </div>
       ))}
     </dl>
-  );
-}
-
-function CompactMetric({ label, value }: { label: string; value: string }) {
-  return (
-    <span className="terminal-command-chip">
-      <span className="text-[var(--terminal-bar-muted)]">{label}</span>
-      {" "}
-      <span className="font-mono font-semibold tabular-nums text-[var(--terminal-bar-foreground)]">
-        {value}
-      </span>
-    </span>
   );
 }
 

@@ -654,9 +654,10 @@ export function ArchivePageClient({
           }
           isLoading={!isVisualCheck && snapshotsQuery.isLoading}
           onSelectRun={setManualSelectedRunId}
+          className="order-2 xl:order-1"
         />
 
-        <main className="min-w-0 space-y-2 xl:flex xl:min-h-0 xl:flex-col xl:overflow-hidden">
+        <main className="order-1 min-w-0 space-y-2 xl:order-2 xl:flex xl:min-h-0 xl:flex-col xl:overflow-hidden">
           <ForwardObservationSection
             window={observationWindow}
             onWindowChange={setObservationWindow}
@@ -835,6 +836,7 @@ export function RecentSuccessfulRunsPanel({
   errorMessage,
   isLoading,
   onSelectRun,
+  className = "",
 }: {
   timeframe: ArchiveTimeframe;
   snapshots: HistoricalSnapshotRun[];
@@ -846,10 +848,11 @@ export function RecentSuccessfulRunsPanel({
   errorMessage: string | null;
   isLoading: boolean;
   onSelectRun: (runId: string) => void;
+  className?: string;
 }) {
   return (
     <section
-      className={recentRunsPanelClassName}
+      className={`${recentRunsPanelClassName} ${className}`}
       data-testid="recent-runs-panel"
       aria-label="Selected Run recent runs"
     >

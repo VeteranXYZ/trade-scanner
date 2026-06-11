@@ -77,7 +77,7 @@ export function DataTable({
 }) {
   return (
     <table
-      className={`w-full border-collapse text-left text-xs ${minWidth} ${className}`}
+      className={`w-full border-collapse text-left text-xs tabular-nums ${minWidth} ${className}`}
     >
       {children}
     </table>

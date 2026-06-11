@@ -319,9 +319,10 @@ export function WatchlistPageClient({
           onImport={importSymbols}
           onCopyExport={copyExportText}
           onFilterChange={updateFilter}
+          className="order-2 xl:order-1"
         />
 
-        <main className="min-w-0 space-y-2 xl:flex xl:min-h-0 xl:flex-col xl:overflow-hidden">
+        <main className="order-1 min-w-0 space-y-2 xl:order-2 xl:flex xl:min-h-0 xl:flex-col xl:overflow-hidden">
           <WatchlistSummaryCards
             summary={summary}
             researchSummary={researchSummary}
@@ -344,7 +345,6 @@ export function WatchlistPageClient({
               isLoading={latestIsLoading}
             />
           )}
-          <WatchlistResearchSummaryPanel summary={researchSummary} />
 
           {latestIsLoading ? (
             <WatchlistStatePanel message="Loading watchlist..." />
@@ -369,6 +369,8 @@ export function WatchlistPageClient({
               onSortChange={updateTableSort}
             />
           )}
+
+          <WatchlistResearchSummaryPanel summary={researchSummary} />
 
           <WatchlistBackdropDisclosure
             data={marketContextData}
@@ -780,6 +782,7 @@ export function WatchlistControls({
   onImport,
   onCopyExport,
   onFilterChange,
+  className = "",
 }: {
   draftInput: string;
   importInput: string;
@@ -796,9 +799,10 @@ export function WatchlistControls({
     key: Key,
     value: WatchlistFilters[Key],
   ) => void;
+  className?: string;
 }) {
   return (
-    <aside className="terminal-rail p-1.5 xl:min-h-0 xl:overflow-hidden">
+    <aside className={`terminal-rail p-1.5 xl:min-h-0 xl:overflow-hidden ${className}`}>
       <section className="space-y-1">
         <h2 className={railSectionLabelClass}>
           Symbols

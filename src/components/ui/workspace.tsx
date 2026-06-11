@@ -233,6 +233,98 @@ export function PageToolbar({
   );
 }
 
+export function StatStrip({
+  label,
+  children,
+  actions,
+  className = "",
+}: {
+  label?: ReactNode;
+  children: ReactNode;
+  actions?: ReactNode;
+  className?: string;
+}) {
+  return (
+    <section
+      className={`terminal-panel flex min-w-0 flex-wrap items-center justify-between gap-2 px-2 py-1 ${className}`}
+    >
+      <div className="flex min-w-0 flex-wrap items-center gap-1.5">
+        {label ? (
+          <span className="shrink-0 border-r border-[var(--border)] pr-2 text-[10px] font-semibold uppercase text-[var(--muted)]">
+            {label}
+          </span>
+        ) : null}
+        {children}
+      </div>
+      {actions ? (
+        <div className="flex min-w-0 flex-wrap items-center justify-end gap-1">
+          {actions}
+        </div>
+      ) : null}
+    </section>
+  );
+}
+
+export function StatCell({
+  label,
+  value,
+  tone = "neutral",
+  className = "",
+  title,
+}: {
+  label: ReactNode;
+  value: ReactNode;
+  tone?: StatusTone;
+  className?: string;
+  title?: string;
+}) {
+  return (
+    <span
+      title={title}
+      className={`inline-flex h-6 max-w-full shrink-0 items-center gap-1.5 overflow-hidden whitespace-nowrap border border-l-2 bg-[var(--panel-muted)] px-1.5 text-[10px] [line-height:1] ${toneAccentClass[tone]} ${className}`}
+    >
+      <span className="shrink-0 font-semibold uppercase text-[var(--muted)]">
+        {label}
+      </span>
+      <span className="min-w-0 truncate font-mono font-semibold tabular-nums text-[var(--foreground)]">
+        {value}
+      </span>
+    </span>
+  );
+}
+
+export function FilterBar({
+  label = "Filters",
+  children,
+  actions,
+  className = "",
+}: {
+  label?: ReactNode;
+  children: ReactNode;
+  actions?: ReactNode;
+  className?: string;
+}) {
+  return (
+    <section
+      className={`terminal-panel flex min-w-0 flex-wrap items-end justify-between gap-2 px-2 py-1.5 ${className}`}
+    >
+      <div className="flex min-w-0 flex-wrap items-end gap-2">
+        {label ? (
+          <span className="mb-1 shrink-0 text-[10px] font-semibold uppercase text-[var(--muted)]">
+            {label}
+          </span>
+        ) : null}
+        {children}
+      </div>
+      {actions ? (
+        <div className="flex min-w-0 flex-wrap items-center justify-end gap-1">
+          {actions}
+        </div>
+      ) : null}
+    </section>
+  );
+}
+
 export function ControlGroup({
   title,
   children,

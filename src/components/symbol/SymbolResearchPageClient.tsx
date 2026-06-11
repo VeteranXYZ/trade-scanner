@@ -1891,10 +1891,15 @@ function DecisionHeader({
         </div>
 
         <div className="flex min-w-0 shrink-0 items-center gap-3 text-[11px] text-[var(--muted)]">
+          <DecisionInlineStat label="Action" value={interpretation.action} />
           <DecisionInlineStat label="Research Priority" value={interpretation.label} />
           <DecisionInlineStat
             label="Rank Score"
             value={formatSymbolResearchScore(scoreBreakdown.rankScore)}
+          />
+          <DecisionInlineStat
+            label="Risk Context"
+            value={formatSymbolResearchScore(scoreBreakdown.riskScore)}
           />
           {qualityTier ? (
             <DecisionInlineStat label="Quality" value={toTitleCase(qualityTier)} />
