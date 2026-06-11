@@ -30,6 +30,7 @@ import {
 import { formatDisplayDateTime } from "@/lib/utils/format";
 import { useAppLanguage } from "@/lib/i18n/AppLanguageProvider";
 import type { Language } from "@/lib/i18n/dictionaries";
+import { buildSymbolResearchHref } from "@/lib/navigation/researchNavigation";
 import { getVegaRankApiBaseUrl } from "@/lib/runtime/vegaRankApi";
 import { explainCode, explainCodes } from "@/lib/vegarank-codebook/explainCode";
 import { groupCodeByResultGroup } from "@/lib/vegarank-codebook/codeRegistry";
@@ -45,6 +46,8 @@ import {
   type LatestRankingsGroupKey,
   type ScannerDisplayDictionary,
 } from "./latestRankingsUi";
+
+export { buildSymbolResearchHref };
 
 export type LatestRankingsAssetClass =
   | "crypto"
@@ -152,16 +155,6 @@ type BuildLatestRankingsUrlParams = {
   tradeApiBaseUrl?: string;
 };
 
-type BuildSymbolResearchHrefParams = {
-  exchange?: string | null;
-  symbol: string;
-  timeframe?: string | null;
-  assetClass?: string | null;
-  includeLowQuality?: boolean | string | null;
-  limit?: number | string | null;
-  from?: string | null;
-};
-
 type LatestRankingsQueryStateInput =
   | { get(name: string): string | null }
   | Record<string, string | string[] | number | boolean | null | undefined>
@@ -217,6 +210,15 @@ type LatestRankingsTerminalTone =
   | "eligible"
   | "warning";
 type LatestRankingsGroupTone = Extract<StatusTone, ChipTone>;
+const latestRankingsSortKeys = [
+  "symbol",
+  "rank",
+  "signal",
+  "action",
+  "setup",
+  "quality",
+  "price",
+] as const satisfies readonly LatestRankingsSortKey[];
 
 export function LatestRankingsPageClient({
   initialQueryState,
@@ -239,10 +241,9 @@ export function LatestRankingsPageClient({
     initialFilters.includeLowQuality,
   );
   const [tableSort, setTableSort] =
-    useState<DataSortState<LatestRankingsSortKey> | null>({
-      key: "rank",
-      direction: "desc",
-    });
+    useState<DataSortState<LatestRankingsSortKey> | null>(
+      initialFilters.sortState,
+    );
   const latestRankingsQuery = useQuery({
     queryKey: ["latest-rankings", timeframe, assetClass, limit, includeLowQuality],
     queryFn: ({ signal }) =>
@@ -855,6 +856,7 @@ function LatestRankingsResultsTable({
                     assetClass={assetClass}
                     includeLowQuality={includeLowQuality}
                     limit={limit}
+                    sortState={sortState}
                     dictionary={dictionary}
                     language={language}
                   />
@@ -884,6 +886,7 @@ function LatestRankingsRow({
   assetClass,
   includeLowQuality,
   limit,
+  sortState,
   dictionary,
   language,
 }: {
@@ -894,6 +897,7 @@ function LatestRankingsRow({
   assetClass: LatestRankingsAssetClass;
   includeLowQuality: boolean;
   limit: LatestRankingsLimit;
+  sortState: DataSortState<LatestRankingsSortKey> | null;
   dictionary: ScannerDisplayDictionary;
   language: Language;
 }) {
@@ -924,6 +928,7 @@ function LatestRankingsRow({
             includeLowQuality,
             limit,
             from: "rankings",
+            sort: encodeLatestRankingsSortState(sortState),
           })}
         >
           {item.symbol}
@@ -1422,45 +1427,6 @@ export function buildSymbolResearchPath({
   return buildSymbolResearchHref({ exchange, symbol, timeframe });
 }
 
-export function buildSymbolResearchHref({
-  exchange,
-  symbol,
-  timeframe,
-  assetClass,
-  includeLowQuality,
-  limit,
-  from,
-}: BuildSymbolResearchHrefParams) {
-  const normalizedExchange = normalizeExchangePathSegment(exchange);
-  const normalizedSymbol = symbol.trim().toUpperCase();
-  const params = new URLSearchParams({
-    timeframe: timeframe?.trim() || "4h",
-  });
-  const normalizedAssetClass = assetClass?.trim();
-  const normalizedLimit = normalizePositiveInteger(limit);
-  const normalizedFrom = normalizeLatestRankingFrom(from);
-
-  if (normalizedAssetClass) {
-    params.set("assetClass", normalizedAssetClass);
-  }
-
-  if (includeLowQuality === true || includeLowQuality === "true") {
-    params.set("includeLowQuality", "true");
-  }
-
-  if (normalizedLimit !== null) {
-    params.set("limit", String(normalizedLimit));
-  }
-
-  if (normalizedFrom) {
-    params.set("from", normalizedFrom);
-  }
-
-  return `/symbol/${encodeURIComponent(normalizedExchange)}/${encodeURIComponent(
-    normalizedSymbol,
-  )}?${params.toString()}`;
-}
-
 export function buildLatestRunSummaryText({
   symbolsTotal,
   symbolsScanned,
@@ -1534,6 +1500,10 @@ function getLatestRankingsInitialFilters(searchParams: LatestRankingsQueryStateI
     limit: normalizeLatestRankingsLimit(getLatestRankingsQueryStateValue(searchParams, "limit")),
     includeLowQuality:
       getLatestRankingsQueryStateValue(searchParams, "includeLowQuality") === "true",
+    sortState:
+      parseLatestRankingsSortState(
+        getLatestRankingsQueryStateValue(searchParams, "sort"),
+      ) ?? { key: "rank" as const, direction: "desc" as const },
   };
 }
 
@@ -1579,23 +1549,27 @@ function normalizeLatestRankingsLimit(value: string | null): LatestRankingsLimit
     : 100;
 }
 
-function normalizeExchangePathSegment(value: string | null | undefined) {
-  return value?.trim().toLowerCase() || "binance";
+function encodeLatestRankingsSortState(
+  sortState: DataSortState<LatestRankingsSortKey> | null,
+) {
+  return sortState ? `${sortState.key}:${sortState.direction}` : null;
 }
 
-function normalizeLatestRankingFrom(value: string | null | undefined) {
-  return value?.trim();
-}
+function parseLatestRankingsSortState(
+  value: string | null,
+): DataSortState<LatestRankingsSortKey> | null {
+  const [key, direction] = value?.split(":").map((part) => part.trim()) ?? [];
 
-function normalizePositiveInteger(value: number | string | null | undefined) {
-  const number = typeof value === "string" ? Number(value.trim()) : Number(value);
-
-  if (!Number.isInteger(number) || number <= 0) {
-    return null;
+  if (
+    latestRankingsSortKeys.includes(key as LatestRankingsSortKey) &&
+    (direction === "asc" || direction === "desc")
+  ) {
+    return { key: key as LatestRankingsSortKey, direction };
   }
 
-  return number;
+  return null;
 }
+
 
 async function getLatestRankingsErrorMessage(response: Response, fallback: string) {
   const errorBody = (await response.json().catch(() => null)) as

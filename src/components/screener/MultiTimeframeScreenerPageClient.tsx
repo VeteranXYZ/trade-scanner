@@ -25,6 +25,11 @@ import {
 import { formatDisplayDateTime } from "@/lib/utils/format";
 import { useAppLanguage } from "@/lib/i18n/AppLanguageProvider";
 import type { Language } from "@/lib/i18n/dictionaries";
+import {
+  getNavigationQueryValue,
+  type ResearchNavigationContext,
+  type ResearchNavigationQueryState,
+} from "@/lib/navigation/researchNavigation";
 import { getVegaRankApiBaseUrl } from "@/lib/runtime/vegaRankApi";
 import {
   formatDateTime,
@@ -87,16 +92,38 @@ export type MtfScreenerTableSortKey =
   | `${MtfScreenerTimeframe}_group`
   | `${MtfScreenerTimeframe}_rank`;
 
-export function MultiTimeframeScreenerPageClient() {
+const mtfScreenerTableSortKeys = [
+  "symbol",
+  "combined_rank",
+  "higher_timeframe_safety",
+  "signal",
+  "1h_group",
+  "1h_rank",
+  "4h_group",
+  "4h_rank",
+  "1d_group",
+  "1d_rank",
+  "1w_group",
+  "1w_rank",
+] as const satisfies readonly MtfScreenerTableSortKey[];
+
+export function MultiTimeframeScreenerPageClient({
+  initialQueryState,
+}: {
+  initialQueryState?: ResearchNavigationQueryState;
+} = {}) {
+  const initialState = getMtfScreenerInitialState(initialQueryState);
   const [filters, setFilters] = useState<MtfScreenerFilters>(
-    defaultMtfScreenerFilters,
+    initialState.filters,
   );
   const [presetId, setPresetId] = useState<MtfScreenerPresetId | "custom">(
-    "custom",
+    initialState.presetId,
   );
-  const [symbolSearch, setSymbolSearch] = useState("");
+  const [symbolSearch, setSymbolSearch] = useState(initialState.symbolSearch);
   const [tableSortState, setTableSortState] =
-    useState<DataSortState<MtfScreenerTableSortKey> | null>(null);
+    useState<DataSortState<MtfScreenerTableSortKey> | null>(
+      initialState.sortState,
+    );
   const latestQuery = useQuery({
     queryKey: ["mtf-latest-screener", assetClass],
     queryFn: ({ signal }) => fetchMtfLatestRankings({ signal }),
@@ -132,6 +159,15 @@ export function MultiTimeframeScreenerPageClient() {
   const activeFilterLabels = useMemo(
     () => getActiveMtfFilterLabels(filters, symbolSearch),
     [filters, symbolSearch],
+  );
+  const navigationContext = useMemo(
+    () =>
+      buildMtfScreenerNavigationContext({
+        filters,
+        symbolSearch,
+        sortState: tableSortState,
+      }),
+    [filters, symbolSearch, tableSortState],
   );
 
   const updateGroupFilter = (
@@ -271,6 +307,7 @@ export function MultiTimeframeScreenerPageClient() {
               sourceData={latestQuery.data}
               totalRows={rows.length}
               filteredRows={visibleRows.length}
+              navigationContext={navigationContext}
             />
           )}
         </main>
@@ -286,6 +323,7 @@ export function MultiTimeframeScreenerPageClient() {
           marketContextData={marketContextQuery.data}
           marketContextIsLoading={marketContextQuery.isLoading}
           marketContextIsError={marketContextQuery.isError}
+          navigationContext={navigationContext}
           className="order-3 xl:order-3"
         />
       </div>
@@ -302,6 +340,7 @@ export function MtfScreenerTable({
   filteredRows = rows.length,
   onExportVisible,
   onExportAll,
+  navigationContext,
 }: {
   rows: MtfScreenerRow[];
   sortState?: DataSortState<MtfScreenerTableSortKey> | null;
@@ -314,6 +353,7 @@ export function MtfScreenerTable({
   filteredRows?: number;
   onExportVisible?: () => void;
   onExportAll?: () => void;
+  navigationContext?: ResearchNavigationContext;
 }) {
   const { dictionary, language } = useAppLanguage();
 
@@ -484,7 +524,7 @@ export function MtfScreenerTable({
                   />
                 </DataTableCell>
                 <DataTableCell align="center">
-                  <ResearchLink row={row} />
+                  <ResearchLink row={row} context={navigationContext} />
                 </DataTableCell>
               </tr>
             ))}
@@ -1096,6 +1136,7 @@ export function MtfScreenerDetailRail({
   marketContextData,
   marketContextIsLoading = false,
   marketContextIsError = false,
+  navigationContext,
   className = "",
 }: {
   rows: MtfScreenerRow[];
@@ -1108,6 +1149,7 @@ export function MtfScreenerDetailRail({
   marketContextData?: MarketContextResponse | null;
   marketContextIsLoading?: boolean;
   marketContextIsError?: boolean;
+  navigationContext?: ResearchNavigationContext;
   className?: string;
 }) {
   const { dictionary, language } = useAppLanguage();
@@ -1217,7 +1259,11 @@ export function MtfScreenerDetailRail({
                 return (
                   <Link
                     key={`${reason}-${row.symbol}`}
-                    href={buildMtfSymbolResearchHref({ row, timeframe })}
+                    href={buildMtfSymbolResearchHref({
+                      row,
+                      timeframe,
+                      context: navigationContext,
+                    })}
                     title={notes.length > 0 ? notes.join("; ") : undefined}
                     className={`group/detail block border border-l-2 border-[var(--border)] bg-[var(--panel-muted)] px-2 py-1.5 text-[11px] transition hover:border-[var(--accent-border)] hover:bg-[var(--row-hover)] ${getMtfResearchBucketBorderClass(tone)}`}
                   >
@@ -2437,12 +2483,18 @@ function prioritizeMtfRiskNotes(row: MtfScreenerRow, notes: string[]) {
   return ordered;
 }
 
-function ResearchLink({ row }: { row: MtfScreenerRow }) {
+function ResearchLink({
+  row,
+  context,
+}: {
+  row: MtfScreenerRow;
+  context?: ResearchNavigationContext;
+}) {
   const timeframe = getMtfSymbolResearchTimeframe(row);
 
   return (
     <Link
-      href={buildMtfSymbolResearchHref({ row, timeframe })}
+      href={buildMtfSymbolResearchHref({ row, timeframe, context })}
       title={`Open ${timeframe} research for ${row.symbol}`}
       className="terminal-mini-action is-accent min-w-[104px] gap-1 px-1.5 py-0.5 underline-offset-2 hover:underline"
     >
@@ -2467,6 +2519,153 @@ export function areMtfScreenerFiltersDefault(filters: MtfScreenerFilters) {
     ) &&
     filters.exclude1dRisk === defaultMtfScreenerFilters.exclude1dRisk &&
     filters.exclude1wRisk === defaultMtfScreenerFilters.exclude1wRisk
+  );
+}
+
+function getMtfScreenerInitialState(
+  queryState?: ResearchNavigationQueryState,
+): {
+  filters: MtfScreenerFilters;
+  presetId: MtfScreenerPresetId | "custom";
+  symbolSearch: string;
+  sortState: DataSortState<MtfScreenerTableSortKey> | null;
+} {
+  const filters = cloneMtfScreenerFilters(defaultMtfScreenerFilters);
+
+  applyMtfGroupContext(filters, getNavigationQueryValue(queryState, "group"));
+  applyMtfRiskContext(filters, getNavigationQueryValue(queryState, "risk"));
+
+  return {
+    filters,
+    presetId: "custom",
+    symbolSearch: getNavigationQueryValue(queryState, "q")?.trim() ?? "",
+    sortState: parseMtfScreenerSortState(
+      getNavigationQueryValue(queryState, "sort"),
+    ),
+  };
+}
+
+function buildMtfScreenerNavigationContext({
+  filters,
+  symbolSearch,
+  sortState,
+}: {
+  filters: MtfScreenerFilters;
+  symbolSearch: string;
+  sortState: DataSortState<MtfScreenerTableSortKey> | null;
+}): ResearchNavigationContext {
+  return {
+    q: symbolSearch.trim() || null,
+    group: encodeMtfGroupContext(filters),
+    risk: encodeMtfRiskContext(filters),
+    sort: encodeMtfScreenerSortState(sortState),
+  };
+}
+
+function cloneMtfScreenerFilters(filters: MtfScreenerFilters): MtfScreenerFilters {
+  return {
+    groups: { ...filters.groups },
+    minRank: { ...filters.minRank },
+    exclude1dRisk: filters.exclude1dRisk,
+    exclude1wRisk: filters.exclude1wRisk,
+  };
+}
+
+function encodeMtfGroupContext(filters: MtfScreenerFilters) {
+  const entries = MTF_SCREENER_TIMEFRAMES.flatMap((timeframe) => {
+    const group = filters.groups[timeframe];
+
+    return group === "any" ? [] : [`${timeframe}:${group}`];
+  });
+
+  return entries.length > 0 ? entries.join(",") : null;
+}
+
+function applyMtfGroupContext(
+  filters: MtfScreenerFilters,
+  value: string | null,
+) {
+  const normalized = value?.trim();
+
+  if (!normalized) {
+    return;
+  }
+
+  if (isMtfScreenerGroupFilter(normalized)) {
+    for (const timeframe of MTF_SCREENER_TIMEFRAMES) {
+      filters.groups[timeframe] = normalized;
+    }
+    return;
+  }
+
+  for (const token of normalized.split(",")) {
+    const [timeframe, group] = token.split(":").map((part) => part.trim());
+
+    if (isMtfScreenerTimeframe(timeframe) && isMtfScreenerGroupFilter(group)) {
+      filters.groups[timeframe] = group;
+    }
+  }
+}
+
+function encodeMtfRiskContext(filters: MtfScreenerFilters) {
+  const entries = [
+    filters.exclude1dRisk ? "exclude1d" : null,
+    filters.exclude1wRisk ? "exclude1w" : null,
+  ].filter(Boolean);
+
+  return entries.length > 0 ? entries.join(",") : null;
+}
+
+function applyMtfRiskContext(filters: MtfScreenerFilters, value: string | null) {
+  const tokens = new Set(
+    value
+      ?.split(",")
+      .map((token) => token.trim().toLowerCase())
+      .filter(Boolean) ?? [],
+  );
+
+  filters.exclude1dRisk = tokens.has("exclude1d");
+  filters.exclude1wRisk = tokens.has("exclude1w");
+}
+
+function encodeMtfScreenerSortState(
+  sortState: DataSortState<MtfScreenerTableSortKey> | null,
+) {
+  return sortState ? `${sortState.key}:${sortState.direction}` : null;
+}
+
+function parseMtfScreenerSortState(
+  value: string | null,
+): DataSortState<MtfScreenerTableSortKey> | null {
+  const [key, direction] = value?.split(":").map((part) => part.trim()) ?? [];
+
+  if (
+    isMtfScreenerTableSortKey(key) &&
+    (direction === "asc" || direction === "desc")
+  ) {
+    return { key, direction };
+  }
+
+  return null;
+}
+
+function isMtfScreenerTableSortKey(
+  value: string | undefined,
+): value is MtfScreenerTableSortKey {
+  return mtfScreenerTableSortKeys.includes(value as MtfScreenerTableSortKey);
+}
+
+function isMtfScreenerTimeframe(
+  value: string | undefined,
+): value is MtfScreenerTimeframe {
+  return MTF_SCREENER_TIMEFRAMES.includes(value as MtfScreenerTimeframe);
+}
+
+function isMtfScreenerGroupFilter(
+  value: string | undefined,
+): value is MtfScreenerGroupFilter {
+  return mtfScreenerGroupFilterOptions.includes(
+    value as MtfScreenerGroupFilter,
   );
 }
 

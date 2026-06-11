@@ -4,7 +4,10 @@ import {
   normalizeGroupKey,
 } from "@/components/rankings/latestRankingsUi";
 import { shortResearchDisclaimer } from "@/components/researchCopy";
-import { buildSymbolResearchHref } from "@/components/symbol/symbolResearchLinks";
+import {
+  buildSymbolResearchHref,
+  type ResearchNavigationContext,
+} from "@/lib/navigation/researchNavigation";
 import type { Language } from "@/lib/i18n/dictionaries";
 import { explainCode, explainCodes } from "@/lib/vegarank-codebook/explainCode";
 import { resultGroupByGroupCode } from "@/lib/vegarank-codebook/codeRegistry";
@@ -444,12 +447,15 @@ export function buildMtfSymbolResearchHref({
   row,
   timeframe = getMtfSymbolResearchTimeframe(row),
   assetClass = "crypto",
+  context,
 }: {
   row: MtfScreenerRow;
   timeframe?: string;
   assetClass?: string;
+  context?: ResearchNavigationContext;
 }) {
   return buildSymbolResearchHref({
+    ...context,
     exchange: row.exchange,
     symbol: row.symbol,
     timeframe,

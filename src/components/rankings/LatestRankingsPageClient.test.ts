@@ -231,6 +231,8 @@ describe("LatestRankingsPageClient layout", () => {
     expect(html).toContain("Low-quality");
     expect(html).toContain("Finished");
     expect(html).toContain("Candle");
+    expect(html).toContain("from=rankings");
+    expect(html).toContain("sort=rank%3Adesc");
     expect(html).not.toContain("Copy symbols");
     expect(html).not.toContain(">Candle Time<");
     expect(html).not.toContain("Interpretation Key");

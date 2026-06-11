@@ -24,6 +24,11 @@ import {
   StatusBadge,
   type StatusTone,
 } from "@/components/ui/workspace";
+import {
+  getNavigationQueryValue,
+  type ResearchNavigationContext,
+  type ResearchNavigationQueryState,
+} from "@/lib/navigation/researchNavigation";
 import { getVegaRankApiBaseUrl } from "@/lib/runtime/vegaRankApi";
 import {
   MTF_SCREENER_TIMEFRAMES,
@@ -56,6 +61,7 @@ import {
   saveWatchlistSymbols,
   sortWatchlistRows,
   watchlistPresets,
+  watchlistSortOptions,
   type WatchlistFilters,
   type WatchlistPresetId,
   type WatchlistResearchSummary,
@@ -75,10 +81,13 @@ type WatchlistTableSortState = {
 
 export function WatchlistPageClient({
   visualCheckData,
+  initialQueryState,
 }: {
   visualCheckData?: WatchlistVisualCheckData;
+  initialQueryState?: ResearchNavigationQueryState;
 } = {}) {
   const isVisualCheck = Boolean(visualCheckData);
+  const initialUrlState = getWatchlistInitialUrlState(initialQueryState);
   const initialSymbols =
     visualCheckData?.selectedSymbols ?? DEFAULT_WATCHLIST_SYMBOLS;
   const [symbols, setSymbols] = useState<string[]>(() => [...initialSymbols]);
@@ -89,10 +98,10 @@ export function WatchlistPageClient({
   const [importStatus, setImportStatus] = useState<string | null>(null);
   const [exportStatus, setExportStatus] = useState<string | null>(null);
   const [filters, setFilters] = useState<WatchlistFilters>(
-    defaultWatchlistFilters,
+    initialUrlState.filters,
   );
   const [sortState, setSortState] =
-    useState<WatchlistSortState>(defaultWatchlistSort);
+    useState<WatchlistSortState>(initialUrlState.sortState);
   const latestQuery = useQuery({
     queryKey: ["mtf-latest-watchlist", assetClass],
     queryFn: ({ signal }) => fetchWatchlistMtfLatestRankings({ signal }),
@@ -172,6 +181,10 @@ export function WatchlistPageClient({
   const tableSortState = useMemo<WatchlistTableSortState>(
     () => ({ key: sortState.field, direction: sortState.direction }),
     [sortState],
+  );
+  const navigationContext = useMemo(
+    () => buildWatchlistNavigationContext({ filters, sortState }),
+    [filters, sortState],
   );
   const exportText = useMemo(
     () => buildWatchlistExportText(parseWatchlistSymbols(draftInput)),
@@ -357,6 +370,7 @@ export function WatchlistPageClient({
               filteredRows={sortedRows.length}
               sortState={tableSortState}
               onSortChange={updateTableSort}
+              navigationContext={navigationContext}
             />
           ) : (
             <WatchlistTable
@@ -367,6 +381,7 @@ export function WatchlistPageClient({
               filteredRows={sortedRows.length}
               sortState={tableSortState}
               onSortChange={updateTableSort}
+              navigationContext={navigationContext}
             />
           )}
 
@@ -487,6 +502,7 @@ export function WatchlistTable({
   filteredRows = rows.length,
   sortState = null,
   onSortChange,
+  navigationContext,
 }: {
   rows: WatchlistRow[];
   onRemoveSymbol?: (symbol: string) => void;
@@ -498,6 +514,7 @@ export function WatchlistTable({
     field: WatchlistSortField,
     defaultDirection: WatchlistSortState["direction"],
   ) => void;
+  navigationContext?: ResearchNavigationContext;
 }) {
   if (rows.length === 0) {
     return (
@@ -625,7 +642,7 @@ export function WatchlistTable({
                   {row.mtfRow ? <RiskNotesCell row={row} /> : "Not found"}
                 </DataTableCell>
                 <DataTableCell align="center">
-                  <ResearchLink row={row} />
+                  <ResearchLink row={row} context={navigationContext} />
                 </DataTableCell>
                 {onRemoveSymbol ? (
                   <DataTableCell align="center">
@@ -1225,9 +1242,15 @@ function RiskNotesCell({ row }: { row: WatchlistRow }) {
   );
 }
 
-function ResearchLink({ row }: { row: WatchlistRow }) {
+function ResearchLink({
+  row,
+  context,
+}: {
+  row: WatchlistRow;
+  context?: ResearchNavigationContext;
+}) {
   const timeframe = getWatchlistResearchTimeframe(row);
-  const href = buildWatchlistResearchHref({ row, timeframe });
+  const href = buildWatchlistResearchHref({ row, timeframe, context });
 
   if (!href || !timeframe) {
     return (
@@ -1506,6 +1529,82 @@ function getWatchlistErrorMessage(error: unknown) {
   return error instanceof Error && error.message
     ? error.message
     : "Unable to load watchlist.";
+}
+
+function getWatchlistInitialUrlState(
+  queryState?: ResearchNavigationQueryState,
+): {
+  filters: WatchlistFilters;
+  sortState: WatchlistSortState;
+} {
+  const filters = {
+    ...defaultWatchlistFilters,
+    symbolSearch: getNavigationQueryValue(queryState, "q")?.trim() ?? "",
+  };
+
+  applyWatchlistRiskContext(filters, getNavigationQueryValue(queryState, "risk"));
+
+  return {
+    filters,
+    sortState:
+      parseWatchlistSortState(getNavigationQueryValue(queryState, "sort")) ??
+      defaultWatchlistSort,
+  };
+}
+
+function buildWatchlistNavigationContext({
+  filters,
+  sortState,
+}: {
+  filters: WatchlistFilters;
+  sortState: WatchlistSortState;
+}): ResearchNavigationContext {
+  return {
+    q: filters.symbolSearch.trim() || null,
+    risk: encodeWatchlistRiskContext(filters),
+    sort: `${sortState.field}:${sortState.direction}`,
+  };
+}
+
+function encodeWatchlistRiskContext(filters: WatchlistFilters) {
+  const entries = [
+    filters.hideMissing ? "foundOnly" : null,
+    filters.exclude1dRisk ? "exclude1d" : null,
+    filters.exclude1wRisk ? "exclude1w" : null,
+    filters.onlyShortTermWatch ? "shortTermWatch" : null,
+  ].filter(Boolean);
+
+  return entries.length > 0 ? entries.join(",") : null;
+}
+
+function applyWatchlistRiskContext(
+  filters: WatchlistFilters,
+  value: string | null,
+) {
+  const tokens = new Set(
+    value
+      ?.split(",")
+      .map((token) => token.trim().toLowerCase())
+      .filter(Boolean) ?? [],
+  );
+
+  filters.hideMissing = tokens.has("foundonly");
+  filters.exclude1dRisk = tokens.has("exclude1d");
+  filters.exclude1wRisk = tokens.has("exclude1w");
+  filters.onlyShortTermWatch = tokens.has("shorttermwatch");
+}
+
+function parseWatchlistSortState(value: string | null): WatchlistSortState | null {
+  const [field, direction] = value?.split(":").map((part) => part.trim()) ?? [];
+
+  if (
+    watchlistSortOptions.some((option) => option.field === field) &&
+    (direction === "asc" || direction === "desc")
+  ) {
+    return { field: field as WatchlistSortField, direction };
+  }
+
+  return null;
 }
 
 function getBrowserStorage() {

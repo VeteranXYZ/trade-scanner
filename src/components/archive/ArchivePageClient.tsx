@@ -28,7 +28,12 @@ import {
   type DataSortState,
   type DataSortValue,
 } from "@/components/table/dataTableSorting";
-import { buildSymbolResearchHref } from "@/components/symbol/symbolResearchLinks";
+import {
+  buildSymbolResearchHref,
+  getNavigationQueryValue,
+  normalizeSymbolResearchTimeframe,
+  type ResearchNavigationQueryState,
+} from "@/lib/navigation/researchNavigation";
 import {
   PageShell,
   RefreshIconButton,
@@ -422,17 +427,20 @@ const observationRowsGroupFilters = [
 
 export function ArchivePageClient({
   visualCheckData,
+  initialQueryState,
 }: {
   visualCheckData?: ArchiveVisualCheckData;
+  initialQueryState?: ResearchNavigationQueryState;
 } = {}) {
   const isVisualCheck = Boolean(visualCheckData);
+  const initialUrlState = getArchiveInitialUrlState(initialQueryState);
   const [timeframe, setTimeframe] = useState<ArchiveTimeframe>(
-    visualCheckData?.initialTimeframe ?? "4h",
+    visualCheckData?.initialTimeframe ?? initialUrlState.timeframe,
   );
   const [observationWindow, setObservationWindow] =
     useState<ObservationWindow>(visualCheckData?.initialObservationWindow ?? 3);
   const [manualSelectedRunId, setManualSelectedRunId] = useState<string | null>(
-    null,
+    initialUrlState.runId,
   );
   const [refreshingTimeframe, setRefreshingTimeframe] =
     useState<ArchiveTimeframe | null>(null);
@@ -1737,6 +1745,9 @@ export function ObservationRowsTable({
                         symbol: row.symbol,
                         timeframe: row.timeframe,
                         assetClass,
+                        from: "archive",
+                        runId: row.scanRunId,
+                        snapshotId: row.id,
                       })}
                       className="terminal-mini-action is-accent h-6 px-2"
                     >
@@ -2854,6 +2865,9 @@ export function SnapshotTable({
                         symbol: row.symbol,
                         timeframe: row.timeframe,
                         assetClass,
+                        from: "archive",
+                        runId: row.scanRunId,
+                        snapshotId: row.id,
                       })}
                       className="terminal-mini-action is-accent px-2 py-1"
                     >
@@ -3773,6 +3787,20 @@ export function buildHistoricalObservationReadinessUrl({
   const baseUrl = getVegaRankApiBaseUrl(tradeApiBaseUrl);
 
   return `${baseUrl}/api/archive/observation-readiness?${params.toString()}`;
+}
+
+function getArchiveInitialUrlState(
+  queryState?: ResearchNavigationQueryState,
+): {
+  timeframe: ArchiveTimeframe;
+  runId: string | null;
+} {
+  return {
+    timeframe: normalizeSymbolResearchTimeframe(
+      getNavigationQueryValue(queryState, "timeframe"),
+    ) as ArchiveTimeframe,
+    runId: getNavigationQueryValue(queryState, "runId")?.trim() || null,
+  };
 }
 
 function formatQueryError(error: unknown) {

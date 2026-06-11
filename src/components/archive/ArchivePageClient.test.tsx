@@ -267,6 +267,7 @@ describe("ArchivePageClient display formatting", () => {
     expect(html).toContain("2 rows");
     expect(html).toContain("Overheated caution");
     expect(html).toContain("Risk review");
+    expect(html).toContain("from=archive");
     expect(html).not.toContain("Do not chase");
     expect(html).not.toContain("Avoid");
     expect(html).not.toContain("Show More");

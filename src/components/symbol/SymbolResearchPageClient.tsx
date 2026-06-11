@@ -8,6 +8,12 @@ import { RefreshIconButton } from "@/components/ui/workspace";
 import { useAppLanguage } from "@/lib/i18n/AppLanguageProvider";
 import type { Language } from "@/lib/i18n/dictionaries";
 import {
+  buildArchiveHref,
+  buildDefaultResearchReturnLink,
+  buildRankingsHref,
+  buildSourceAwareResearchReturnLink,
+} from "@/lib/navigation/researchNavigation";
+import {
   getVegaRankApiBaseUrl,
   getVegaRankApiOriginLabel,
 } from "@/lib/runtime/vegaRankApi";
@@ -22,6 +28,7 @@ import {
   isSymbolInWatchlist,
   loadWatchlistSymbols,
   normalizeWatchlistSymbol,
+  removeWatchlistSymbol,
   saveWatchlistSymbols,
   type WatchlistStorage,
 } from "@/components/watchlist/watchlistUi";
@@ -335,12 +342,28 @@ export function SymbolResearchPageClient({
   const apiOrigin =
     visualCheckData?.apiOriginLabel ??
     getSymbolResearchApiOriginLabel(tradeApiBaseUrl);
-  const scannerReturnHref =
-    visualCheckData?.scannerReturnHref ??
-    buildScannerReturnHref(searchParams, {
-      timeframe,
-      assetClass,
-    });
+  const researchReturnLink =
+    visualCheckData?.scannerReturnHref
+      ? {
+          href: visualCheckData.scannerReturnHref,
+          label: "Back to Rankings",
+          source: "rankings" as const,
+        }
+      : buildSourceAwareResearchReturnLink(searchParams, {
+          timeframe,
+          assetClass,
+        }) ??
+        buildDefaultResearchReturnLink({
+          timeframe,
+          assetClass,
+        });
+  const scannerReturnHref = researchReturnLink.href;
+  const scannerReturnLabel = researchReturnLink.label;
+  const archiveHref = buildArchiveHref({
+    timeframe,
+    assetClass,
+    symbol: normalizedSymbol,
+  });
   const queryParams = useMemo(
     () => ({
       exchange,
@@ -470,6 +493,8 @@ export function SymbolResearchPageClient({
           timeframeSelection={timeframeSelection}
           assetClass={assetClass}
           scannerReturnHref={scannerReturnHref}
+          scannerReturnLabel={scannerReturnLabel}
+          archiveHref={archiveHref}
           searchParams={searchParams}
           isFetching={isFetching}
           onSymbolSubmit={handleSymbolSubmit}
@@ -481,6 +506,7 @@ export function SymbolResearchPageClient({
           message="Loading symbol research..."
           apiOrigin={apiOrigin}
           scannerReturnHref={scannerReturnHref}
+          scannerReturnLabel={scannerReturnLabel}
           loading
         />
       </main>
@@ -500,6 +526,8 @@ export function SymbolResearchPageClient({
           timeframeSelection={timeframeSelection}
           assetClass={assetClass}
           scannerReturnHref={scannerReturnHref}
+          scannerReturnLabel={scannerReturnLabel}
+          archiveHref={archiveHref}
           searchParams={searchParams}
           isFetching={isFetching}
           onSymbolSubmit={handleSymbolSubmit}
@@ -511,6 +539,7 @@ export function SymbolResearchPageClient({
           message={errorMessage}
           apiOrigin={apiOrigin}
           scannerReturnHref={scannerReturnHref}
+          scannerReturnLabel={scannerReturnLabel}
         />
       </main>
     );
@@ -529,6 +558,8 @@ export function SymbolResearchPageClient({
           timeframeSelection={timeframeSelection}
           assetClass={assetClass}
           scannerReturnHref={scannerReturnHref}
+          scannerReturnLabel={scannerReturnLabel}
+          archiveHref={archiveHref}
           searchParams={searchParams}
           isFetching={isFetching}
           onSymbolSubmit={handleSymbolSubmit}
@@ -540,6 +571,7 @@ export function SymbolResearchPageClient({
           message="No research data available."
           apiOrigin={apiOrigin}
           scannerReturnHref={scannerReturnHref}
+          scannerReturnLabel={scannerReturnLabel}
         />
       </main>
     );
@@ -580,6 +612,12 @@ export function SymbolResearchPageClient({
           timeframeSelection={timeframeSelection}
           assetClass={data.symbol?.assetClass ?? assetClass}
           scannerReturnHref={scannerReturnHref}
+          scannerReturnLabel={scannerReturnLabel}
+          archiveHref={buildArchiveHref({
+            timeframe: selectedTimeframe,
+            assetClass: data.symbol?.assetClass ?? assetClass,
+            symbol: unavailableSymbol,
+          })}
           searchParams={searchParams}
           isFetching={isFetching}
           onSymbolSubmit={handleSymbolSubmit}
@@ -621,6 +659,12 @@ export function SymbolResearchPageClient({
           timeframeSelection={timeframeSelection}
           assetClass={data.symbol.assetClass}
           scannerReturnHref={scannerReturnHref}
+          scannerReturnLabel={scannerReturnLabel}
+          archiveHref={buildArchiveHref({
+            timeframe: selectedTimeframe,
+            assetClass: data.symbol.assetClass,
+            symbol: data.symbol.symbol,
+          })}
           searchParams={searchParams}
           isFetching={isFetching}
           onSymbolSubmit={handleSymbolSubmit}
@@ -632,6 +676,7 @@ export function SymbolResearchPageClient({
           message="No research snapshot is available for this symbol."
           apiOrigin={apiOrigin}
           scannerReturnHref={scannerReturnHref}
+          scannerReturnLabel={scannerReturnLabel}
         />
       </main>
     );
@@ -863,6 +908,12 @@ export function SymbolResearchPageClient({
           timeframeSelection={timeframeSelection}
           assetClass={data.symbol.assetClass}
           scannerReturnHref={scannerReturnHref}
+          scannerReturnLabel={scannerReturnLabel}
+          archiveHref={buildArchiveHref({
+            timeframe: selectedTimeframe,
+            assetClass: data.symbol.assetClass,
+            symbol: data.symbol.symbol,
+          })}
           searchParams={searchParams}
           isFetching={isFetching}
           onSymbolSubmit={handleSymbolSubmit}
@@ -1256,41 +1307,25 @@ export function buildScannerReturnHref(
   searchParamsOrState?: QueryStateInput,
   fallback?: { timeframe?: string | null; assetClass?: string | null },
 ) {
-  const params = new URLSearchParams();
-  const requestedTimeframe =
-    getQueryStateValue(searchParamsOrState, "timeframe")?.trim() ||
-    fallback?.timeframe?.trim();
-  const timeframe = requestedTimeframe
-    ? normalizeSymbolResearchTimeframe(requestedTimeframe)
-    : null;
-  const assetClass =
-    getQueryStateValue(searchParamsOrState, "assetClass")?.trim() ||
-    fallback?.assetClass?.trim();
-  const limit = normalizePositiveInteger(
-    getQueryStateValue(searchParamsOrState, "limit"),
-  );
-  const includeLowQuality =
-    getQueryStateValue(searchParamsOrState, "includeLowQuality") === "true";
-
-  if (timeframe) {
-    params.set("timeframe", timeframe);
-  }
-
-  if (assetClass) {
-    params.set("assetClass", assetClass);
-  }
-
-  if (includeLowQuality) {
-    params.set("includeLowQuality", "true");
-  }
-
-  if (limit !== null) {
-    params.set("limit", String(limit));
-  }
-
-  const query = params.toString();
-
-  return query ? `/rankings?${query}` : "/rankings";
+  return buildRankingsHref({
+    timeframe:
+      getQueryStateValue(searchParamsOrState, "timeframe") ??
+      fallback?.timeframe ??
+      null,
+    assetClass:
+      getQueryStateValue(searchParamsOrState, "assetClass") ??
+      fallback?.assetClass ??
+      null,
+    group: getQueryStateValue(searchParamsOrState, "group"),
+    risk: getQueryStateValue(searchParamsOrState, "risk"),
+    sort: getQueryStateValue(searchParamsOrState, "sort"),
+    q: getQueryStateValue(searchParamsOrState, "q"),
+    includeLowQuality: getQueryStateValue(
+      searchParamsOrState,
+      "includeLowQuality",
+    ),
+    limit: getQueryStateValue(searchParamsOrState, "limit"),
+  });
 }
 
 export function buildSymbolResearchTimeframeHref({
@@ -1348,6 +1383,8 @@ function SymbolResearchNavigation({
   timeframeSelection,
   assetClass,
   scannerReturnHref,
+  scannerReturnLabel,
+  archiveHref,
   searchParams,
   isFetching,
   onSymbolSubmit,
@@ -1363,6 +1400,8 @@ function SymbolResearchNavigation({
   timeframeSelection?: SymbolResearchTimeframeSelection;
   assetClass?: string | null;
   scannerReturnHref: string;
+  scannerReturnLabel: string;
+  archiveHref: string;
   searchParams: QueryStateInput;
   isFetching: boolean;
   onSymbolSubmit: (value: string) => void;
@@ -1506,7 +1545,13 @@ function SymbolResearchNavigation({
             href={scannerReturnHref}
             className="terminal-command-action"
           >
-            Back to Rankings
+            {scannerReturnLabel}
+          </Link>
+          <Link
+            href={archiveHref}
+            className="terminal-command-action"
+          >
+            Review Archive
           </Link>
           {watchlistSymbol ? (
             <SymbolWatchlistControl
@@ -1615,13 +1660,35 @@ export function SymbolWatchlistControl({
         : "Storage unavailable. Added in this view only.",
     );
   };
+  const removeFromWatchlist = () => {
+    const targetStorage = resolveSymbolWatchlistStorage(storage);
+    const currentSymbols = loadWatchlistSymbols(targetStorage);
+    const nextSymbols = removeWatchlistSymbol(currentSymbols, normalizedSymbol);
+
+    setWatchlistSymbols(nextSymbols);
+    saveWatchlistSymbols(targetStorage, nextSymbols);
+    setStatusMessage(
+      targetStorage
+        ? "Removed from watchlist."
+        : "Storage unavailable. Removed in this view only.",
+    );
+  };
 
   return (
     <div className={className}>
       {inWatchlist ? (
-        <span className={savedClassName}>
-          In Watchlist
-        </span>
+        <>
+          <span className={savedClassName}>
+            In Watchlist
+          </span>
+          <button
+            type="button"
+            onClick={removeFromWatchlist}
+            className={actionClassName}
+          >
+            Remove from Watchlist
+          </button>
+        </>
       ) : (
         <button
           type="button"
@@ -1770,12 +1837,14 @@ function ResearchState({
   message,
   apiOrigin,
   scannerReturnHref,
+  scannerReturnLabel = "Back to Rankings",
   loading = false,
 }: {
   title: string;
   message: string;
   apiOrigin?: string;
   scannerReturnHref?: string;
+  scannerReturnLabel?: string;
   loading?: boolean;
 }) {
   return (
@@ -1797,7 +1866,7 @@ function ResearchState({
           href={scannerReturnHref}
           className="ui-button mt-4 h-8 px-3 text-xs"
         >
-          Back to Rankings
+          {scannerReturnLabel}
         </Link>
       ) : null}
     </section>
@@ -2755,6 +2824,12 @@ function getSymbolResearchNavigationState(searchParams?: QueryStateInput) {
     includeLowQuality: getQueryStateValue(searchParams, "includeLowQuality"),
     limit: getQueryStateValue(searchParams, "limit"),
     from: getQueryStateValue(searchParams, "from"),
+    group: getQueryStateValue(searchParams, "group"),
+    risk: getQueryStateValue(searchParams, "risk"),
+    sort: getQueryStateValue(searchParams, "sort"),
+    q: getQueryStateValue(searchParams, "q"),
+    runId: getQueryStateValue(searchParams, "runId"),
+    snapshotId: getQueryStateValue(searchParams, "snapshotId"),
   };
 }
 
@@ -2773,15 +2848,6 @@ function getQueryStateValue(input: QueryStateInput, key: string) {
   return value === null || value === undefined ? null : String(value);
 }
 
-function normalizePositiveInteger(value: number | string | null | undefined) {
-  const number = typeof value === "string" ? Number(value.trim()) : Number(value);
-
-  if (!Number.isInteger(number) || number <= 0) {
-    return null;
-  }
-
-  return number;
-}
 
 function getSymbolResearchErrorDisplayMessage(error: unknown) {
   if (error instanceof Error && error.message) {

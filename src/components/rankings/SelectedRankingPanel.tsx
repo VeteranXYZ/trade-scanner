@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { useLanguage } from "@/components/providers/LanguageProvider";
 import { useAppLanguage } from "@/lib/i18n/AppLanguageProvider";
+import { buildSymbolResearchHref } from "@/lib/navigation/researchNavigation";
 import { explainCode, explainCodes } from "@/lib/vegarank-codebook/explainCode";
 import type { ScannerCodeContractResult } from "@/lib/vegarank-codebook/serializeScanResult";
 import type { Timeframe } from "@/lib/shared/timeframes";
@@ -56,7 +57,12 @@ export function SelectedRankingPanel({ result }: SelectedRankingPanelProps) {
             </div>
           </div>
           <Link
-            href={`/symbol/${result.exchange}/${result.symbol}`}
+            href={buildSymbolResearchHref({
+              exchange: result.exchange,
+              symbol: result.symbol,
+              timeframe: result.timeframe,
+              from: "rankings",
+            })}
             className="h-6 border border-[var(--border)] px-2 py-0.5 text-[11px] font-semibold text-[var(--foreground)]"
           >
             {t.common.detail}

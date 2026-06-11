@@ -528,6 +528,11 @@ describe("SymbolResearchPageClient success state", () => {
     expect(html).toContain('id="symbol-details"');
     expect(html).not.toContain("<details open");
     expect(html).toContain("In Watchlist");
+    expect(html).toContain("Remove from Watchlist");
+    expect(html).toContain("Review Archive");
+    expect(html).toContain(
+      'href="/archive?timeframe=4h&amp;assetClass=crypto&amp;symbol=SEIUSDT"',
+    );
     expect(html).toContain('href="/watchlist"');
   });
 
@@ -683,7 +688,46 @@ describe("SymbolResearchPageClient success state", () => {
     expect(html).toContain("Selected timeframe: 4h");
     expect(html).toContain("Fallback timeframe: 4h");
     expect(html).toContain("Requested timeframe bad is not supported.");
+    expect(html).toContain("Back to Screener");
+    expect(html).toContain(
+      'href="/screener?assetClass=crypto&amp;timeframe=4h"',
+    );
     expect(html).toContain('href="/symbol/binance/SEIUSDT?timeframe=1d');
+  });
+
+  it("renders source-aware archive return links when opened from archive", () => {
+    searchParamsMock.mockReturnValue(
+      new URLSearchParams(
+        "timeframe=4h&assetClass=crypto&from=archive&runId=run-1&snapshotId=row-2",
+      ),
+    );
+    useQueryMock.mockImplementation(
+      ({ queryKey }: { queryKey: [string, unknown] }) => ({
+        isLoading: false,
+        isError: false,
+        isFetching: false,
+        refetch: vi.fn(),
+        data:
+          queryKey[0] === "signal-evaluation"
+            ? null
+            : queryKey[0] === "market-context"
+              ? makeMarketContextResponse()
+              : makeSuccessResponse(),
+      }),
+    );
+
+    const html = renderToStaticMarkup(
+      createElement(SymbolResearchPageClient, {
+        exchange: "binance",
+        symbol: "SEIUSDT",
+      }),
+    );
+
+    expect(html).toContain("Back to Archive");
+    expect(html).toContain(
+      'href="/archive?timeframe=4h&amp;assetClass=crypto&amp;runId=run-1&amp;snapshotId=row-2"',
+    );
+    expect(html).toContain("Review Archive");
   });
 
   it("does not render direct trading command wording", () => {
@@ -827,6 +871,7 @@ describe("SymbolWatchlistControl", () => {
 
     expect(html).toContain("In Watchlist");
     expect(html).toContain("Open Watchlist");
+    expect(html).toContain("Remove from Watchlist");
     expect(html).not.toContain("Add to Watchlist");
   });
 

@@ -6,7 +6,10 @@ import {
   type MtfScreenerTimeframe,
 } from "@/components/screener/multiTimeframeScreenerUi";
 import { formatGroupLabel, formatScore } from "@/components/rankings/latestRankingsUi";
-import { buildSymbolResearchHref } from "@/components/symbol/symbolResearchLinks";
+import {
+  buildSymbolResearchHref,
+  type ResearchNavigationContext,
+} from "@/lib/navigation/researchNavigation";
 
 export const WATCHLIST_STORAGE_KEY = "vegarank.watchlist.symbols";
 export const LEGACY_WATCHLIST_STORAGE_KEY = "trade-scanner.watchlist.symbols";
@@ -500,16 +503,19 @@ export function buildWatchlistResearchHref({
   row,
   timeframe = getWatchlistResearchTimeframe(row),
   assetClass = "crypto",
+  context,
 }: {
   row: WatchlistRow;
   timeframe?: MtfScreenerTimeframe | null;
   assetClass?: string;
+  context?: ResearchNavigationContext;
 }) {
   if (!row.mtfRow || !timeframe) {
     return null;
   }
 
   return buildSymbolResearchHref({
+    ...context,
     exchange: row.mtfRow.exchange,
     symbol: row.symbol,
     timeframe,
