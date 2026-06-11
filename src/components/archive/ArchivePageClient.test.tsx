@@ -203,16 +203,16 @@ describe("ArchivePageClient display formatting", () => {
     expect(html).toContain("Selected Run");
     expect(html).toContain("Validation");
     expect(html).toContain("Outcome Summary");
-    expect(html).toContain("Loading Outcome Rows");
-    expect(html).not.toContain("Load Outcome Rows");
-    expect(html).toContain("Original Ranking Rows");
+    expect(html).toContain("Validation Readiness");
+    expect(html).toContain("Loading Snapshot Rows");
+    expect(html).not.toContain("Load Snapshot Rows");
+    expect(html).toContain("Source Snapshot Rows");
     expect(html).toContain("terminal-command-bar");
     expect(html).not.toContain(
       "mb-1 flex flex-wrap items-center gap-2 border border-[var(--border-medium)] bg-[var(--panel-muted)] px-2 py-1",
     );
     expect(html).not.toContain("History Reading Path");
     expect(html).not.toContain("Selected Snapshot");
-    expect(html).not.toContain("Snapshot Rows");
   });
 
   it("formats dates deterministically without browser locale text", () => {
@@ -259,10 +259,10 @@ describe("ArchivePageClient display formatting", () => {
       }),
     );
 
-    expect(html).toContain("Original Ranking Rows");
-    expect(html).toContain("Original ranking output from Selected Run.");
+    expect(html).toContain("Source Snapshot Rows");
+    expect(html).toContain("Source snapshot rows from Selected Run.");
     expect(html).toContain(
-      "Research opens current symbol view, not historical replay.",
+      "Open Research opens current symbol research, not historical replay.",
     );
     expect(html).toContain("2 rows");
     expect(html).toContain("Overheated caution");
@@ -304,16 +304,16 @@ describe("ArchivePageClient display formatting", () => {
     expect(html).toContain('aria-sort="ascending"');
   });
 
-  it("renders Outcome Rows default filters with all rows visible", () => {
+  it("renders Snapshot Rows default filters with all rows visible", () => {
     const html = renderObservationRowsTable();
 
-    expect(html).toContain("Outcome Rows");
+    expect(html).toContain("Snapshot Rows");
     expect(html).toContain("Validation Source");
     expect(html).toContain("bg-[var(--panel-data)]");
     expect(html).toContain("Showing 4");
-    expect(html).toContain("Original State");
+    expect(html).toContain("Research Group");
     expect(html).toContain("Hot");
-    expect(html).toContain("Outcome Status");
+    expect(html).toContain("Validation Status");
     expect(html).toContain("Symbol");
     expect(html).toContain("COMPLETEELIGIBLEUSDT");
     expect(html).toContain("COMPLETEWATCHUSDT");
@@ -446,8 +446,8 @@ describe("ArchivePageClient display formatting", () => {
     });
 
     expect(html).toContain("Showing 0/4");
-    expect(html).toContain("No matching observation rows");
-    expect(html).toContain("No observation rows match the current filters.");
+    expect(html).toContain("No snapshot rows found.");
+    expect(html).toContain("No snapshot rows match the current filters.");
     expect(html).not.toContain("COMPLETEELIGIBLEUSDT");
     expect(html).not.toContain("PARTIALRISKUSDT");
     expect(html).not.toContain("MISSINGRISKUSDT");
@@ -496,7 +496,7 @@ describe("ArchivePageClient display formatting", () => {
     expect(html).toContain(">33333<");
     expect(html).toContain('title="11111111-1111-4111-8111-111111111111"');
     expect(html).toContain(
-      'aria-label="Select historical run 11111111-1111-4111-8111-111111111111"',
+      'aria-label="Select stored run 11111111-1111-4111-8111-111111111111"',
     );
     expect(html).not.toContain(">11111111-1111-4111-8111-111111111111<");
     expect(html).toContain("409 rows");
@@ -534,6 +534,7 @@ describe("ArchivePageClient display formatting", () => {
     );
 
     expect(html).toContain("Outcome Summary");
+    expect(html).toContain("Validation Readiness");
     expect(html).toContain("Source ready");
     expect(html).toContain("Validation ready");
     expect(html).toContain("1 candle");
@@ -544,27 +545,26 @@ describe("ArchivePageClient display formatting", () => {
     expect(html).toContain("Complete");
     expect(html).toContain("Partial");
     expect(html).toContain("Missing");
-    expect(html).toContain("Median");
-    expect(html).toContain("Positive");
-    expect(html).toContain("Drawdown");
+    expect(html).toContain("Median Change");
+    expect(html).toContain("Positive Rate");
+    expect(html).toContain("Max Adverse Move");
     expect(html).toContain("Window");
-    expect(html).toContain("Outcome metrics use Validation Source");
-    expect(html).toContain("Group distribution");
-    expect(html).toContain("Notable symbols");
-    expect(html).toContain("Outcome Status:");
+    expect(html).toContain("Validation metrics use Validation Source");
+    expect(html).toContain("Group Distribution");
+    expect(html).toContain("Notable Symbols");
+    expect(html).toContain("Validation Status:");
     expect(html).toContain("Complete has the selected future window");
     expect(html).toContain("Partial has fewer future candles");
     expect(html).toContain("Missing has no usable future window");
-    expect(html).toContain("Outcome Rows");
+    expect(html).toContain("Snapshot Rows");
     expect(html).toContain("Validation Source");
-    expect(html).toContain("Return");
-    expect(html).toContain("Max Drawdown");
-    expect(html).toContain("Outcome Status");
+    expect(html).toContain("Observed Change");
+    expect(html).toContain("Max Adverse Move");
+    expect(html).toContain("Validation Status");
     expect(html).toContain("SEIUSDT");
     expect(html).toContain("RISKUSDT");
     expect(html).toContain("NEWUSDT");
     expect(html).toContain("Insufficient future candles");
-    expect(html).not.toContain("Observed Change");
     expect(html).not.toContain("Win rate");
     expect(html).not.toContain("Accuracy");
     expect(html).not.toContain("Worked");
@@ -576,7 +576,7 @@ describe("ArchivePageClient display formatting", () => {
     expect(html).not.toContain("top-100");
   });
 
-  it("renders ready mature observation rows without readiness loading or missing diagnostics", () => {
+  it("renders ready mature snapshot rows without readiness loading or missing diagnostics", () => {
     const selectedRun = makeObservationRun({
       runId: "selected-not-ready",
       finishedAt: "2026-06-02T15:05:15.000Z",
@@ -656,7 +656,7 @@ describe("ArchivePageClient display formatting", () => {
     expect(html).not.toContain("Validation Source unavailable");
   });
 
-  it("keeps ready observation context visible while observation rows are loading", () => {
+  it("keeps ready observation context visible while snapshot rows are loading", () => {
     const selectedRun = makeObservationRun({
       runId: "selected-not-ready",
       finishedAt: "2026-06-02T15:05:15.000Z",
@@ -696,11 +696,11 @@ describe("ArchivePageClient display formatting", () => {
     expect(html).toContain("Validation loading");
     expect(html).toContain("selected");
     expect(html).toContain("mature-r");
-    expect(html).toContain("Loading Outcome Rows");
+    expect(html).toContain("Loading Snapshot Rows");
     expect(html).not.toContain("Loading Validation Source");
   });
 
-  it("uses a ready observationRun runId for snapshot observation rows", () => {
+  it("uses a ready observationRun runId for snapshot snapshot rows", () => {
     const selectedRun = makeObservationRun({ runId: "selected-not-ready" });
     const observationRun = makeObservationRun({ runId: "mature-ready" });
     const readiness = makeReadinessResponse({
@@ -808,9 +808,9 @@ describe("ArchivePageClient display formatting", () => {
     expect(html).toContain("Eligible");
     expect(html).toContain("Watch");
     expect(html).toContain("Risk");
-    expect(html).toContain("Largest positive returns");
-    expect(html).toContain("Largest negative returns");
-    expect(html).toContain("Largest drawdowns");
+    expect(html).toContain("Largest Positive Changes");
+    expect(html).toContain("Largest Negative Changes");
+    expect(html).toContain("Largest Adverse Moves");
     expect(html).toContain("ELIGIBLEUSDT");
     expect(html).toContain("WATCHUSDT");
     expect(html).toContain("RISKUSDT");
@@ -886,15 +886,15 @@ describe("ArchivePageClient display formatting", () => {
 
     expect(html).toContain("Outcome Summary");
     expect(html).toContain("Not enough complete rows");
-    expect(html).toContain("Outcomes partial");
+    expect(html).toContain("Rows partial");
     expect(html).toContain("Window pending");
     expect(html).toContain("N/A");
     expect(html).toContain("PARTIALUPUSDT");
     expect(html).toContain("PARTIALDOWNUSDT");
     expect(html).toContain("Insufficient future candles");
-    expect(html).toContain("Largest positive returns");
-    expect(html).toContain("Largest negative returns");
-    expect(html).toContain("Largest drawdowns");
+    expect(html).toContain("Largest Positive Changes");
+    expect(html).toContain("Largest Negative Changes");
+    expect(html).toContain("Largest Adverse Moves");
     expect(html).not.toContain("12.00%</span></div></li>");
     expect(html).not.toContain("-9.00%</span></div></li>");
   });
@@ -960,8 +960,7 @@ describe("ArchivePageClient display formatting", () => {
     expect(html).toContain("Complete");
     expect(html).toContain("Partial");
     expect(html).toContain("Missing");
-    expect(html).not.toContain("Loading Outcome Rows");
-    expect(html).not.toContain("Max Drawdown");
+    expect(html).not.toContain("Loading Snapshot Rows");
     expect(html).not.toContain("AAAUSDT");
     expect(html).not.toContain("BBBUSDT");
     expect(html).not.toContain("CCCUSDT");
@@ -1107,7 +1106,7 @@ describe("ArchivePageClient display formatting", () => {
     expect(html).toContain("22222222");
     expect(html).toContain("Window 3 candles");
     expect(html).toContain("Selected Run has stale market data coverage");
-    expect(html).toContain("Return");
+    expect(html).toContain("Observed Change");
     expect(html).not.toContain("Validation Source unavailable");
   });
 
@@ -1163,7 +1162,7 @@ describe("ArchivePageClient display formatting", () => {
     );
     expect(html).toContain("11111111");
     expect(html).toContain("22222222");
-    expect(html).toContain("Return");
+    expect(html).toContain("Observed Change");
     expect(html).toContain("Validation Source");
     expect(html).not.toContain("Loading Validation Source");
     expect(html).not.toContain("Validation Source unavailable");
@@ -1195,8 +1194,8 @@ describe("ArchivePageClient display formatting", () => {
     })).toBeNull();
     expect(html).toContain("Validation Source unavailable");
     expect(html).toContain("Validation Source readiness could not be determined");
-    expect(html).toContain("Details");
-    expect(html).not.toContain("Loading Outcome Rows");
+    expect(html).toContain("Source Data");
+    expect(html).not.toContain("Loading Snapshot Rows");
   });
 
   it("renders too-recent selected runs without fetching all-missing rows", () => {
@@ -1246,7 +1245,7 @@ describe("ArchivePageClient display formatting", () => {
     expect(html).toContain("Waiting for future candles");
     expect(html).toContain("Missing");
     expect(html).toContain("12 hours");
-    expect(html).not.toContain("Loading Outcome Rows");
+    expect(html).not.toContain("Loading Snapshot Rows");
   });
 
   it("uses the selected run when readiness says the selected run is ready", () => {
@@ -1282,7 +1281,7 @@ describe("ArchivePageClient display formatting", () => {
     expect(html).toContain("Validation ready");
     expect(html).toContain("11111111");
     expect(html).toContain("Ready");
-    expect(html).toContain("Return");
+    expect(html).toContain("Observed Change");
   });
 
   it("derives a fallback summary when rows exist but the API summary is null", () => {
@@ -1332,8 +1331,8 @@ describe("ArchivePageClient display formatting", () => {
       partialCount: 1,
       missingCount: 0,
     });
-    expect(html).toContain("Return");
-    expect(html).not.toContain("Outcome Rows not returned");
+    expect(html).toContain("Observed Change");
+    expect(html).not.toContain("Snapshot Rows not returned");
   });
 
   it("renders a diagnostic when a ready observation run returns no rows and null summary", () => {
@@ -1377,14 +1376,14 @@ describe("ArchivePageClient display formatting", () => {
       returnedRows: 0,
       missingCount: 413,
     });
-    expect(html).toContain("Outcome Rows not returned");
-    expect(html).toContain("Validation Source is available, but no Outcome Rows were returned.");
+    expect(html).toContain("Snapshot Rows not returned");
+    expect(html).toContain("Validation Source is available, but no Snapshot Rows were returned.");
     expect(html).toContain("Rows");
     expect(html).toContain("Returned Rows");
     expect(html).toContain(">413<");
     expect(html).toContain(">0<");
     expect(html).not.toContain(
-      "No outcome rows are available for the Validation Source.",
+      "No snapshot rows are available for the Validation Source.",
     );
   });
 
@@ -1400,7 +1399,7 @@ describe("ArchivePageClient display formatting", () => {
       selectedRunId: selectedRun.runId,
       readiness,
       response: null,
-      observationRowsError: "Unable to load forward observation (503).",
+      observationRowsError: "Unable to load archive snapshot rows (503).",
     });
     const html = renderToStaticMarkup(
       createElement(ForwardObservationSection, {
@@ -1413,9 +1412,9 @@ describe("ArchivePageClient display formatting", () => {
     );
 
     expect(uiState.status).toBe("observation_rows_error");
-    expect(html).toContain("Outcome Rows unavailable");
-    expect(html).toContain("Unable to load forward observation (503).");
-    expect(html).not.toContain("Loading Outcome Rows");
+    expect(html).toContain("Snapshot Rows unavailable");
+    expect(html).toContain("Unable to load archive snapshot rows (503).");
+    expect(html).not.toContain("Loading Snapshot Rows");
   });
 
   it("shows row-loading copy only for a concrete observation run request", () => {
@@ -1460,9 +1459,9 @@ describe("ArchivePageClient display formatting", () => {
 
     expect(readinessLoadingState.status).toBe("loading_readiness");
     expect(readinessLoadingHtml).toContain("Loading Validation Source");
-    expect(readinessLoadingHtml).not.toContain("Loading Outcome Rows");
+    expect(readinessLoadingHtml).not.toContain("Loading Snapshot Rows");
     expect(rowsLoadingState.status).toBe("loading_observation_rows");
-    expect(rowsLoadingHtml).toContain("Loading Outcome Rows");
+    expect(rowsLoadingHtml).toContain("Loading Snapshot Rows");
   });
 
   it("keeps observation probing bounded and adjusts the probe range by window", () => {
@@ -1721,8 +1720,7 @@ function makeObservationResponse(
       limited: false,
       timeframe,
       assetClass: "crypto",
-      disclaimer:
-        "Research-only. Not financial advice. Historical observations are not predictions.",
+      disclaimer: "Research-only. Not trading advice.",
     },
     rows,
   };
@@ -1792,8 +1790,7 @@ function makeReadinessResponse(
       candidateCount: 2,
       candidateLimit: 25,
       fullUniverseMinExpectedSymbols: 300,
-      disclaimer:
-        "Research-only. Not financial advice. Historical observations are not predictions.",
+      disclaimer: "Research-only. Not trading advice.",
     },
   };
 }

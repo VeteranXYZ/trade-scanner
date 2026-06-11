@@ -43,10 +43,10 @@ describe("latest rankings UI helpers", () => {
     expect(formatQualityTier("wrapped_or_staked")).toBe("Wrapped/Staked");
     expect(formatGroupLabel("eligible")).toBe("Eligible");
     expect(formatGroupHint("eligible")).toBe(
-      "Candidates worth manual review: positive rank, confirmed/trend, clear setup, and no detected risks.",
+      "Rows worth manual review: positive rank, confirmed/trend, clear setup, and no detected risks.",
     );
     expect(formatGroupHint("watch")).toBe(
-      "Monitor for confirmation; lower or negative-rank watch rows are lower priority.",
+      "Monitor for confirmation; lower or negative-rank watch rows remain lower priority.",
     );
     expect(formatGroupHint("overheated")).toBe(
       "Extended conditions require additional review.",
@@ -87,12 +87,12 @@ describe("latest rankings UI helpers", () => {
         structureScore: null,
       }),
     ).toEqual([
-      { label: "Setup Score", value: "72.2" },
+      { label: "Setup Quality", value: "72.2" },
       { label: "Confirmation", value: "60.0" },
       { label: "Risk", value: "24.8" },
       { label: "Trend", value: "55.0" },
       { label: "Momentum", value: "48.0" },
-      { label: "Volume", value: "70.0" },
+      { label: "Liquidity", value: "70.0" },
       { label: "Structure", value: "-" },
     ]);
   });

@@ -749,9 +749,9 @@ export const dictionaries = {
       "backtest.warning.volatileAfterSignal":
         "Similar structures had wide follow-through and drawdown ranges.",
       "backtest.warning.researchOnly":
-        "Historical behavior review is research-only and not a trading signal.",
+        "Historical behavior review is research-only and not trading advice.",
       "backtest.note.researchOnly":
-        "Research-only: this is not financial advice or a trading recommendation.",
+        "Research-only. Not trading advice.",
       "backtest.note.noDatabase":
         "No database is used; results are calculated from recent Binance candles.",
     } satisfies Record<ScannerExplanationKey, string>,

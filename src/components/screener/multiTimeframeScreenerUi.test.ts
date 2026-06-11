@@ -296,10 +296,10 @@ describe("multi-timeframe screener helpers", () => {
     ]);
     expect(mtfResearchBuckets.map((bucket) => bucket.label)).toEqual([
       "Short-term Observation",
-      "MTF Strength",
-      "Higher-TF Watchlist",
+      "Timeframe Alignment",
+      "Higher-Timeframe Watch",
       "Overheated",
-      "Breakdown Risk",
+      "Risk Review",
     ]);
 
     for (const bucket of mtfResearchBuckets) {
@@ -347,7 +347,7 @@ describe("multi-timeframe screener helpers", () => {
       getMtfHigherTimeframeHealth(
         makeHealthRow({ oneDayGroup: "watch", oneWeekGroup: "neutral" }),
       ).label,
-    ).toBe("Higher TF OK");
+    ).toBe("Higher-Timeframe OK");
     expect(
       getMtfHigherTimeframeHealth(makeHealthRow({ oneDayGroup: "risk" })).label,
     ).toBe("1d Risk");
@@ -358,9 +358,9 @@ describe("multi-timeframe screener helpers", () => {
       getMtfHigherTimeframeHealth(
         makeHealthRow({ oneDayGroup: "risk", oneWeekGroup: "risk" }),
       ).label,
-    ).toBe("Higher TF Risk");
+    ).toBe("Higher-Timeframe Risk");
     expect(getMtfHigherTimeframeHealth(makeHealthRow({ oneDayGroup: "watch" })).label).toBe(
-      "Limited HTF Data",
+      "Limited Higher-Timeframe Data",
     );
   });
 
@@ -491,7 +491,7 @@ describe("multi-timeframe screener helpers", () => {
     expect(csv).toContain("PX_501");
     expect(csv).toContain("RK_302");
     expect(csv).toContain("/symbol/binance/BTCUSDT?timeframe=4h&assetClass=crypto&from=screener");
-    expect(csv).toContain("Research-only. Not financial advice.");
+    expect(csv).toContain("Research-only. Not trading advice.");
   });
 
   it("escapes CSV commas, quotes, and newlines", () => {
@@ -558,13 +558,13 @@ describe("multi-timeframe screener helpers", () => {
         exportType: "visible_rows",
         exportedAt: "2026-06-02T15:00:00.000Z",
       }),
-    ).toBe("trade-scanner-visible-rows-2026-06-02.csv");
+    ).toBe("vegarank-screener-2026-06-02.csv");
     expect(
       getMtfScreenerExportFilename({
         exportType: "all_joined_rows",
         exportedAt: "2026-06-02T15:00:00.000Z",
       }),
-    ).toBe("trade-scanner-all-joined-rows-2026-06-02.csv");
+    ).toBe("vegarank-screener-2026-06-02.csv");
   });
 });
 

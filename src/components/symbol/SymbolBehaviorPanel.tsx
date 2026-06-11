@@ -71,7 +71,7 @@ export function SymbolBehaviorPanel({
     >
       <div className="mb-3 flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h2 className="text-sm font-semibold">Historical Behavior</h2>
+          <h2 className="text-sm font-semibold">Behavior</h2>
           <p className="mt-1 text-xs text-[var(--muted)]">
             How similar prior ranking results behaved for this symbol and timeframe only.
           </p>
@@ -282,11 +282,11 @@ function HistoricalFollowThroughEvaluationCard({
           value={evaluation.directionMatchLabel}
         />
         <BehaviorFact
-          label="Median Follow-through"
+          label="Median Change"
           value={evaluation.medianReturnLabel}
         />
         <BehaviorFact
-          label="Historical Positive Rate"
+          label="Positive Rate"
           value={evaluation.positiveRateLabel}
         />
       </div>
@@ -368,7 +368,7 @@ function CurrentBehaviorContext({
           value={getBehaviorGroupLabel(context.resultGroup, dictionary)}
         />
         <BehaviorFact
-          label="Current Signal"
+          label="Current Research Priority"
           value={getBehaviorSignalLabel(context.signalLabel, dictionary)}
         />
         <BehaviorFact
@@ -386,7 +386,7 @@ function BehaviorHorizons({ horizons }: { horizons: SymbolBehaviorHorizonRow[] }
     <div className="mt-4">
       <h3 className="text-sm font-semibold">Forward horizon observations</h3>
       <p className="mt-1 text-xs text-[var(--muted)]">
-        Forward return compares the signal price to the close after each completed
+        Forward change compares the snapshot price to the close after each completed
         horizon.
       </p>
       <div className="mt-3 overflow-x-auto">
@@ -395,8 +395,8 @@ function BehaviorHorizons({ horizons }: { horizons: SymbolBehaviorHorizonRow[] }
             <tr>
               <th className="px-2 py-1.5">Horizon</th>
               <th className="px-2 py-1.5 text-right">Observations</th>
-              <th className="px-2 py-1.5 text-right">Avg Return</th>
-              <th className="px-2 py-1.5 text-right">Median Return</th>
+              <th className="px-2 py-1.5 text-right">Avg Change</th>
+              <th className="px-2 py-1.5 text-right">Median Change</th>
               <th className="px-2 py-1.5 text-right">
                 Historical Positive Rate
               </th>
@@ -461,9 +461,9 @@ function RecentBehaviorOutcomes({
     <div className="mt-4">
       <div className="mb-3 flex flex-wrap items-end justify-between gap-2">
         <div>
-          <h3 className="text-sm font-semibold">Recent outcomes</h3>
+          <h3 className="text-sm font-semibold">Recent Observations</h3>
           <p className="mt-1 text-xs text-[var(--muted)]">
-            Most recent prior observations with available forward returns.
+            Most recent prior observations with available forward changes.
           </p>
         </div>
         <span className="text-xs text-[var(--muted)]">
@@ -481,17 +481,17 @@ function RecentBehaviorOutcomes({
 
       {visibleOutcomes.length === 0 ? (
         <p className="text-sm text-[var(--muted)]">
-          No recent outcomes are available yet.
+          No recent observations are available yet.
         </p>
       ) : (
         <div className="overflow-x-auto">
           <table className="w-full min-w-[760px] border-collapse text-left text-xs">
             <thead className="bg-[var(--table-header)] text-[10px] uppercase text-[var(--muted)]">
               <tr>
-                <th className="px-2 py-1.5">Scan Time</th>
-                <th className="px-2 py-1.5">Group</th>
-                <th className="px-2 py-1.5">Signal</th>
-                <th className="px-2 py-1.5 text-right">Rank</th>
+                <th className="px-2 py-1.5">Updated</th>
+                <th className="px-2 py-1.5">Research Group</th>
+                <th className="px-2 py-1.5">Research Priority</th>
+                <th className="px-2 py-1.5 text-right">Rank Score</th>
                 <th className="px-2 py-1.5 text-right">Next 1</th>
                 <th className="px-2 py-1.5 text-right">Next 3</th>
                 <th className="px-2 py-1.5 text-right">Next 5</th>

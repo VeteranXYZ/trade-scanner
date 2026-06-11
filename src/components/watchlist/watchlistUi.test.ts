@@ -377,7 +377,7 @@ describe("watchlist research summary", () => {
     expect(summary.conditionLabel).toBe(
       "Short-term repair inside higher-timeframe risk",
     );
-    expect(summary.researchPosture).toBe("Repair candidates only");
+    expect(summary.researchPosture).toBe("Repair review only");
     expect(summary.counts.repairInsideRiskSymbols).toBe(1);
     expect(summary.bestResearchCandidates[0]).toMatchObject({
       symbol: "REPAIRUSDT",
@@ -444,7 +444,7 @@ describe("watchlist research summary", () => {
       {
         symbol: "MISSINGUSDT",
         timeframe: null,
-        reason: "Not found in latest MTF response.",
+        reason: "Not found in latest multi-timeframe snapshot.",
         rankScore: null,
       },
     ]);

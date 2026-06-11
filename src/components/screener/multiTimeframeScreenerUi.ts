@@ -36,13 +36,13 @@ export const mtfScreenerPresetIds = [
 export type MtfScreenerPresetId = (typeof mtfScreenerPresetIds)[number];
 
 export const mtfScreenerSortOptions = [
-  { field: "combined_rank", label: "Screener Rank" },
+  { field: "combined_rank", label: "Rank Score" },
   { field: "symbol", label: "Symbol" },
   { field: "1h_rank", label: "1h Rank" },
   { field: "4h_rank", label: "4h Rank" },
   { field: "1d_rank", label: "1d Rank" },
   { field: "1w_rank", label: "1w Rank" },
-  { field: "higher_timeframe_safety", label: "Higher-Timeframe Safety" },
+  { field: "higher_timeframe_safety", label: "Higher-Timeframe Context" },
 ] as const;
 
 export type MtfScreenerSortField =
@@ -170,12 +170,12 @@ export const mtfScreenerPresets: MtfScreenerPreset[] = [
   },
   {
     id: "mtf_strength",
-    label: "MTF Strength",
+    label: "Timeframe Alignment",
     description: "Aligned constructive structure across timeframes.",
   },
   {
     id: "higher_timeframe_safe_watchlist",
-    label: "Higher-TF Watchlist",
+    label: "Higher-Timeframe Watch",
     description: "4h constructive; 1d and 1w not risk.",
   },
   {
@@ -185,14 +185,14 @@ export const mtfScreenerPresets: MtfScreenerPreset[] = [
   },
   {
     id: "breakdown_risk",
-    label: "Breakdown Risk",
+    label: "Risk Review",
     description: "1h or 4h needs risk-first review.",
   },
 ];
 
 const mtfResearchBucketImplications: Record<MtfResearchBucketId, string> = {
   short_term_repair: "Observation context",
-  mtf_strength: "Stronger candidates",
+  mtf_strength: "Aligned candidates",
   higher_timeframe_safe_watchlist: "Needs confirmation",
   overheated_caution: "Extended/crowded",
   breakdown_risk: "Risk-first review",
@@ -505,7 +505,7 @@ export function getMtfHigherTimeframeHealth(
   if (oneDayRisk && oneWeekRisk) {
     return {
       code: "higher_tf_risk",
-      label: "Higher TF Risk",
+      label: "Higher-Timeframe Risk",
       sortRank: 0,
     };
   }
@@ -529,14 +529,14 @@ export function getMtfHigherTimeframeHealth(
   if (!oneDay || !oneWeek) {
     return {
       code: "limited_htf_data",
-      label: "Limited HTF Data",
+      label: "Limited Higher-Timeframe Data",
       sortRank: 2,
     };
   }
 
   return {
-    code: "higher_tf_ok",
-    label: "Higher TF OK",
+      code: "higher_tf_ok",
+      label: "Higher-Timeframe OK",
     sortRank: 3,
   };
 }
@@ -555,7 +555,7 @@ export function getMtfPrimarySignal(
       .find(Boolean);
 
   if (!snapshot) {
-    return "No latest signal";
+    return "No latest ranking result";
   }
 
   const signalCode = snapshot.signalCodes[0] ?? snapshot.phaseCode;
@@ -781,10 +781,7 @@ export function getMtfScreenerExportFilename({
   exportedAt: string;
 }) {
   const date = sanitizeExportDate(exportedAt);
-  const label =
-    exportType === "visible_rows" ? "visible-rows" : "all-joined-rows";
-
-  return `trade-scanner-${label}-${date}.csv`;
+  return `vegarank-screener-${date}.csv`;
 }
 
 function hasMtfGroup(

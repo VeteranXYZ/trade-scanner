@@ -96,7 +96,7 @@ describe("symbol behavior UI helpers", () => {
           message: "No prior signals.",
         },
       }),
-    ).toContain("No prior matching signals were found yet");
+    ).toContain("No prior matching ranking results were found yet");
     expect(
       getBehaviorUnavailableMessage({
         diagnostics: { available: false, reason: "no_latest_signal" },
@@ -104,7 +104,7 @@ describe("symbol behavior UI helpers", () => {
       }),
     ).toContain("Current coverage: 146 / 200 required candles.");
     expect(getBehaviorUnavailableMessage()).toBe(
-      "Historical behavior is currently unavailable for this symbol/timeframe.",
+      "Behavior is currently unavailable for this symbol/timeframe.",
     );
   });
 
@@ -347,7 +347,7 @@ describe("symbol behavior UI helpers", () => {
       "Waiting for more completed forward candles",
     );
     expect(quality?.hygieneSummary).toBe(
-      "Longer-horizon outcomes are still incomplete.",
+      "Longer-horizon observations are still incomplete.",
     );
     expect(quality?.hasLimitedForwardCandles).toBe(true);
     expect(quality?.caveats).toEqual([]);
@@ -408,7 +408,7 @@ describe("symbol behavior UI helpers", () => {
     );
     expect(quality?.caveats).toEqual([
       "Clustered recent observations are close together in time.",
-      "Longer-horizon outcomes are still incomplete.",
+      "Longer-horizon observations are still incomplete.",
     ]);
   });
 
@@ -464,7 +464,7 @@ describe("symbol behavior UI helpers", () => {
     expect(buildBehaviorSampleQuality({ behavior: null })).toBeNull();
   });
 
-  it("evaluates risk signals with negative 5-candle median as downside follow-through", () => {
+  it("evaluates risk results with negative 5-candle median as downside follow-through", () => {
     const evaluation = buildHistoricalFollowThroughEvaluation({
       behavior: makeBehavior({
         currentContext: { resultGroup: "risk", signalLabel: "breakdown_risk" },
@@ -482,7 +482,7 @@ describe("symbol behavior UI helpers", () => {
     expect(evaluation.selectedHorizonLabel).toBe("5 candles");
     expect(evaluation.sampleLabel).toBe("16 completed forward observations");
     expect(evaluation.directionMatchLabel).toBe("75.0% downside follow-through");
-    expect(evaluation.medianReturnLabel).toBe("-1.39% median return");
+    expect(evaluation.medianReturnLabel).toBe("-1.39% median change");
     expect(evaluation.positiveRateLabel).toBe("25.0% positive rate");
   });
 
@@ -496,7 +496,7 @@ describe("symbol behavior UI helpers", () => {
     });
 
     expect(evaluation.posture).toBe(
-      "Risk signal did not show downside follow-through in this sample",
+      "Risk result did not show downside follow-through in this sample",
     );
     expect(evaluation.interpretation).toContain(
       "did not show downside follow-through",
@@ -549,7 +549,7 @@ describe("symbol behavior UI helpers", () => {
     expect(cooling.posture).toBe("Pullback / cooling behavior observed");
     expect(cooling.directionMatchLabel).toBe("62.0% pullback / cooling behavior");
     expect(continued.posture).toBe(
-      "Overheated signals continued higher in this sample",
+      "Overheated results continued higher in this sample",
     );
     expect(continued.interpretation).toContain(
       "does not remove overextension risk",

@@ -477,8 +477,8 @@ export function SymbolResearchPageClient({
           onRefresh={handleRefresh}
         />
         <ResearchState
-          title={normalizedSymbol}
-          message={`Loading symbol research for ${normalizedSymbol} on ${timeframe}...`}
+          title="Symbol Research"
+          message="Loading symbol research..."
           apiOrigin={apiOrigin}
           scannerReturnHref={scannerReturnHref}
           loading
@@ -629,7 +629,7 @@ export function SymbolResearchPageClient({
         />
         <ResearchState
           title={data.symbol.symbol}
-          message="No selected latest signal found for this symbol/timeframe."
+          message="No research snapshot is available for this symbol."
           apiOrigin={apiOrigin}
           scannerReturnHref={scannerReturnHref}
         />
@@ -781,10 +781,10 @@ export function SymbolResearchPageClient({
           <ResponsiveTable
             headers={[
               "Timeframe",
-              "Group",
-              "Action",
-              "Rank",
-              "Scan Time",
+              "Research Group",
+              "Research Priority",
+              "Rank Score",
+              "Updated",
               "Run Context",
             ]}
             rows={timeframeSnapshots.map((item) => [
@@ -975,7 +975,7 @@ async function fetchSymbolResearch({
     }
 
     throw new Error(
-      "Failed to reach trade API. Check NEXT_PUBLIC_TRADE_API_BASE_URL and CORS.",
+      "Unable to load symbol research. Check API base URL configuration and CORS.",
     );
   }
 
@@ -1013,7 +1013,7 @@ async function fetchSignalEvaluation({
       throw error;
     }
 
-    throw new Error("Failed to reach trade API for signal evaluation.");
+    throw new Error("Unable to load validation context.");
   }
 
   const body = (await response.json().catch(() => null)) as
@@ -1021,7 +1021,7 @@ async function fetchSignalEvaluation({
     | null;
 
   if (!response.ok) {
-    throw new Error("Signal evaluation is currently unavailable.");
+    throw new Error("Validation context is currently unavailable.");
   }
 
   return body;
@@ -1127,7 +1127,7 @@ export function buildSymbolMarketContextImplication({
       return `Supportive backdrop; symbol confirmation still leads.${higherTimeframeRiskNote}`;
     }
 
-    return `Supportive backdrop; symbol signal remains primary.${higherTimeframeRiskNote}`;
+    return `Supportive backdrop; symbol structure remains primary.${higherTimeframeRiskNote}`;
   }
 
   if (isMixedSymbolMarketContext(data)) {
@@ -1414,7 +1414,7 @@ function SymbolResearchNavigation({
           className="terminal-command-brand"
           title={`Symbol Research / ${symbol} / Selected timeframe: ${timeframe}`}
         >
-          <h1 className="terminal-command-title">SYMBOL</h1>
+          <h1 className="terminal-command-title">Symbol Research</h1>
           <label className="shrink-0">
             <span className="sr-only">Exchange</span>
             <select
@@ -1449,7 +1449,7 @@ function SymbolResearchNavigation({
             type="submit"
             className="terminal-command-action is-primary"
           >
-            Open
+            Open Research
           </button>
         </form>
 
@@ -1519,7 +1519,7 @@ function SymbolResearchNavigation({
             onClick={onRefresh}
             disabled={isFetching}
             isRefreshing={isFetching}
-            label="Refresh"
+            label="Refresh Research"
           />
         </div>
       </div>
@@ -1676,10 +1676,10 @@ function TimeframeAvailabilityPanel({
           "Reason",
           "Candles",
           "Run Context",
-          "Group",
-          "Action",
-          "Rank",
-          "Scan Time",
+          "Research Group",
+          "Research Priority",
+          "Rank Score",
+          "Updated",
         ]}
         rows={rows.map((row) => [
           row.isSelected ? `${row.timeframe} (selected)` : row.timeframe,
@@ -1827,7 +1827,7 @@ function SymbolResearchUnavailableState({
       </div>
 
       <div className="terminal-panel mt-5 px-3 py-3">
-        <h2 className="text-sm font-semibold">Suggested next checks</h2>
+        <h2 className="text-sm font-semibold">Suggested Review</h2>
         <ul className="mt-2 space-y-1.5 text-sm text-[var(--muted)]">
           {content.suggestions.map((suggestion) => (
             <li key={suggestion}>{suggestion}</li>
@@ -1869,7 +1869,7 @@ function DecisionHeader({
       <div className="flex min-w-0 items-center gap-2 overflow-x-auto whitespace-nowrap">
         <div className="flex min-w-0 shrink-0 items-center gap-1.5">
           <span className="text-[10px] font-semibold uppercase text-[var(--muted)]">
-            Decision
+            Current Context
           </span>
           <span className="font-mono text-base font-semibold text-[var(--foreground)]">
             {symbol}
@@ -1891,9 +1891,9 @@ function DecisionHeader({
         </div>
 
         <div className="flex min-w-0 shrink-0 items-center gap-3 text-[11px] text-[var(--muted)]">
-          <DecisionInlineStat label="Primary" value={interpretation.label} />
+          <DecisionInlineStat label="Research Priority" value={interpretation.label} />
           <DecisionInlineStat
-            label="Rank"
+            label="Rank Score"
             value={formatSymbolResearchScore(scoreBreakdown.rankScore)}
           />
           {qualityTier ? (
@@ -1959,16 +1959,16 @@ function WhyThisStatePanel({
   scoreBreakdown: ReturnType<typeof getSymbolResearchScoreBreakdown>;
 }) {
   return (
-    <WorkspacePanel title="Why">
+    <WorkspacePanel title="Evidence Quality">
       <div className="mb-2 grid grid-cols-3 gap-1.5">
-        <MiniMetric label="Rank" value={formatSymbolResearchScore(scoreBreakdown.rankScore)} />
+        <MiniMetric label="Rank Score" value={formatSymbolResearchScore(scoreBreakdown.rankScore)} />
         <MiniMetric
-          label="Confirm"
+          label="Confidence"
           value={formatSymbolResearchScore(scoreBreakdown.confirmationScore)}
         />
         <MiniMetric label="Risk" value={formatSymbolResearchScore(scoreBreakdown.riskScore)} />
       </div>
-      <EvidenceList title="Positive" values={positiveEvidence} />
+      <EvidenceList title="Supportive Evidence" values={positiveEvidence} />
       <EvidenceList title="Limits" values={risksAndLimits} className="mt-2" />
     </WorkspacePanel>
   );
@@ -2003,7 +2003,7 @@ function NextChecksPanel({ items }: { items: string[] }) {
   const primaryItems = items.slice(0, 4);
 
   return (
-    <WorkspacePanel title="Check next">
+    <WorkspacePanel title="Review Next">
       <ul className="space-y-1 text-[12px] text-[var(--foreground)]">
         {primaryItems.map((item) => (
           <li
@@ -2042,7 +2042,7 @@ function MtfContextStrip({
       className={`terminal-panel flex min-h-8 min-w-0 items-center gap-1.5 overflow-x-auto px-2 py-1 ${className}`}
     >
       <span className="shrink-0 text-[10px] font-semibold uppercase text-[var(--muted)]">
-        MTF
+        Multi-Timeframe
       </span>
       {orderedSnapshots.length > 0 ? (
         <div className="flex min-w-0 items-center gap-1">
@@ -2079,7 +2079,7 @@ function MtfContextStrip({
         </div>
       ) : (
         <p className="text-xs text-[var(--muted)]">
-          MTF context is not available for this symbol.
+          Multi-timeframe context is not available for this symbol.
         </p>
       )}
     </section>
@@ -2106,7 +2106,7 @@ function HistoricalEvidenceSummaryPanel({
   ].filter((value) => value && value !== "Not available");
 
   return (
-    <WorkspacePanel title="History">
+    <WorkspacePanel title="Behavior">
       <div className="grid grid-cols-2 gap-1.5 text-[12px]">
         {summaryParts.slice(0, 4).map((part) => (
           <div
@@ -2182,14 +2182,14 @@ function SignalEvaluationPanel({
   className?: string;
 }) {
   return (
-    <Panel title="Signal Evaluation" className={className}>
+    <Panel title="Validation" className={className}>
       <p className="mb-3 max-w-3xl text-sm text-[var(--muted)]">
-        Across the broader market, how this signal type has behaved historically.
-        Separate from this symbol&apos;s own history.
+        Across the broader market, how this ranking-result type has behaved
+        across completed samples. Separate from this symbol&apos;s own behavior.
       </p>
       {isLoading ? (
         <p className="text-sm text-[var(--muted)]">
-          Loading broad-market signal evaluation...
+          Loading validation context...
         </p>
       ) : (
         <>
@@ -2199,12 +2199,12 @@ function SignalEvaluationPanel({
               value={readout.expectedDirectionLabel}
             />
             <Fact label="Sample Quality" value={readout.sampleQualityLabel} />
-            <Fact label="Source Signals" value={readout.sourceSignals} />
-            <Fact label="Completed Signals" value={readout.completedSignals} />
+            <Fact label="Source Results" value={readout.sourceSignals} />
+            <Fact label="Completed Results" value={readout.completedSignals} />
             <Fact label="Selected Horizon" value={readout.selectedHorizonLabel} />
-            <Fact label="Historical Median Return" value={readout.medianReturn} />
-            <Fact label="Historical Match Rate" value={readout.directionMatchRate} />
-            <Fact label="Historical Positive Rate" value={readout.positiveRate} />
+            <Fact label="Median Change" value={readout.medianReturn} />
+            <Fact label="Match Rate" value={readout.directionMatchRate} />
+            <Fact label="Positive Rate" value={readout.positiveRate} />
           </div>
           <div
             className={`mt-3 border border-l-4 px-3 py-2.5 text-sm ${
@@ -2330,7 +2330,7 @@ function getSymbolResearchPrimaryReason({
   }
 
   if (group === "risk") {
-    return `${signal} risk state; ${decisionSummary.keyCaution}`;
+    return `${signal} risk context; ${decisionSummary.keyCaution}`;
   }
 
   if (group === "overheated") {
@@ -2368,11 +2368,11 @@ function buildSymbolResearchEvidence({
   language: Language;
 }) {
   const positive = uniqueDisplayItems([
-    `${selectedTimeframe.toUpperCase()} state is ${formatSymbolResearchGroupForDisplay(
+    `${selectedTimeframe.toUpperCase()} research group is ${formatSymbolResearchGroupForDisplay(
       interpretation.group,
       dictionary,
     )}`,
-    `Rank ${formatSymbolResearchScore(scoreBreakdown.rankScore)}`,
+    `Rank Score ${formatSymbolResearchScore(scoreBreakdown.rankScore)}`,
     `Confirmation ${formatSymbolResearchScore(scoreBreakdown.confirmationScore)}`,
     `${explainCode(latestSignal.setupCode, language).label} setup`,
     ...interpretation.reasons.slice(0, 2),
@@ -2417,7 +2417,7 @@ function buildSymbolResearchNextChecks({
     `${selectedTimeframe.toUpperCase()} remains ${formatSymbolResearchGroupForDisplay(
       interpretation.group,
       dictionary,
-    )} after the next scan`,
+    )} after the next ranking run`,
     ...higherTimeframeChecks,
     researchSummary.nextConfirmation[0],
     "Historical evidence supports follow-through",

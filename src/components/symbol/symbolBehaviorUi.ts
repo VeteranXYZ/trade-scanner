@@ -361,7 +361,7 @@ export function buildBehaviorSampleQuality({
     hasLimitedForwardCandles &&
     sampleQualityLabel !== "Waiting for more completed forward candles"
   ) {
-    caveats.push("Longer-horizon outcomes are still incomplete.");
+    caveats.push("Longer-horizon observations are still incomplete.");
   }
 
   return {
@@ -465,7 +465,7 @@ export function buildHistoricalFollowThroughEvaluation({
   diagnostics?: SymbolBehaviorDiagnostics | null;
   sampleQuality?: BehaviorSampleQualityReadout | null;
 }): HistoricalFollowThroughEvaluation {
-  const title = "Historical Follow-through Evaluation";
+  const title = "Behavior Evaluation";
   const evaluationScope = "Same symbol / same timeframe / similar ranking context";
 
   if (!behavior || diagnostics?.available === false) {
@@ -536,7 +536,7 @@ export function buildHistoricalFollowThroughEvaluation({
       directionMatchPct,
     }),
     directionMatchPct,
-    medianReturnLabel: `${formatBehaviorPercent(median)} median return`,
+    medianReturnLabel: `${formatBehaviorPercent(median)} median change`,
     positiveRateLabel: `${formatBehaviorWinRate(positiveRate)} positive rate`,
     interpretation: getFollowThroughInterpretation({
       context,
@@ -572,9 +572,9 @@ export function getBehaviorDiagnosticsTitle(
 ) {
   switch (diagnostics?.reason) {
     case "no_latest_signal":
-      return "No current latest signal";
+      return "No current latest ranking result";
     case "no_prior_signals":
-      return "No prior matching signals";
+      return "No prior matching ranking results";
     case "missing_forward_candles":
       return "Forward candles not ready";
     case "insufficient_sample":
@@ -582,9 +582,9 @@ export function getBehaviorDiagnosticsTitle(
     case "calculation_failed":
       return "Calculation unavailable";
     case "ok":
-      return "Historical behavior available";
+      return "Behavior available";
     default:
-      return "Historical behavior unavailable";
+      return "Behavior unavailable";
   }
 }
 
@@ -600,19 +600,19 @@ export function getBehaviorUnavailableMessage({
 
   switch (diagnostics?.reason) {
     case "no_latest_signal":
-      return `Historical behavior is unavailable because this symbol/timeframe does not currently have a latest signal.${suffix}`;
+      return `Behavior is unavailable because this symbol/timeframe does not currently have a latest ranking result.${suffix}`;
     case "no_prior_signals":
-      return "No prior matching signals were found yet for this symbol/timeframe. This can be normal for newly added 1d/1w data or newly available symbols.";
+      return "No prior matching ranking results were found yet for this symbol/timeframe. This can be normal for newly added 1d/1w data or newly available symbols.";
     case "missing_forward_candles":
-      return "Prior signals exist, but not enough forward candles have completed yet to summarize behavior.";
+      return "Prior ranking results exist, but not enough forward candles have completed yet to summarize behavior.";
     case "insufficient_sample":
-      return "There are prior signals, but not enough completed outcomes yet to summarize behavior safely.";
+      return "There are prior ranking results, but not enough completed observations yet to summarize behavior safely.";
     case "calculation_failed":
-      return "Historical behavior could not be calculated for this request. The rest of Symbol Research remains available.";
+      return "Behavior could not be calculated for this request. The rest of Symbol Research remains available.";
     default:
       return (
         diagnostics?.message ||
-        "Historical behavior is currently unavailable for this symbol/timeframe."
+        "Behavior is currently unavailable for this symbol/timeframe."
       );
   }
 }
@@ -882,26 +882,26 @@ function getBehaviorReadoutSummaryText({
     label === "Constructive tendency" ||
     label === "Strong constructive tendency"
   ) {
-    return `Prior similar signals tended to show constructive follow-through over ${selectedHorizonLabel} in this sample.`;
+    return `Prior similar ranking results tended to show constructive follow-through over ${selectedHorizonLabel} in this sample.`;
   }
 
   if (label === "Weak follow-through") {
-    return `Prior similar signals did not consistently follow through over ${selectedHorizonLabel} in this sample.`;
+    return `Prior similar ranking results did not consistently follow through over ${selectedHorizonLabel} in this sample.`;
   }
 
   if (label === "Downside continuation tendency") {
-    return `Prior similar risk signals tended to continue lower over ${selectedHorizonLabel} in this sample.`;
+    return `Prior similar risk results tended to continue lower over ${selectedHorizonLabel} in this sample.`;
   }
 
   if (label === "Risk not confirmed in sample") {
-    return `Prior similar risk signals did not consistently continue lower over ${selectedHorizonLabel} in this sample.`;
+    return `Prior similar risk results did not consistently continue lower over ${selectedHorizonLabel} in this sample.`;
   }
 
   if (contextType === "risk") {
-    return `Prior similar risk signals had mixed follow-through over ${selectedHorizonLabel} in this sample.`;
+    return `Prior similar risk results had mixed follow-through over ${selectedHorizonLabel} in this sample.`;
   }
 
-  return `Prior similar signals had mixed follow-through over ${selectedHorizonLabel} in this sample.`;
+  return `Prior similar ranking results had mixed follow-through over ${selectedHorizonLabel} in this sample.`;
 }
 
 function buildBehaviorReadoutCaveats({
@@ -1043,7 +1043,7 @@ function getFollowThroughPosture({
       }
 
       if (median > 0) {
-        return "Risk signal did not show downside follow-through in this sample";
+        return "Risk result did not show downside follow-through in this sample";
       }
 
       return "Mixed follow-through";
@@ -1069,7 +1069,7 @@ function getFollowThroughPosture({
       }
 
       if (median > 0 && positiveRate >= 50) {
-        return "Overheated signals continued higher in this sample";
+        return "Overheated results continued higher in this sample";
       }
 
       return "Mixed overextension follow-through";
@@ -1134,9 +1134,9 @@ function getFollowThroughInterpretation({
 }) {
   switch (posture) {
     case "Downside follow-through observed":
-      return `Prior similar risk signals showed downside follow-through over ${selectedHorizonLabel} in this sample.`;
-    case "Risk signal did not show downside follow-through in this sample":
-      return `Prior similar risk signals did not show downside follow-through over ${selectedHorizonLabel} in this sample.`;
+      return `Prior similar risk results showed downside follow-through over ${selectedHorizonLabel} in this sample.`;
+    case "Risk result did not show downside follow-through in this sample":
+      return `Prior similar risk results did not show downside follow-through over ${selectedHorizonLabel} in this sample.`;
     case "Upside follow-through observed":
       return `Prior similar positive setups showed upside follow-through over ${selectedHorizonLabel} in this sample.`;
     case "Upside follow-through not supported in this sample":
@@ -1144,9 +1144,9 @@ function getFollowThroughInterpretation({
     case "Watchlist follow-through is constructive":
       return `Watchlist follow-through was constructive over ${selectedHorizonLabel}, but confirmation is still needed.`;
     case "Pullback / cooling behavior observed":
-      return `Prior overheated signals showed pullback or cooling behavior over ${selectedHorizonLabel} in this sample.`;
-    case "Overheated signals continued higher in this sample":
-      return `Overheated signals continued higher over ${selectedHorizonLabel} in this sample, but this does not remove overextension risk.`;
+      return `Prior overheated results showed pullback or cooling behavior over ${selectedHorizonLabel} in this sample.`;
+    case "Overheated results continued higher in this sample":
+      return `Overheated results continued higher over ${selectedHorizonLabel} in this sample, but this does not remove overextension risk.`;
     case "Mixed historical follow-through":
       return "Historical follow-through is mixed in this sample.";
     default:
@@ -1200,7 +1200,7 @@ function buildHistoricalFollowThroughUnavailableCaveats(
   }
 
   if (sampleQuality?.hasLimitedForwardCandles) {
-    caveats.push("Longer-horizon outcomes are still incomplete.");
+    caveats.push("Longer-horizon observations are still incomplete.");
   }
 
   return uniqueStrings(caveats);
@@ -1386,7 +1386,7 @@ function getBehaviorSampleQualitySummary({
   }
 
   if (hasLimitedForwardCandles) {
-    return "Longer-horizon outcomes are still incomplete.";
+    return "Longer-horizon observations are still incomplete.";
   }
 
   return `${sampleQualityLabel}; treat as research context.`;

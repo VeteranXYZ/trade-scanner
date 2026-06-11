@@ -156,7 +156,7 @@ export function SymbolResearchChart({
               position: "aboveBar",
               shape: "circle",
               color: "#d6b45d",
-              text: "Latest signal candle",
+              text: "Latest ranking candle",
               size: 1,
             },
           ]);
@@ -268,7 +268,7 @@ export function SymbolResearchChart({
           <h2 className="text-sm font-semibold">{isCompact ? "Chart" : "Research Chart"}</h2>
           {!isCompact ? (
             <p className="mt-1 text-xs text-[var(--muted)]">
-              Candles, MA20/MA50, and latest signal marker.
+              Candles, MA20/MA50, and latest ranking marker.
             </p>
           ) : null}
         </div>
@@ -281,7 +281,7 @@ export function SymbolResearchChart({
           ) : null}
           <LegendValue label="Last close" value={formatChartPrice(chartData.latestClose)} />
           <LegendValue
-            label="Latest signal"
+            label="Latest ranking result"
             value={latestSignal?.label || "Not available"}
           />
           <LegendValue

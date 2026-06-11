@@ -396,7 +396,7 @@ describe("SymbolResearchPageClient unavailable state", () => {
           available: false,
           reason: "no_latest_signal",
           message:
-            "Historical behavior is unavailable because no latest ranking result exists for this symbol/timeframe.",
+            "Behavior is unavailable because no latest ranking result exists for this symbol/timeframe.",
         },
       },
     });
@@ -422,14 +422,14 @@ describe("SymbolResearchPageClient unavailable state", () => {
       "Refresh after the next ranking run; 1w coverage updates as more weekly candles accrue.",
     );
     expect(html).toContain("Back to Rankings");
-    expect(html).toContain("Refresh");
-    expect(html).toContain(">Open</button>");
+    expect(html).toContain("Refresh Research");
+    expect(html).toContain("Open Research");
     expect(html).toContain('href="/rankings?timeframe=1w&amp;assetClass=crypto');
     expect(html).toContain('href="/symbol/binance/SEIUSDT?timeframe=4h');
     expect(html).toContain('href="/symbol/binance/SEIUSDT?timeframe=1d');
     expect(html).toContain('href="/symbol/binance/SEIUSDT?timeframe=1w');
     expect(html).toContain('href="/symbol/binance/SEIUSDT?timeframe=1h');
-    expect(html).toContain("Historical Behavior");
+    expect(html).toContain("Behavior");
     expect(html).toContain(
       "Current coverage: 145 / 200 required candles.",
     );
@@ -446,7 +446,7 @@ describe("SymbolResearchPageClient success state", () => {
     useQueryMock.mockReset();
   });
 
-  it("renders the historical behavior section from the research response", () => {
+  it("renders the behavior section from the research response", () => {
     useQueryMock.mockReturnValue({
       isLoading: false,
       isError: false,
@@ -462,35 +462,35 @@ describe("SymbolResearchPageClient success state", () => {
       }),
     );
 
-    expect(html).toContain("Decision");
-    expect(html).toContain("Primary");
+    expect(html).toContain("Current Context");
+    expect(html).toContain("Research Priority");
     expect(html).toContain("Selected timeframe: 4h");
-    expect(html).toContain("Why");
+    expect(html).toContain("Evidence Quality");
     expect(html).toContain("Positive");
     expect(html).toContain("Limits");
-    expect(html).toContain("Check next");
+    expect(html).toContain("Review Next");
     expect(html).toContain("Chart");
-    expect(html).toContain("MTF");
+    expect(html).toContain("Multi-Timeframe");
     expect(html).toContain("Backdrop");
-    expect(html).toContain("History");
+    expect(html).toContain("Behavior");
     expect(html).toContain("Timeline");
     expect(html).toContain("Diagnostics");
-    expect(html.indexOf("Decision")).toBeLessThan(
-      html.indexOf("MTF"),
+    expect(html.indexOf("Current Context")).toBeLessThan(
+      html.indexOf("Multi-Timeframe"),
     );
-    expect(html.indexOf("MTF")).toBeLessThan(
+    expect(html.indexOf("Multi-Timeframe")).toBeLessThan(
       html.indexOf("Chart"),
     );
     expect(html.indexOf("Chart")).toBeLessThan(
-      html.indexOf("Why"),
+      html.indexOf("Evidence Quality"),
     );
-    expect(html.indexOf("Why")).toBeLessThan(
-      html.indexOf("Check next"),
+    expect(html.indexOf("Evidence Quality")).toBeLessThan(
+      html.indexOf("Review Next"),
     );
-    expect(html.indexOf("Check next")).toBeLessThan(
-      html.indexOf("History"),
+    expect(html.indexOf("Review Next")).toBeLessThan(
+      html.indexOf("Behavior"),
     );
-    expect(html.indexOf("History")).toBeLessThan(
+    expect(html.indexOf("Behavior")).toBeLessThan(
       html.indexOf("Backdrop"),
     );
     expect(html.indexOf("Backdrop")).toBeLessThan(
@@ -511,16 +511,16 @@ describe("SymbolResearchPageClient success state", () => {
     expect(html).toContain("Constructive, manual review required");
     expect(html).toContain("Price stays above MA20 / MA50 context");
     expect(html).toContain("Data Source");
-    expect(html).toContain("Signal Evaluation");
+    expect(html).toContain("Validation");
     expect(html).toContain("Across the broader market");
-    expect(html).toContain("Historical Behavior");
-    expect(html).toContain("Historical Follow-through Evaluation");
+    expect(html).toContain("Behavior");
+    expect(html).toContain("Behavior Evaluation");
     expect(html).toContain("How similar prior ranking results behaved");
     expect(html).toContain("Sample size");
     expect(html).toContain("Forward horizon observations");
     expect(html).toContain("Current context");
-    expect(html).toContain("Recent outcomes");
-    expect(html).toContain("Most recent prior observations with available forward returns.");
+    expect(html).toContain("Recent Observations");
+    expect(html).toContain("Most recent prior observations with available forward changes.");
     expect(html).toContain("Timeline");
     expect(html).toMatch(/Timeframe Snapshot|Multi-Timeframe Snapshot/);
     expect(html).toContain("Recent Candles Summary");
@@ -603,8 +603,8 @@ describe("SymbolResearchPageClient success state", () => {
 
     expect(html).toContain("Market context unavailable");
     expect(html).toContain("symbol data remains available");
-    expect(html).toContain("Decision");
-    expect(html).toContain("Why");
+    expect(html).toContain("Current Context");
+    expect(html).toContain("Evidence Quality");
   });
 
   it("keeps symbol research request shape unchanged while adding layout sections", () => {
@@ -713,7 +713,7 @@ describe("SymbolResearchPageClient success state", () => {
     expect(html).not.toMatch(/take\s+profit|stop\s+loss/);
   });
 
-  it("renders the Signal Evaluation card from the broad-market response", () => {
+  it("renders the Validation card from the broad-market response", () => {
     useQueryMock.mockImplementation(
       ({ queryKey }: { queryKey: [string, unknown] }) => ({
         isLoading: false,
@@ -744,14 +744,14 @@ describe("SymbolResearchPageClient success state", () => {
       ([options]) => options.queryKey[0] === "signal-evaluation",
     );
 
-    expect(html).toContain("Signal Evaluation");
+    expect(html).toContain("Validation");
     expect(html).toContain(
-      "Across the broader market, how this signal type has behaved historically",
+      "Across the broader market, how this ranking-result type has behaved",
     );
     expect(html).toContain("Historical Orientation");
     expect(html).toContain("Risk follow-through observed");
     expect(html).toContain(
-      "Historical evaluation supports caution for this risk label.",
+      "Validation context supports caution for this risk label.",
     );
     expect(signalEvaluationCall?.[0].queryKey[1]).toMatchObject({
       timeframe: "4h",
@@ -782,15 +782,14 @@ describe("SymbolResearchPageClient success state", () => {
     );
 
     expect(html).toContain("BTCUSDT");
-    expect(html).toContain("Decision");
+    expect(html).toContain("Current Context");
     expect(html).toContain("Chart");
-    expect(html).toContain("Why");
-    expect(html).toContain("Check next");
+    expect(html).toContain("Evidence Quality");
+    expect(html).toContain("Review Next");
     expect(html).toContain("Multi-Timeframe Snapshot");
     expect(html).toContain("Backdrop");
     expect(html).toContain("Constructive backdrop");
-    expect(html).toContain("History");
-    expect(html).toContain("Historical Behavior");
+    expect(html).toContain("Behavior");
     expect(html).toContain("Timeline");
     expect(html).toContain("Diagnostics");
     expect(html).toContain("visual-check mock");
@@ -956,8 +955,7 @@ function makeSuccessResponse({
     behaviorDiagnostics: {
       available: true,
       reason: "ok",
-      message:
-        "Historical behavior is available from prior ranking results with forward candles.",
+      message: "Behavior is available from prior ranking results with forward candles.",
     },
     candles: {
       timeframe: "4h",
@@ -1199,7 +1197,7 @@ function makeMarketContextResponse(
         "BTC 4h tactical context: short term weakness.",
         "ETH confirmation: confirms broader risk.",
       ],
-      warnings: ["Research-only context. Not a trading signal."],
+      warnings: ["Research-only. Not trading advice."],
     },
     rules: {
       researchOnly: true,

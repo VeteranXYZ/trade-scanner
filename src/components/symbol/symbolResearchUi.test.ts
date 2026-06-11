@@ -86,14 +86,14 @@ describe("symbol research UI helpers", () => {
         structureScore: 88,
       }),
     ).toEqual([
-      { label: "Rank", value: "81.2" },
-      { label: "Final Signal", value: "70.0" },
-      { label: "Setup Score", value: "-" },
+      { label: "Rank Score", value: "81.2" },
+      { label: "Risk-Adjusted Score", value: "70.0" },
+      { label: "Setup Quality", value: "-" },
       { label: "Confirmation", value: "62.1" },
       { label: "Risk", value: "20.0" },
       { label: "Trend", value: "54.0" },
       { label: "Momentum", value: "49.0" },
-      { label: "Volume", value: "34.0" },
+      { label: "Liquidity", value: "34.0" },
       { label: "Structure", value: "88.0" },
     ]);
   });
@@ -185,11 +185,11 @@ describe("symbol research UI helpers", () => {
     expect(summary.summaryLabel).toBe("Risk context reinforced");
     expect(summary.suggestedResearchPosture).toBe("Risk review only");
     expect(summary.behaviorSupport).toContain(
-      "prior similar risk signals tended to continue lower",
+      "prior similar risk results tended to continue lower",
     );
   });
 
-  it("keeps risk posture cautious when historical behavior sample is insufficient", () => {
+  it("keeps risk posture cautious when behavior sample is insufficient", () => {
     const summary = buildResearchDecisionSummary({
       selectedTimeframe: "4h",
       selectedSignal: makeDecisionSignal("4h", "risk"),
@@ -211,7 +211,7 @@ describe("symbol research UI helpers", () => {
 
     expect(summary.suggestedResearchPosture).toBe("Caution review");
     expect(summary.behaviorSupport).toBe(
-      "Historical behavior sample is insufficient.",
+      "Behavior sample is insufficient.",
     );
     expect(summary.confidenceNote).toBe(
       "Very limited sample: Production history is still accumulating.",
@@ -310,7 +310,7 @@ describe("symbol research UI helpers", () => {
       "Multi-timeframe context is unavailable.",
     );
     expect(summary.behaviorSupport).toBe(
-      "Historical behavior context is unavailable.",
+      "Behavior context is unavailable.",
     );
     expect(summary.suggestedResearchPosture).toBe(
       "Deeper research context",
@@ -540,9 +540,9 @@ describe("symbol research UI helpers", () => {
 
     expect(rows.map((row) => [row.timeframe, row.status, row.reason])).toEqual([
       ["4h", "selected_available", "Available"],
-      ["1d", "not_returned", "No latest signal was returned for this timeframe."],
-      ["1w", "not_returned", "No latest signal was returned for this timeframe."],
-      ["1h", "not_returned", "No latest signal was returned for this timeframe."],
+      ["1d", "not_returned", "No latest ranking result was returned for this timeframe."],
+      ["1w", "not_returned", "No latest ranking result was returned for this timeframe."],
+      ["1h", "not_returned", "No latest ranking result was returned for this timeframe."],
     ]);
   });
 
@@ -610,7 +610,7 @@ describe("symbol research UI helpers", () => {
 
   it("avoids multi-timeframe wording when only one snapshot exists", () => {
     const base =
-      "Snapshot rows may use the selected full-universe signal for the requested timeframe and latest available full-universe signals for other timeframes.";
+      "Snapshot rows may use the selected full-universe ranking result for the requested timeframe and latest available full-universe ranking results for other timeframes.";
     const availabilityNote =
       "Unavailable or planned timeframes are omitted from this snapshot unless the API returns enough detail to explain them.";
 
@@ -707,7 +707,7 @@ describe("symbol research UI helpers", () => {
     expect(readout.directionMatchRate).toBe("64.0%");
     expect(readout.medianReturn).toBe("-0.90%");
     expect(readout.mainInterpretation).toContain(
-      "Historical evaluation supports caution for this risk label.",
+      "Validation context supports caution for this risk label.",
     );
   });
 
@@ -731,7 +731,7 @@ describe("symbol research UI helpers", () => {
 
     expect(readout.statusLabel).toBe("Historically not supportive");
     expect(readout.mainInterpretation).toContain(
-      "Historical evaluation does not support this bullish label in the current sample.",
+      "Validation context does not support this positive label in the current sample.",
     );
   });
 
@@ -755,7 +755,7 @@ describe("symbol research UI helpers", () => {
 
     expect(readout.statusLabel).toBe("Risk follow-through observed");
     expect(readout.mainInterpretation).toContain(
-      "Median outcome leaned lower, while average was affected by large outliers.",
+      "Median completed change leaned lower, while average was affected by large outliers.",
     );
   });
 
@@ -794,7 +794,7 @@ describe("symbol research UI helpers", () => {
     expect(readout.sampleQualityLabel).toBe("Limited");
     expect(readout.warnings).toEqual([
       "Longer horizons are still incomplete.",
-      "Some recent signals do not have enough future candles yet.",
+      "Some recent ranking results do not have enough future candles yet.",
       "1h production history is still accumulating.",
     ]);
   });
@@ -818,7 +818,7 @@ describe("symbol research UI helpers", () => {
 
     expect(unavailable.available).toBe(false);
     expect(unavailable.mainInterpretation).toBe(
-      "Signal evaluation is currently unavailable.",
+      "Validation context is currently unavailable.",
     );
     expect(limited.sampleQualityLabel).toBe("Very limited");
     expect(limited.mainInterpretation).toContain("Sample is limited");

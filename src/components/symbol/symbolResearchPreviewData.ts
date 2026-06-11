@@ -501,7 +501,7 @@ function buildPreviewMarketContext(): MarketContextResponse {
         "BTC 4h tactical context: short term strength.",
         "ETH confirmation: confirms broader risk-on conditions.",
       ],
-      warnings: ["Research-only context. Not a trading signal."],
+      warnings: ["Research-only. Not trading advice."],
     },
     rules: {
       researchOnly: true,

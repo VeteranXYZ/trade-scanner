@@ -759,7 +759,7 @@ function ArchiveCommandBar({
             onClick={onRefresh}
             disabled={isRefreshing || isVisualCheck}
             isRefreshing={isRefreshing}
-            label={isVisualCheck ? "Mock data" : "Refresh"}
+            label={isVisualCheck ? "Visual Check Data" : "Refresh Archive"}
           />
         </div>
       </div>
@@ -871,14 +871,14 @@ export function RecentSuccessfulRunsPanel({
       </div>
       {isError ? (
         <StatePanel
-          title="Archive unavailable"
+          title="Unable to load archive data."
           message={errorMessage ?? "Stored ranking runs could not be loaded."}
         />
       ) : isLoading ? (
-        <StatePanel title="Loading runs" message="Loading stored ranking runs." />
+        <StatePanel title="Loading archive runs..." message="Loading stored ranking runs." />
       ) : snapshots.length === 0 ? (
         <StatePanel
-          title="No runs"
+          title="No archived runs available."
           message={`No successful ${timeframe} runs are available.`}
         />
       ) : (
@@ -903,7 +903,7 @@ export function RecentSuccessfulRunsPanel({
                 type="button"
                 onClick={() => onSelectRun(run.runId)}
                 aria-pressed={isSelected}
-                aria-label={`Select historical run ${run.runId}`}
+                aria-label={`Select stored run ${run.runId}`}
                 className={formatRecentRunCardClassName(run, isSelected)}
               >
                 <div className="flex min-w-0 items-center gap-1">
@@ -1089,6 +1089,9 @@ export function ForwardObservationSection({
           >
             {outcomeSummaryStatus.label}
           </StatusBadge>
+          <span className="text-[10px] font-semibold uppercase text-[var(--muted)]">
+            Validation Readiness
+          </span>
         </div>
         <div className="flex flex-wrap gap-1 border border-[var(--border)] bg-[var(--panel-muted)] p-0.5">
           {OBSERVATION_WINDOWS.map((option) => (
@@ -1109,7 +1112,7 @@ export function ForwardObservationSection({
       <div className="flex min-h-0 flex-col gap-1 px-2 py-1 xl:flex-1 xl:overflow-hidden">
         {!isRequested ? (
           <StatePanel
-            title="Loading Outcome Rows"
+            title="Loading Snapshot Rows"
             message={
               selectedReadinessRun
                 ? `Selected run ${shortRunId(selectedReadinessRun.runId)} is loading automatically.`
@@ -1119,7 +1122,7 @@ export function ForwardObservationSection({
         ) : snapshotError ? (
           <StatePanel title="Selected Run unavailable" message={snapshotError} />
         ) : snapshotIsLoading ? (
-          <StatePanel title="Loading Selected Run" message="Loading ranking rows." />
+          <StatePanel title="Loading Selected Run" message="Loading snapshot rows." />
         ) : !selectedReadinessRun ? (
           <StatePanel
             title="No Selected Run"
@@ -1152,8 +1155,8 @@ export function ForwardObservationSection({
           />
         ) : rows.length === 0 ? (
           <StatePanel
-            title="Outcome Rows unavailable"
-            message="No outcome rows are available for the Validation Source."
+            title="Snapshot Rows unavailable"
+            message="No snapshot rows are available for the Validation Source."
           />
         ) : (
           <ObservationRowsTable rows={rows} isFetching={uiState.isFetching} />
@@ -1206,7 +1209,7 @@ function SelectedScanValidationStrip({
             value: `${formatCount(selectedRun?.symbolsScanned)}/${formatCount(
               selectedRun?.signalsCreated,
             )}`,
-            title: "Rows / signals",
+            title: "Rows / results",
           },
           {
             value: selectedRun ? formatFullUniverse(selectedRun) : "-",
@@ -1383,13 +1386,13 @@ function ArchiveDetails({
   return (
     <details className="shrink-0 border border-[var(--border)] bg-[var(--panel-muted)]">
       <summary className="cursor-pointer bg-[var(--table-header)] px-2 py-1 text-[11px] font-semibold uppercase tracking-normal text-[var(--foreground)]">
-        Details
+        Source Data
       </summary>
       <div className="space-y-1.5 border-t border-[var(--border)] px-2 py-1.5">
         <ObservationDataStatusLegend />
         <DetailLine
           label="Data path"
-          value="Outcome metrics use Validation Source; Original Ranking Rows stay tied to Selected Run."
+          value="Validation metrics use Validation Source; Source Snapshot Rows stay tied to Selected Run."
         />
         {readyContextNote ? (
           <DetailLine label="Validation note" value={readyContextNote} />
@@ -1422,7 +1425,7 @@ function ArchiveDetails({
             title="Source Data"
             rows={[
               ["Readiness", readiness ? "Loaded" : "Unavailable"],
-              ["Outcome Rows", response ? formatCount(response.rows.length) : "-"],
+              ["Snapshot Rows", response ? formatCount(response.rows.length) : "-"],
               [
                 "Returned Rows",
                 response ? formatCount(response.metadata.rowCount) : "-",
@@ -1481,7 +1484,7 @@ function RawDetails({
   return (
     <details className="border border-[var(--border)] bg-[var(--panel)]">
       <summary className="cursor-pointer px-2 py-1 text-[11px] font-semibold text-[var(--foreground)]">
-        Raw run metadata and row fields
+        Source run metadata and row fields
       </summary>
       <pre className="max-h-80 overflow-auto border-t border-[var(--border)] p-2 text-[10px] leading-4 text-[var(--muted)]">
         {JSON.stringify(raw, null, 2)}
@@ -1540,7 +1543,7 @@ export function ObservationRowsTable({
     <section className="terminal-panel-data overflow-hidden xl:flex xl:min-h-0 xl:flex-1 xl:flex-col">
       <div className="terminal-panel-header is-start">
         <h3 className="terminal-panel-title shrink-0">
-          Outcome Rows
+          Snapshot Rows
         </h3>
         <StatusBadge
           tone={visibleRows.length === rows.length ? "complete" : "info"}
@@ -1566,14 +1569,14 @@ export function ObservationRowsTable({
           onSelect={(value) => setDataStatusFilter(value)}
         />
         <ObservationRowsFilterGroup
-          label="State"
+          label="Research Group"
           options={observationRowsGroupFilters}
           selectedValue={groupFilter}
           onSelect={(value) => setGroupFilter(value)}
         />
         <label className="flex min-w-[150px] flex-1 items-center gap-1 sm:flex-none">
           <span className="shrink-0 text-[10px] font-semibold uppercase tracking-normal text-[var(--muted)]">
-            Search
+            Search Symbol
           </span>
           <input
             value={symbolSearch}
@@ -1586,8 +1589,8 @@ export function ObservationRowsTable({
 
       {visibleRows.length === 0 ? (
         <StatePanel
-          title="No matching observation rows"
-          message="No observation rows match the current filters."
+          title="No snapshot rows found."
+          message="No snapshot rows match the current filters."
         />
       ) : (
         <DataTableScroll className="max-h-[70vh] !overflow-x-auto !overflow-y-auto xl:min-h-0 xl:flex-1">
@@ -1607,7 +1610,7 @@ export function ObservationRowsTable({
                   defaultDirection="desc"
                   onSortChange={updateSort}
                 >
-                  Original State
+                  Research Group
                 </DataTableHeaderCell>
                 <DataTableHeaderCell
                   sortKey="rank_score"
@@ -1616,7 +1619,7 @@ export function ObservationRowsTable({
                   onSortChange={updateSort}
                   align="right"
                 >
-                  Rank
+                  Rank Score
                 </DataTableHeaderCell>
                 <DataTableHeaderCell
                   sortKey="anchor_close"
@@ -1643,7 +1646,7 @@ export function ObservationRowsTable({
                   onSortChange={updateSort}
                   align="right"
                 >
-                  Return
+                  Observed Change
                 </DataTableHeaderCell>
                 <DataTableHeaderCell
                   sortKey="max_drawdown"
@@ -1652,7 +1655,7 @@ export function ObservationRowsTable({
                   onSortChange={updateSort}
                   align="right"
                 >
-                  Max Drawdown
+                  Max Adverse Move
                 </DataTableHeaderCell>
                 <DataTableHeaderCell
                   sortKey="data_status"
@@ -1660,9 +1663,9 @@ export function ObservationRowsTable({
                   defaultDirection="desc"
                   onSortChange={updateSort}
                 >
-                  Outcome Status
+                  Validation Status
                 </DataTableHeaderCell>
-                <DataTableHeaderCell>Research</DataTableHeaderCell>
+                <DataTableHeaderCell>Open Research</DataTableHeaderCell>
               </tr>
             </thead>
             <tbody>
@@ -1734,7 +1737,7 @@ export function ObservationRowsTable({
                       })}
                       className="terminal-mini-action is-accent h-6 px-2"
                     >
-                      Research
+                      Open Research
                     </Link>
                   </DataTableCell>
                 </tr>
@@ -2155,7 +2158,7 @@ function getOutcomeSummaryStatus({
 }): { label: string; tone: StatusTone } {
   if (uiState.status === "observation_ready") {
     if (summary?.completeCount === 0 && summary.partialCount > 0) {
-      return { label: "Outcomes partial", tone: "partial" };
+      return { label: "Rows partial", tone: "partial" };
     }
 
     if (summary?.completeCount === 0 && summary.missingCount > 0) {
@@ -2208,7 +2211,7 @@ function ForwardObservationStatePanel({
 function ObservationDataStatusLegend() {
   return (
     <div className="terminal-panel mb-3 px-3 py-2 text-xs leading-5 text-[var(--muted)]">
-      <span className="font-semibold text-[var(--foreground)]">Outcome Status:</span>{" "}
+      <span className="font-semibold text-[var(--foreground)]">Validation Status:</span>{" "}
       Complete has the selected future window, Partial has fewer future candles,
       Missing has no usable future window.
     </div>
@@ -2237,19 +2240,19 @@ function ObservationSummarySection({ summary }: {
         tone="missing"
       />
       <SummaryStripStat
-        label="Median"
+        label="Median Change"
         value={formatCompactObservationSummaryPercent(
           summary.medianObservedChangePct,
         )}
         tone={getObservedSummaryTone(summary.medianObservedChangePct)}
       />
       <SummaryStripStat
-        label="Positive"
+        label="Positive Rate"
         value={formatCompactObservationSummaryPercent(summary.positiveRatePct)}
         tone={getPositiveRateTone(summary.positiveRatePct)}
       />
       <SummaryStripStat
-        label="Drawdown"
+        label="Max Adverse Move"
         value={formatCompactObservationSummaryPercent(
           summary.worstMaxDrawdownPct,
         )}
@@ -2295,7 +2298,7 @@ function GroupDistributionTable({
 }) {
   return (
     <div className="mt-4">
-      <h4 className="text-sm font-semibold">Group distribution</h4>
+      <h4 className="text-sm font-semibold">Group Distribution</h4>
       <p className="mt-1 max-w-3xl text-xs leading-5 text-[var(--muted)]">
         Complete rows only; partial and missing rows are counted separately.
       </p>
@@ -2314,13 +2317,13 @@ function GroupDistributionTable({
                 <DataTableHeaderCell align="right">Partial</DataTableHeaderCell>
                 <DataTableHeaderCell align="right">Missing</DataTableHeaderCell>
                 <DataTableHeaderCell align="right">
-                  Median return
+                  Median Change
                 </DataTableHeaderCell>
                 <DataTableHeaderCell align="right">
-                  Average return
+                  Average Change
                 </DataTableHeaderCell>
                 <DataTableHeaderCell align="right">
-                  Median drawdown
+                  Median Adverse Move
                 </DataTableHeaderCell>
               </tr>
             </thead>
@@ -2375,21 +2378,21 @@ function NotableHistoricalExamples({
 }) {
   return (
     <div className="mt-4">
-      <h4 className="text-sm font-semibold">Notable symbols</h4>
+      <h4 className="text-sm font-semibold">Notable Symbols</h4>
       <p className="mt-1 max-w-3xl text-xs leading-5 text-[var(--muted)]">
-        Largest returns and drawdowns from complete rows.
+        Largest observed changes and adverse moves from complete rows.
       </p>
       <div className="mt-3 grid gap-3 lg:grid-cols-3">
         <NotableExampleList
-          title="Largest positive returns"
+          title="Largest Positive Changes"
           examples={summary.notable.largestPositiveObservedChanges}
         />
         <NotableExampleList
-          title="Largest negative returns"
+          title="Largest Negative Changes"
           examples={summary.notable.largestNegativeObservedChanges}
         />
         <NotableExampleList
-          title="Largest drawdowns"
+          title="Largest Adverse Moves"
           examples={summary.notable.largestObservedDrawdowns}
         />
       </div>
@@ -2426,12 +2429,12 @@ function NotableExampleList({
               </div>
               <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-[var(--muted)]">
                 <span>
-                  Return{" "}
+                  Change{" "}
                   {formatObservationPercent(example.observedChangePct)}
                 </span>
                 {example.maxDrawdownPct !== null ? (
                   <span>
-                    Drawdown{" "}
+                    Adverse Move{" "}
                     {formatObservationPercent(example.maxDrawdownPct)}
                   </span>
                 ) : null}
@@ -2461,13 +2464,13 @@ function getForwardObservationPanelTitle(uiState: ForwardObservationUiState) {
     case "using_recommended_observable_run":
       return "Using Validation Source";
     case "loading_observation_rows":
-      return "Loading Outcome Rows";
+      return "Loading Snapshot Rows";
     case "observation_rows_error":
-      return "Outcome Rows unavailable";
+      return "Snapshot Rows unavailable";
     case "observation_ready_summary_missing":
-      return "Outcome Rows not returned";
+      return "Snapshot Rows not returned";
     case "observation_empty":
-      return "No Outcome Rows returned";
+      return "No Snapshot Rows returned";
     case "observation_ready":
       return "Validation ready";
   }
@@ -2504,15 +2507,15 @@ function getForwardObservationPanelMessage({
     case "using_selected_run":
       return "The Selected Run is also the Validation Source.";
     case "using_recommended_observable_run":
-      return "The Selected Run remains unchanged; Outcome Rows use the Validation Source.";
+      return "The Selected Run remains unchanged; Snapshot Rows use the Validation Source.";
     case "loading_observation_rows":
-      return "Loading Outcome Rows for the Validation Source.";
+      return "Loading Snapshot Rows for the Validation Source.";
     case "observation_rows_error":
-      return uiState.observationRowsError ?? "Outcome Rows could not be loaded.";
+      return uiState.observationRowsError ?? "Snapshot Rows could not be loaded.";
     case "observation_ready_summary_missing":
-      return "Validation Source is available, but no Outcome Rows were returned.";
+      return "Validation Source is available, but no Snapshot Rows were returned.";
     case "observation_empty":
-      return "Validation Source is available, but it has no Outcome Rows for this forward window.";
+      return "Validation Source is available, but it has no Snapshot Rows for this forward window.";
     case "observation_ready":
       return formatObservationReadinessMessage(readiness);
   }
@@ -2680,7 +2683,7 @@ export function SnapshotTable({
       <summary className="terminal-panel-header cursor-pointer list-none marker:hidden">
         <div className="flex min-w-0 items-center gap-2">
           <h2 className="terminal-panel-title">
-            Original Ranking Rows
+            Source Snapshot Rows
           </h2>
         </div>
         <StatusBadge
@@ -2700,31 +2703,34 @@ export function SnapshotTable({
       </summary>
       <div className="border-t border-[var(--border)] px-2 py-2">
         <p className="mb-2 text-[11px] leading-4 text-[var(--muted)]">
-          Original ranking output from Selected Run. Research opens current
-          symbol view, not historical replay.
+          Source snapshot rows from Selected Run. Open Research opens current
+          symbol research, not historical replay.
         </p>
-      {!requested ? (
-        <div className="terminal-state-panel">
-          <p className="text-[12px] leading-5 text-[var(--muted)]">
-            Rows load automatically after selecting a run to keep the initial
-            archive page light.
-            {selectedRunId ? ` Selected run ${shortRunId(selectedRunId)}.` : ""}
-          </p>
-        </div>
-      ) : isError ? (
-        <StatePanel
-          title="Original rows unavailable"
-          message={errorMessage ?? "Original ranking rows could not be loaded."}
-        />
-      ) : isLoading && rows.length === 0 ? (
-        <StatePanel title="Loading rows" message="Loading original ranking rows." />
-      ) : rows.length === 0 ? (
-        <StatePanel
-          title="No rows"
-          message="No ranking rows are available for the Selected Run."
-        />
-      ) : (
-        <DataTableScroll className="max-h-72 !overflow-x-auto !overflow-y-auto">
+        {!requested ? (
+          <div className="terminal-state-panel">
+            <p className="text-[12px] leading-5 text-[var(--muted)]">
+              Rows load automatically after selecting a run to keep the initial
+              archive page light.
+              {selectedRunId ? ` Selected run ${shortRunId(selectedRunId)}.` : ""}
+            </p>
+          </div>
+        ) : isError ? (
+          <StatePanel
+            title="Source snapshot rows unavailable"
+            message={errorMessage ?? "Source snapshot rows could not be loaded."}
+          />
+        ) : isLoading && rows.length === 0 ? (
+          <StatePanel
+            title="Loading snapshot rows"
+            message="Loading source snapshot rows."
+          />
+        ) : rows.length === 0 ? (
+          <StatePanel
+            title="No snapshot rows"
+            message="No snapshot rows are available for the Selected Run."
+          />
+        ) : (
+          <DataTableScroll className="max-h-72 !overflow-x-auto !overflow-y-auto">
           <DataTable minWidth="min-w-[1180px]">
             <thead className="sticky top-0 z-20 bg-[var(--table-header)] text-[10px] uppercase tracking-normal text-[var(--muted)]">
               <tr>
@@ -2734,7 +2740,7 @@ export function SnapshotTable({
                   onSortChange={updateSort}
                   align="right"
                 >
-                  #
+                  Rank
                 </DataTableHeaderCell>
                 <DataTableHeaderCell
                   sortKey="symbol"
@@ -2756,17 +2762,17 @@ export function SnapshotTable({
                   defaultDirection="desc"
                   onSortChange={updateSort}
                 >
-                  Group
+                  Research Group
                 </DataTableHeaderCell>
                 <DataTableHeaderCell
                   sortKey="label"
                   sortState={sortState}
                   onSortChange={updateSort}
                 >
-                  Label
+                  Research Label
                 </DataTableHeaderCell>
-                <DataTableHeaderCell>Primary Signal</DataTableHeaderCell>
-                <DataTableHeaderCell>Risk Notes</DataTableHeaderCell>
+                <DataTableHeaderCell>Research Priority</DataTableHeaderCell>
+                <DataTableHeaderCell>Risk Context</DataTableHeaderCell>
                 <DataTableHeaderCell
                   sortKey="rank_score"
                   sortState={sortState}
@@ -2776,9 +2782,9 @@ export function SnapshotTable({
                 >
                   Rank Score
                 </DataTableHeaderCell>
-                <DataTableHeaderCell>Components</DataTableHeaderCell>
-                <DataTableHeaderCell>Versions</DataTableHeaderCell>
-                <DataTableHeaderCell>Research</DataTableHeaderCell>
+                <DataTableHeaderCell>Score Components</DataTableHeaderCell>
+                <DataTableHeaderCell>Source Versions</DataTableHeaderCell>
+                <DataTableHeaderCell>Open Research</DataTableHeaderCell>
               </tr>
             </thead>
             <tbody>
@@ -2848,7 +2854,7 @@ export function SnapshotTable({
                       })}
                       className="terminal-mini-action is-accent px-2 py-1"
                     >
-                      Research
+                      Open Research
                     </Link>
                   </DataTableCell>
                 </tr>
@@ -2856,7 +2862,7 @@ export function SnapshotTable({
             </tbody>
           </DataTable>
         </DataTableScroll>
-      )}
+        )}
       </div>
     </details>
   );
@@ -3590,7 +3596,7 @@ async function fetchHistoricalSnapshots({
   );
 
   if (!response.ok) {
-    throw new Error(`Failed to load historical snapshots (${response.status}).`);
+    throw new Error(`Unable to load archive runs (${response.status}).`);
   }
 
   return (await response.json()) as HistoricalSnapshotsResponse;
@@ -3611,7 +3617,7 @@ async function fetchHistoricalSnapshot({
   );
 
   if (!response.ok) {
-    throw new Error(`Failed to load historical snapshot (${response.status}).`);
+    throw new Error(`Unable to load archive snapshot (${response.status}).`);
   }
 
   return (await response.json()) as HistoricalSnapshotDetailResponse;
@@ -3635,7 +3641,7 @@ async function fetchHistoricalSnapshotObservations({
 
   if (!response.ok) {
     throw new Error(
-      `Unable to load forward observation (${response.status}).`,
+      `Unable to load archive snapshot rows (${response.status}).`,
     );
   }
 
@@ -4095,7 +4101,7 @@ function formatObservationReadinessMessage(
     case "unavailable":
       return "Validation data is unavailable for the selected window.";
     case "observable":
-      return "Outcome Rows are available for this window.";
+      return "Snapshot Rows are available for this window.";
     default:
       return "Validation is not ready for the selected window.";
   }

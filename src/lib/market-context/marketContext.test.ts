@@ -49,7 +49,7 @@ describe("market context classification", () => {
       "ETH confirmation: confirms constructive context.",
     );
     expect(response.summary.warnings).toContain(
-      "Research-only context. Not a trading signal.",
+      "Research-only. Not trading advice.",
     );
   });
 

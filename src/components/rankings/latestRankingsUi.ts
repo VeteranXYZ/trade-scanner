@@ -35,9 +35,9 @@ export type LatestRankingsReviewTier =
 
 const groupHints = {
   eligible:
-    "Candidates worth manual review: positive rank, confirmed/trend, clear setup, and no detected risks.",
+    "Rows worth manual review: positive rank, confirmed/trend, clear setup, and no detected risks.",
   watch:
-    "Monitor for confirmation; lower or negative-rank watch rows are lower priority.",
+    "Monitor for confirmation; lower or negative-rank watch rows remain lower priority.",
   overheated: "Extended conditions require additional review.",
   risk: "Risk context requires repair review.",
   neutral: "Mixed research context.",
@@ -447,12 +447,12 @@ export function formatQualityTier(value: string | null | undefined) {
 
 export function getLatestRankingsScoreRows(item: LatestRankingsScoreInput) {
   return [
-    { label: "Setup Score", value: formatScore(item.opportunityScore) },
+    { label: "Setup Quality", value: formatScore(item.opportunityScore) },
     { label: "Confirmation", value: formatScore(item.confirmationScore) },
     { label: "Risk", value: formatScore(item.riskScore) },
     { label: "Trend", value: formatScore(item.trendScore) },
     { label: "Momentum", value: formatScore(item.momentumScore) },
-    { label: "Volume", value: formatScore(item.volumeScore) },
+    { label: "Liquidity", value: formatScore(item.volumeScore) },
     { label: "Structure", value: formatScore(item.structureScore) },
   ];
 }

@@ -96,12 +96,12 @@ export type WatchlistPresetId = (typeof watchlistPresets)[number]["id"];
 
 export const watchlistSortOptions = [
   { field: "symbol", label: "Symbol" },
-  { field: "1h_rank", label: "1h Rank" },
-  { field: "4h_rank", label: "4h Rank" },
-  { field: "1d_rank", label: "1d Rank" },
-  { field: "1w_rank", label: "1w Rank" },
-  { field: "higher_timeframe_safety", label: "Higher-Timeframe Safety" },
-  { field: "best_short_term_rank", label: "Short-Term Rank" },
+  { field: "1h_rank", label: "1h Rank Score" },
+  { field: "4h_rank", label: "4h Rank Score" },
+  { field: "1d_rank", label: "1d Rank Score" },
+  { field: "1w_rank", label: "1w Rank Score" },
+  { field: "higher_timeframe_safety", label: "Higher-Timeframe Context" },
+  { field: "best_short_term_rank", label: "Short-Term Rank Score" },
 ] as const;
 
 export type WatchlistSortField =
@@ -144,7 +144,7 @@ export type WatchlistResearchCondition =
 export type WatchlistResearchPosture =
   | "Defensive review"
   | "Selective watchlist review"
-  | "Repair candidates only"
+  | "Repair review only"
   | "Mostly wait"
   | "Data incomplete";
 
@@ -588,7 +588,7 @@ function getResearchConditionText(conditionLabel: WatchlistResearchCondition) {
     case "Short-term repair inside higher-timeframe risk":
       return "Some 1h or 4h repair is present, but higher-timeframe risk remains the main context.";
     case "Higher-timeframe improving":
-      return "Selected symbols include cleaner 4h watch states with limited higher-timeframe risk.";
+      return "Selected symbols include cleaner 4h watch context with limited higher-timeframe risk.";
     case "Mixed / selective":
       return "The watchlist is mixed; use symbol research for selective manual review.";
     case "Insufficient data":
@@ -620,7 +620,7 @@ function getResearchPosture({
     counts.repairInsideRiskSymbols > 0 &&
     cleanerCandidateCount === 0
   ) {
-    return "Repair candidates only";
+    return "Repair review only";
   }
 
   if (cleanerCandidateCount > 0 || counts.shortTermWatchSymbols > 0) {
@@ -669,7 +669,7 @@ function buildResearchCandidateReason(
 ) {
   const primaryText = timeframe
     ? `${timeframe} ${getTimeframeGroupLabel(row, timeframe)}`
-    : "Short-term watch state";
+    : "Short-term watch context";
   const context = getHigherTimeframeContext(row);
 
   return `${primaryText} with ${context}.`;
@@ -700,7 +700,7 @@ function buildHighestRiskReason(row: WatchlistRow) {
 
 function buildMissingDataReason(row: WatchlistRow) {
   if (!row.mtfRow) {
-    return "Not found in latest MTF response.";
+    return "Not found in latest multi-timeframe snapshot.";
   }
 
   const missing = (["1d", "1w"] as const).filter(

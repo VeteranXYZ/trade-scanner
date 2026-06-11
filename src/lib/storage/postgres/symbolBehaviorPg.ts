@@ -182,7 +182,7 @@ export async function loadSymbolBehaviorPg(
         available: false,
         reason: "no_prior_signals",
         message:
-          "Historical behavior is not available yet because no prior ranking results were found for this symbol/timeframe.",
+          "Behavior is not available yet because no prior ranking results were found for this symbol/timeframe.",
       },
     };
   }
@@ -197,7 +197,7 @@ export async function loadSymbolBehaviorPg(
         available: false,
         reason: "missing_forward_candles",
         message:
-          "Historical behavior is not available yet because prior signals do not have enough forward candles.",
+          "Behavior is not available yet because prior ranking results do not have enough forward candles.",
       },
     };
   }
@@ -218,7 +218,7 @@ export async function loadSymbolBehaviorPg(
       available: true,
       reason: "ok",
       message:
-        "Historical behavior is available from prior ranking results with forward candles.",
+        "Behavior is available from prior ranking results with forward candles.",
     },
   };
 }

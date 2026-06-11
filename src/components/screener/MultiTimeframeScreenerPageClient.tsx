@@ -207,7 +207,7 @@ export function MultiTimeframeScreenerPageClient() {
     <PageShell className="screener-terminal max-w-none [--screener-sticky-offset:0rem] xl:h-full xl:min-h-0 xl:overflow-hidden">
       <MtfScreenerCommandBar
         title={mtfScreenerProductionCopy.title}
-        datasetLabel="Latest joined rows"
+        datasetLabel="Latest joined snapshots"
         statusLabel={getMtfQueryStatusLabel({
           isLoading: latestQuery.isLoading,
           isError: latestQuery.isError,
@@ -258,11 +258,11 @@ export function MultiTimeframeScreenerPageClient() {
 
         <main className="order-1 min-h-0 min-w-0 xl:order-2 xl:flex xl:flex-col xl:overflow-hidden">
           {latestQuery.isLoading ? (
-            <MtfStatePanel message="Loading multi-timeframe latest ranking data." />
+            <MtfStatePanel message="Loading research snapshot..." />
           ) : latestQuery.isError ? (
             <MtfStatePanel message={getMtfErrorMessage(latestQuery.error)} />
           ) : rows.length === 0 ? (
-            <MtfStatePanel message="No latest multi-timeframe rows are available yet." />
+            <MtfStatePanel message="No ranking results found." />
           ) : (
             <MtfScreenerTable
               rows={visibleRows}
@@ -319,7 +319,7 @@ export function MtfScreenerTable({
 
   if (rows.length === 0) {
     return (
-      <MtfStatePanel message="No symbols match the selected multi-timeframe filters." />
+      <MtfStatePanel message="No symbols match the current filters." />
     );
   }
 
@@ -328,7 +328,7 @@ export function MtfScreenerTable({
       <div className="terminal-panel-header">
         <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
           <h2 className="terminal-panel-title">
-            Joined Symbol Table
+            Joined Snapshot
           </h2>
           <StatusBadge tone="accent" className="text-[10px]">
             Showing {filteredRows} of {totalRows} symbols
@@ -367,7 +367,7 @@ export function MtfScreenerTable({
                 align="center"
                 className="sticky top-0 z-20 border-l border-[var(--table-group)] bg-[var(--table-header-strong)] text-[var(--foreground)]"
               >
-                State
+                Timeframe Alignment
               </DataTableHeaderCell>
               {MTF_SCREENER_TIMEFRAMES.map((timeframe) => (
                 <DataTableHeaderCell
@@ -386,20 +386,20 @@ export function MtfScreenerTable({
                 onSortChange={onSortChange}
                 className="sticky top-0 z-20 w-[166px] border-l border-[var(--table-group)] bg-[var(--table-header)]"
               >
-                Primary
+                Research Priority
               </DataTableHeaderCell>
               <DataTableHeaderCell
                 rowSpan={2}
                 className="sticky top-0 z-20 w-[214px] bg-[var(--table-header)]"
               >
-                Notes
+                Risk Context
               </DataTableHeaderCell>
               <DataTableHeaderCell
                 rowSpan={2}
                 align="center"
                 className="sticky top-0 z-20 w-[88px] bg-[var(--table-header)]"
               >
-                Action
+                Open Research
               </DataTableHeaderCell>
             </tr>
             <tr>
@@ -411,7 +411,7 @@ export function MtfScreenerTable({
                 align="right"
                 className="sticky top-6 z-20 w-[66px] border-l border-[var(--table-group)] bg-[var(--table-header)]"
               >
-                Score
+                Rank Score
               </DataTableHeaderCell>
               <DataTableHeaderCell
                 sortKey="higher_timeframe_safety"
@@ -420,7 +420,7 @@ export function MtfScreenerTable({
                 onSortChange={onSortChange}
                 className="sticky top-6 z-20 w-[112px] bg-[var(--table-header)]"
               >
-                HTF
+                Higher-Timeframe Context
               </DataTableHeaderCell>
               {MTF_SCREENER_TIMEFRAMES.map((timeframe) => (
                 <TimeframeHeaderCells
@@ -502,7 +502,7 @@ function MtfScreenerIndicatorToolbar() {
       className="flex min-w-0 flex-1 items-center gap-1 overflow-x-auto text-[10px] [scrollbar-gutter:stable]"
     >
       <span className="shrink-0 border-l border-[var(--border-medium)] pl-2 font-semibold uppercase text-[var(--muted)]">
-        MTF
+        Multi-Timeframe
       </span>
       {MTF_SCREENER_TIMEFRAMES.map((timeframe) => (
         <span
@@ -513,7 +513,7 @@ function MtfScreenerIndicatorToolbar() {
         </span>
       ))}
       <span className="shrink-0 border-l border-[var(--border-medium)] pl-2 font-semibold uppercase text-[var(--muted)]">
-        States
+        Research Groups
       </span>
       {[
         ["eligible", "Eligible"],
@@ -649,7 +649,7 @@ export function MtfScreenerCommandBar({
 
         <div className="terminal-command-main">
           <MtfCommandStat
-            label="Data"
+            label="Snapshot"
             value={statusLabel}
             tone={statusTone}
           />
@@ -691,7 +691,7 @@ export function MtfScreenerCommandBar({
               onClick={onRefresh}
               disabled={isRefreshing}
               isRefreshing={isRefreshing}
-              label="Refresh"
+              label="Refresh Screener"
             />
           ) : null}
         </div>
@@ -781,7 +781,7 @@ function MtfFreshnessPill({
       tone={tone}
       title={
         run
-          ? `${timeframe}: ${timestamp}; ${signalCount} signals, ${missingCount} missing`
+          ? `${timeframe}: ${timestamp}; ${signalCount} ranking results, ${missingCount} missing`
           : `${timeframe}: no selected latest run`
       }
       className="shrink-0 gap-1 px-1 py-0 text-[9px]"
@@ -827,7 +827,7 @@ function getMtfFreshnessTitle(sourceData?: MtfLatestScreenerResponse) {
     const missingCount = sourceData.missingCounts[timeframe] ?? 0;
 
     return run
-      ? `${timeframe}: ${formatDateTime(run.finishedAt ?? run.startedAt)}; ${signalCount} signals, ${missingCount} missing`
+      ? `${timeframe}: ${formatDateTime(run.finishedAt ?? run.startedAt)}; ${signalCount} ranking results, ${missingCount} missing`
       : `${timeframe}: no selected latest run`;
   }).join(" / ");
 }
@@ -952,7 +952,7 @@ function getMtfActiveBucketLabel(
   isFullTableActive: boolean,
 ) {
   if (isFullTableActive) {
-    return "Full Table";
+    return "Ranked Universe";
   }
 
   if (presetId === "custom") {
@@ -1000,23 +1000,23 @@ function formatMtfSortKeyLabel(key: MtfScreenerTableSortKey) {
     case "symbol":
       return "Symbol";
     case "combined_rank":
-      return "Rank";
+      return "Rank Score";
     case "higher_timeframe_safety":
-      return "Higher TF";
+      return "Higher-Timeframe Context";
     case "signal":
-      return "Signal";
+      return "Research Priority";
   }
 
   const rankTimeframe = getMtfTableSortTimeframe(key, "_rank");
 
   if (rankTimeframe) {
-    return `${rankTimeframe} rank`;
+      return `${rankTimeframe} rank score`;
   }
 
   const groupTimeframe = getMtfTableSortTimeframe(key, "_group");
 
   if (groupTimeframe) {
-    return `${groupTimeframe} group`;
+      return `${groupTimeframe} research group`;
   }
 
   return key;
@@ -1048,13 +1048,13 @@ export function MtfResearchBucketsPanel({
         </div>
         <button
           type="button"
-          title="Full Table: all joined rows before preset buckets."
+          title="Ranked Universe: all joined snapshots before preset buckets."
           onClick={onClear}
           aria-pressed={isFullTableActive}
           className={getMtfResearchBucketButtonClass("accent", isFullTableActive)}
         >
           <MtfBucketMarker tone="accent" />
-          <span className="min-w-0 truncate font-semibold">Full Table</span>
+          <span className="min-w-0 truncate font-semibold">Ranked Universe</span>
           <span className="font-mono tabular-nums text-[var(--muted)]">
             {rows.length}
           </span>
@@ -1125,7 +1125,7 @@ export function MtfScreenerDetailRail({
     >
       <div className="terminal-panel-header">
         <h2 className="terminal-panel-title truncate">
-          Detail Rail
+          Snapshot Review
         </h2>
         <StatusBadge tone="info" className="shrink-0 text-[10px]">
           Ready
@@ -1135,7 +1135,7 @@ export function MtfScreenerDetailRail({
       <div className="min-h-0 flex-1 space-y-2 overflow-y-auto p-2">
         <div>
           <div className="mb-1 text-[10px] font-semibold uppercase text-[var(--muted)]">
-            View State
+            View Summary
           </div>
           <div className="grid grid-cols-2 gap-1">
             <MtfDetailRailMetric
@@ -1169,7 +1169,7 @@ export function MtfScreenerDetailRail({
 
         <div className="border-t border-[var(--border)] pt-2">
           <div className="mb-1 text-[10px] font-semibold uppercase text-[var(--muted)]">
-            State Key
+            Research Group Key
           </div>
           <div className="flex flex-wrap gap-1">
             <StatusBadge tone="eligible" className="text-[10px]">
@@ -1201,7 +1201,7 @@ export function MtfScreenerDetailRail({
 
         <div className="border-t border-[var(--border)] pt-2">
           <div className="mb-1 flex items-center justify-between gap-2 text-[10px] font-semibold uppercase text-[var(--muted)]">
-            <span>Focus Rows</span>
+            <span>High-Priority Rows</span>
             <span className="font-mono">{focusRows.length}</span>
           </div>
           <div className="space-y-1">
@@ -1252,7 +1252,7 @@ export function MtfScreenerDetailRail({
               })
             ) : (
               <div className="border border-[var(--border)] bg-[var(--panel-muted)] px-2 py-2 text-[11px] text-[var(--muted)]">
-                No rows
+                No high-priority rows
               </div>
             )}
           </div>
@@ -1324,12 +1324,12 @@ function getMtfMarketBackdropLine(
   ethConfirmation: string | undefined,
 ) {
   if (unavailable) {
-    return "Context unavailable; scanner states unchanged.";
+    return "Context unavailable; research rankings unchanged.";
   }
 
   return ethConfirmation
-    ? `ETH: ${ethConfirmation}; scanner states unchanged.`
-    : "BTC/ETH context only; scanner states unchanged.";
+    ? `ETH: ${ethConfirmation}; research rankings unchanged.`
+    : "BTC/ETH context only; research rankings unchanged.";
 }
 
 function MtfDetailRailMetric({
@@ -1412,7 +1412,7 @@ function getMtfDetailFocusRows(
       getMtfFirstTimeframeWithGroup(row, ["risk"]),
     );
   } else if (presetId === "mtf_strength") {
-    addFocusRows(getMtfStrengthFocusRows(rows), "Strength", "eligible", (row) =>
+    addFocusRows(getMtfStrengthFocusRows(rows), "Aligned", "eligible", (row) =>
       getMtfFirstTimeframeWithGroup(row, ["eligible"]),
     );
   } else if (presetId === "short_term_repair") {
@@ -1422,14 +1422,14 @@ function getMtfDetailFocusRows(
       getMtfFirstTimeframeWithGroup(row, ["watch", "eligible"]),
     );
   } else if (presetId === "overheated_caution") {
-    addFocusRows(getMtfOverheatedFocusRows(rows), "Hot", "overheated", (row) =>
+    addFocusRows(getMtfOverheatedFocusRows(rows), "Extended", "overheated", (row) =>
       getMtfFirstTimeframeWithGroup(row, ["overheated"]),
     );
   } else {
     if (sortState?.key === "combined_rank" || sortState?.key.endsWith("_rank")) {
       addFocusRow(
         rows[0],
-        sortState.direction === "asc" ? "Low Score" : "Top Score",
+        sortState.direction === "asc" ? "Lower Rank Score" : "Higher Rank Score",
         sortState.direction === "asc" ? "risk" : "eligible",
       );
     }
@@ -1452,7 +1452,7 @@ function getMtfDetailFocusRows(
     addFocusRow(rows.find(isMtfMixedSignalRow), "Mixed", "watch");
     addFocusRow(
       rows.find(hasMtfMissingHigherTimeframe),
-      "Missing HTF",
+      "Missing Higher Timeframe",
       "missing",
       "1d",
     );
@@ -1690,7 +1690,7 @@ export function MtfScreenerControls({
           onClick={onClear}
           className="terminal-mini-action h-6 px-2"
         >
-          Clear
+          Clear Filters
         </button>
       </div>
 
@@ -1698,7 +1698,7 @@ export function MtfScreenerControls({
         <section>
           <label className="block">
             <span className="mb-0.5 block text-[9px] font-semibold uppercase text-[var(--muted)]">
-              Symbol
+              Search Symbol
             </span>
             <input
               type="search"
@@ -1721,7 +1721,7 @@ export function MtfScreenerControls({
 
         <section className="border-t border-[var(--border)] pt-1.5">
           <h3 className="mb-1 text-[9px] font-semibold uppercase text-[var(--muted)]">
-            State
+            Research Group
           </h3>
           <div className="grid grid-cols-2 gap-1">
             {MTF_SCREENER_TIMEFRAMES.map((timeframe) => (
@@ -1752,7 +1752,7 @@ export function MtfScreenerControls({
 
         <section className="border-t border-[var(--border)] pt-1.5">
           <h3 className="mb-1 text-[9px] font-semibold uppercase text-[var(--muted)]">
-            Min Score
+            Rank Score
           </h3>
           <div className="grid grid-cols-2 gap-1">
             {MTF_SCREENER_TIMEFRAMES.map((timeframe) => (
@@ -1776,7 +1776,7 @@ export function MtfScreenerControls({
 
         <section className="border-t border-[var(--border)] pt-1.5">
           <h3 className="mb-1 text-[9px] font-semibold uppercase text-[var(--muted)]">
-            Risk
+            Risk Context
           </h3>
           <label className="flex items-center gap-1.5 text-[10px] text-[var(--muted)]">
             <input
@@ -1785,7 +1785,7 @@ export function MtfScreenerControls({
               onChange={() => onExcludeRiskChange("exclude1dRisk")}
               className="accent-[var(--accent)]"
             />
-            Exclude 1d risk
+            Exclude 1d risk context
           </label>
           <label className="mt-1 flex items-center gap-1.5 text-[10px] text-[var(--muted)]">
             <input
@@ -1794,7 +1794,7 @@ export function MtfScreenerControls({
               onChange={() => onExcludeRiskChange("exclude1wRisk")}
               className="accent-[var(--accent)]"
             />
-            Exclude 1w risk
+            Exclude 1w risk context
           </label>
         </section>
 
@@ -1832,7 +1832,7 @@ export function MtfScreenerExportControls({
         disabled={visibleRowsCount === 0}
         className={buttonClass}
       >
-        {variant === "terminal" ? "Export Visible" : "Export Visible Rows"}
+        {variant === "terminal" ? "Export Screener" : "Export Screener Rows"}
       </button>
       <button
         type="button"
@@ -1840,7 +1840,7 @@ export function MtfScreenerExportControls({
         disabled={allRowsCount === 0}
         className={buttonClass}
       >
-        {variant === "terminal" ? "Export All" : "Export All Joined Rows"}
+        {variant === "terminal" ? "Export All Snapshots" : "Export All Joined Snapshots"}
       </button>
     </div>
   );
@@ -1850,7 +1850,7 @@ function MtfStatePanel({ message }: { message: string }) {
   return (
     <section className="terminal-state-panel is-center xl:flex-1">
       <h2 className="text-sm font-semibold text-[var(--foreground)]">
-        Screener state
+        Multi-Timeframe Screener
       </h2>
       <p className="mt-1 max-w-md text-[12px] leading-5 text-[var(--muted)]">
         {message}
@@ -1944,7 +1944,7 @@ function TimeframeHeaderCells({
         onSortChange={onSortChange}
         className="sticky top-6 z-20 w-[84px] border-l border-[var(--table-group)] bg-[var(--table-header)]"
       >
-        State
+        Group
       </DataTableHeaderCell>
       <DataTableHeaderCell
         sortKey={`${timeframe}_rank`}
@@ -1954,7 +1954,7 @@ function TimeframeHeaderCells({
         align="right"
         className="sticky top-6 z-20 w-[58px] bg-[var(--table-header)]"
       >
-        Score
+        Rank Score
       </DataTableHeaderCell>
     </>
   );
@@ -2261,8 +2261,8 @@ function HigherTimeframeHealthCell({ row }: { row: MtfScreenerRow }) {
 
 function formatMtfHigherTimeframeHealthLabel(label: string) {
   return label
-    .replace("Higher TF ", "")
-    .replace("Limited HTF Data", "Limited data");
+    .replace("Higher-Timeframe ", "")
+    .replace("Limited Higher-Timeframe Data", "Limited data");
 }
 
 function PrimarySignalCell({
@@ -2280,9 +2280,9 @@ function PrimarySignalCell({
     return (
       <div
         className="text-[11px] text-[var(--muted-2)]"
-        title={dictionary.scannerResultFallback.noLatestSignal}
+        title="No latest ranking result"
       >
-        {dictionary.scannerResultFallback.noLatestSignal}
+        No latest ranking result
       </div>
     );
   }
@@ -2444,9 +2444,9 @@ function ResearchLink({ row }: { row: MtfScreenerRow }) {
     <Link
       href={buildMtfSymbolResearchHref({ row, timeframe })}
       title={`Open ${timeframe} research for ${row.symbol}`}
-      className="terminal-mini-action is-accent min-w-[64px] gap-1 px-1.5 py-0.5 underline-offset-2 hover:underline"
+      className="terminal-mini-action is-accent min-w-[104px] gap-1 px-1.5 py-0.5 underline-offset-2 hover:underline"
     >
-      <span>Open</span>
+      <span>Open Research</span>
       <span className="font-mono uppercase">{timeframe}</span>
     </Link>
   );
@@ -2455,7 +2455,7 @@ function ResearchLink({ row }: { row: MtfScreenerRow }) {
 function getMtfErrorMessage(error: unknown) {
   return error instanceof Error && error.message
     ? error.message
-    : "Unable to load multi-timeframe screener data.";
+    : "Unable to load research snapshot.";
 }
 
 export function areMtfScreenerFiltersDefault(filters: MtfScreenerFilters) {
@@ -2478,7 +2478,7 @@ export function getActiveMtfFilterLabels(
   const normalizedSearch = symbolSearch.trim();
 
   if (normalizedSearch) {
-    labels.push(`Search ${normalizedSearch}`);
+    labels.push(`Search Symbol ${normalizedSearch}`);
   }
 
   for (const timeframe of MTF_SCREENER_TIMEFRAMES) {
@@ -2493,16 +2493,16 @@ export function getActiveMtfFilterLabels(
     }
 
     if (minRank > 0) {
-      labels.push(`${timeframe} rank >= ${minRank}`);
+      labels.push(`${timeframe} Rank Score >= ${minRank}`);
     }
   }
 
   if (filters.exclude1dRisk) {
-    labels.push("Exclude 1d risk");
+    labels.push("Exclude 1d risk context");
   }
 
   if (filters.exclude1wRisk) {
-    labels.push("Exclude 1w risk");
+    labels.push("Exclude 1w risk context");
   }
 
   return labels;

@@ -73,15 +73,17 @@ describe("WatchlistPageClient", () => {
     expect(html).toContain("Selected");
     expect(html).toContain("Found");
     expect(html).toContain("Missing");
-    expect(html).toContain("Attention");
+    expect(html).toContain("Active Candidates");
+    expect(html).toContain("Research Watch");
     expect(html).toContain("Watch / Repair");
     expect(html).toContain("Risk First");
     expect(html).toContain("Data Gaps");
     expect(html).not.toContain("Best Research Candidates");
+    expect(html).toContain("Watchlist Results");
     expect(html).toContain("Selected Symbols");
     expect(html).toContain("BTCUSDT");
     expect(html).toContain("SEIUSDT");
-    expect(html).toContain("State + Rank");
+    expect(html).toContain("Research Group + Rank Score");
     expect(html).toContain("4h");
     expect(html).toContain("72.5");
     expect(html).toContain("Not found");
@@ -114,8 +116,9 @@ describe("WatchlistPageClient", () => {
     );
 
     expect(html).toContain("Not returned");
-    expect(html).toContain("1h Research");
-    expect(html).toContain("1d Research");
+    expect(html).toContain("Open Research");
+    expect(html).toContain("timeframe=1h");
+    expect(html).toContain("timeframe=1d");
     expect(html).toContain(
       'href="/symbol/binance/SEIUSDT?timeframe=1h&amp;assetClass=crypto&amp;from=watchlist"',
     );
@@ -186,6 +189,7 @@ describe("WatchlistPageClient", () => {
     expect(html).toContain("Market context unavailable");
     expect(html).toContain("BTCUSDT");
     expect(html).toContain("ETHUSDT");
+    expect(html).toContain("Watchlist Results");
     expect(html).toContain("Selected Symbols");
   });
 
@@ -207,7 +211,7 @@ describe("WatchlistPageClient", () => {
     );
 
     expect(html).toContain("Remove");
-    expect(html.match(/<button[^>]*>Remove<\/button>/g)).toHaveLength(2);
+    expect(html.match(/>Remove from Watchlist<\/button>/g)).toHaveLength(2);
   });
 
   it("renders table-header sort controls for data columns", () => {
@@ -244,8 +248,8 @@ describe("WatchlistPageClient", () => {
     expect(html).toContain("4h");
     expect(html).toContain("1d");
     expect(html).toContain("1w");
-    expect(html).toContain("Primary");
-    expect(html).toContain("Attention");
+    expect(html).toContain("Research Group + Rank Score");
+    expect(html).toContain("Risk Context");
     expect(html).not.toContain('data-sort-key="research"');
     expect(html).not.toContain('data-sort-key="remove"');
   });
@@ -283,9 +287,9 @@ describe("WatchlistPageClient", () => {
 
     expect(railHtml).toContain("Symbols");
     expect(railHtml).toContain("Filters");
-    expect(railHtml).toContain("Import / Export");
-    expect(railHtml).toContain("Paste symbols");
-    expect(railHtml).toContain("Copy current list");
+    expect(railHtml).toContain("Import / Export Watchlist");
+    expect(railHtml).toContain("Paste Symbols");
+    expect(railHtml).toContain("Copy Watchlist");
     expect(detailsTag).not.toMatch(/\sopen(?:=|\s|>)/);
     expect(railHtml).not.toContain("Sort");
     expect(railHtml).not.toContain("sort controls");
@@ -348,14 +352,15 @@ describe("WatchlistPageClient", () => {
 
     expect(html).toContain("terminal-command-bar");
     expect(html).toContain("terminal-command-title");
-    expect(html).toContain("WATCHLIST");
+    expect(html).toContain("Watchlist");
+    expect(html).toContain("Latest Snapshot");
     expect(html).toContain("Visible");
     expect(html).toContain("Selected");
     expect(html).toContain("Found");
     expect(html).toContain("Missing");
-    expect(html).toContain("HTF Risk");
+    expect(html).toContain("Higher Timeframe Risk");
     expect(html).toContain("Broad Risk");
-    expect(html).toContain('aria-label="Mock data"');
+    expect(html).toContain('aria-label="Visual Check Data"');
     expect(html).not.toContain("Watchlist Multi-Timeframe");
     expect(html).not.toContain("<dl");
   });
@@ -395,7 +400,7 @@ describe("WatchlistPageClient", () => {
     expect(html).toContain("Watch");
     expect(html).toContain("Not found");
     expect(html).toContain("Not returned");
-    expect(html).toContain("4h Research");
+    expect(html).toContain("Open Research");
     expect(html).not.toContain("Show More");
     expect(html).not.toContain("show more");
   });

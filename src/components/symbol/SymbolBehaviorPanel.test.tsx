@@ -9,7 +9,7 @@ import type {
 } from "./symbolBehaviorUi";
 
 describe("SymbolBehaviorPanel", () => {
-  it("renders available historical behavior data", () => {
+  it("renders available behavior data", () => {
     const html = renderToStaticMarkup(
       createElement(SymbolBehaviorPanel, {
         behavior: makeBehavior(),
@@ -17,7 +17,7 @@ describe("SymbolBehaviorPanel", () => {
       }),
     );
 
-    expect(html).toContain("Historical Behavior");
+    expect(html).toContain("Behavior");
     expect(html).toContain("How similar prior ranking results behaved");
     expect(html).toContain("for this symbol and timeframe only");
     expect(html).toContain("Behavior Readout");
@@ -27,13 +27,13 @@ describe("SymbolBehaviorPanel", () => {
     expect(html).toContain("Horizon Agreement");
     expect(html).toContain("Historical Bias");
     expect(html).toContain(
-      "Prior similar signals tended to show constructive follow-through",
+      "Prior similar ranking results tended to show constructive follow-through",
     );
     expect(html).toContain("Sample Quality");
     expect(html).toContain("Limited sample");
     expect(html).toContain("Treat as research context while the sample grows.");
     expect(html).not.toContain("Limited but usable sample");
-    expect(html).toContain("Historical Follow-through Evaluation");
+    expect(html).toContain("Behavior Evaluation");
     expect(html).toContain("Upside follow-through observed");
     expect(html).toContain("Same symbol / same timeframe / similar ranking context");
     expect(html).toContain("11 completed forward observations");
@@ -41,13 +41,13 @@ describe("SymbolBehaviorPanel", () => {
     expect(html).toContain("Sample size");
     expect(html).toContain("Forward horizon observations");
     expect(html).toContain("1 candle");
-    expect(html).toContain("Avg Return");
+    expect(html).toContain("Avg Change");
     expect(html).toContain("+1.20%");
     expect(html).toContain("Current context");
     expect(html).toContain("Eligible");
     expect(html).toContain("Confirmed");
     expect(html).toContain("Strong Trend");
-    expect(html).toContain("Recent outcomes");
+    expect(html).toContain("Recent Observations");
     expect(html).toContain("Showing 6 of 6 recent observations");
     expect(html).not.toContain(
       "Several recent observations are close together in time",
@@ -63,12 +63,12 @@ describe("SymbolBehaviorPanel", () => {
     );
 
     expect(html).toContain(
-      "No prior matching signals",
+      "No prior matching ranking results",
     );
-    expect(html).toContain("No prior matching signals were found yet");
+    expect(html).toContain("No prior matching ranking results were found yet");
     expect(html).not.toContain("Behavior Readout");
     expect(html).not.toContain("Sample Quality");
-    expect(html).toContain("Historical Follow-through Evaluation");
+    expect(html).toContain("Behavior Evaluation");
     expect(html).toContain(
       "Not enough completed forward candles for follow-through evaluation.",
     );
@@ -83,7 +83,7 @@ describe("SymbolBehaviorPanel", () => {
       }),
     );
 
-    expect(html).toContain("No current latest signal");
+    expect(html).toContain("No current latest ranking result");
     expect(html).toContain("Current coverage: 146 / 200 required candles.");
   });
 
@@ -178,7 +178,7 @@ describe("SymbolBehaviorPanel", () => {
     expect(html).toContain(
       "Recent observations appear clustered close together in time.",
     );
-    expect(html).toContain("Historical Follow-through Evaluation");
+    expect(html).toContain("Behavior Evaluation");
     expect(html).not.toContain(
       "Some recent observations appear clustered and may reflect development or non-scheduled runs.",
     );
@@ -218,12 +218,12 @@ describe("SymbolBehaviorPanel", () => {
     expect(html).toContain("Very limited sample");
     expect(html).toContain("Production history is still accumulating.");
     expect(html).toContain(
-      "Longer-horizon outcomes are still incomplete.",
+      "Longer-horizon observations are still incomplete.",
     );
     expect(html).toContain(
       "Clustered recent observations are close together in time.",
     );
-    expect(html).toContain("Historical Follow-through Evaluation");
+    expect(html).toContain("Behavior Evaluation");
     expect(html).not.toContain(
       "Very limited sample: more completed forward candles are needed.",
     );
@@ -271,8 +271,8 @@ function makeDiagnostics(
     ? "ok"
     : "unknown",
   message = available
-    ? "Historical behavior is available."
-    : "Historical behavior is not available.",
+    ? "Behavior is available."
+    : "Behavior is not available.",
 ): SymbolBehaviorDiagnostics {
   return { available, reason, message };
 }

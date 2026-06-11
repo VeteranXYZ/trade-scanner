@@ -290,7 +290,7 @@ export function LatestRankingsPageClient({
     const link = document.createElement("a");
 
     link.href = url;
-    link.download = `scanner-${timeframe}-${assetClass}.csv`;
+    link.download = `vegarank-rankings-${getCsvDateStamp()}.csv`;
     link.click();
     URL.revokeObjectURL(url);
   };
@@ -347,18 +347,18 @@ export function LatestRankingsPageClient({
 
           {hasUnavailableData ? (
             <StatePanel
-              title="Rankings unavailable"
-              message="API unavailable · latest rankings not loaded. Try Refresh or check API."
+              title="Unable to load rankings."
+              message="Try refreshing the page or adjusting filters."
             />
           ) : isLoading ? (
             <StatePanel
-              title="Loading latest rankings"
-              message="Fetching latest ranking results."
+              title="Loading rankings..."
+              message="Loading the latest ranking results."
             />
           ) : !data?.run || returnedItems === 0 ? (
             <StatePanel
-              title="No latest rankings"
-              message="No results matched the current ranking filters."
+              title="No ranking results found."
+              message="No symbols match the current filters."
             />
           ) : (
             <LatestRankingsResultsTable
@@ -426,7 +426,7 @@ function LatestRankingsCommandBar({
             tone="accent"
           />
           <LatestRankingsCommandStat
-            label="Asset"
+            label="Asset Class"
             value={assetClass.toUpperCase()}
             tone="neutral"
           />
@@ -441,7 +441,7 @@ function LatestRankingsCommandBar({
             tone={run ? "complete" : "missing"}
           />
           <LatestRankingsCommandStat
-            label="Shown"
+            label="Ranked Universe"
             value={`${formatInteger(returnedItems)}/${formatInteger(totalSignals)}`}
             tone={returnedItems > 0 ? "complete" : "missing"}
           />
@@ -453,13 +453,13 @@ function LatestRankingsCommandBar({
             disabled={!canExport}
             className="terminal-command-action disabled:cursor-not-allowed disabled:opacity-55"
           >
-            Export CSV
+            Export Rankings
           </button>
           <RefreshIconButton
             onClick={onRefresh}
             disabled={isRefreshing}
             isRefreshing={isRefreshing}
-            label="Refresh"
+            label="Refresh Rankings"
           />
         </div>
       </div>
@@ -517,7 +517,7 @@ function LatestRankingsControls({
   return (
     <aside className="terminal-rail p-2 xl:h-full xl:min-h-0 xl:overflow-y-auto">
       <h2 className="terminal-panel-title mb-2">
-        Controls
+        Active Filters
       </h2>
       <div className="grid gap-2 text-xs text-[var(--muted)] sm:grid-cols-2 xl:grid-cols-1">
         <ControlSection title="Scope">
@@ -561,7 +561,7 @@ function LatestRankingsControls({
 
           <label className="block">
             <span className="mb-1 block text-[11px] uppercase tracking-wide">
-              API Limit
+              Result Limit
             </span>
             <select
               value={limit}
@@ -589,7 +589,7 @@ function LatestRankingsControls({
             />
             <span>
               <span className="block text-[11px] font-semibold uppercase tracking-wide text-[var(--foreground)]">
-                Include low quality
+                Show Low Quality
               </span>
             </span>
           </label>
@@ -627,11 +627,11 @@ function LatestRankingsSummaryPanel({
     <section className="terminal-panel px-2 py-1">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="flex min-w-0 flex-wrap items-center gap-1.5">
-          <span className="terminal-command-label">Run Summary</span>
+          <span className="terminal-command-label">Ranking Summary</span>
           <CompactMetric label="Universe" value={formatInteger(run?.symbolsTotal)} />
           <CompactMetric label="Reviewed" value={formatInteger(run?.symbolsScanned)} />
           <CompactMetric
-            label="Signals"
+            label="Results"
             value={formatInteger(run?.signalsCreated ?? totalSignals)}
           />
           <CompactMetric label="Skipped" value={formatInteger(run?.symbolsSkipped)} />
@@ -648,7 +648,7 @@ function LatestRankingsSummaryPanel({
           <StatusBadge tone="accent">{timeframe.toUpperCase()}</StatusBadge>
           <StatusBadge tone="neutral">{assetClass.toUpperCase()}</StatusBadge>
           {!includeLowQuality ? (
-            <StatusBadge tone="neutral">Low quality excluded</StatusBadge>
+            <StatusBadge tone="neutral">Low Quality Excluded</StatusBadge>
           ) : null}
           <StatusBadge tone={finishedAt ? "neutral" : "missing"}>
             Finished {formatCompactDateTime(finishedAt)}
@@ -756,8 +756,8 @@ function LatestRankingsResultsTable({
         </div>
         <div className="min-w-0 shrink-0">
           <div className="flex flex-wrap items-center gap-1.5">
-            <h2 className="terminal-panel-title">
-              Latest Ranking Rows
+              <h2 className="terminal-panel-title">
+              Ranking Results
             </h2>
             <StatusBadge tone="accent" className="text-[10px]">
               {formatInteger(rows.length)} rows
@@ -802,7 +802,7 @@ function LatestRankingsResultsTable({
                 onSortChange={onSortChange}
                 className="w-[146px]"
               >
-                Signal
+                Research Group
               </DataTableHeaderCell>
               <DataTableHeaderCell
                 sortKey="action"
@@ -810,7 +810,7 @@ function LatestRankingsResultsTable({
                 onSortChange={onSortChange}
                 className="w-[150px]"
               >
-                Action
+                Research Priority
               </DataTableHeaderCell>
               <DataTableHeaderCell
                 sortKey="setup"
@@ -818,7 +818,7 @@ function LatestRankingsResultsTable({
                 onSortChange={onSortChange}
                 className="w-[138px]"
               >
-                Setup Type
+                Setup
               </DataTableHeaderCell>
               <DataTableHeaderCell
                 sortKey="quality"
@@ -826,7 +826,7 @@ function LatestRankingsResultsTable({
                 onSortChange={onSortChange}
                 className="w-[92px]"
               >
-                Quality
+                Evidence Quality
               </DataTableHeaderCell>
               <DataTableHeaderCell
                 sortKey="price"
@@ -840,10 +840,10 @@ function LatestRankingsResultsTable({
               </DataTableHeaderCell>
               {showCandleTimeColumn ? (
                 <DataTableHeaderCell className="w-[154px]">
-                  Candle Time
+                  Updated
                 </DataTableHeaderCell>
               ) : null}
-              <DataTableHeaderCell className="w-[86px]">Details</DataTableHeaderCell>
+              <DataTableHeaderCell className="w-[96px]">View Details</DataTableHeaderCell>
             </tr>
           </thead>
           <tbody>
@@ -994,7 +994,7 @@ function LatestRankingsRow({
           onClick={onToggleDetails}
           className="terminal-mini-action is-accent h-6 px-2"
         >
-          {isExpanded ? "Hide" : "Details"}
+          {isExpanded ? "Close" : "View Details"}
         </button>
       </DataTableCell>
     </tr>
@@ -1044,27 +1044,27 @@ function LatestRankingsDetails({
 
   return (
     <div className="grid gap-3 text-[11px] leading-5 text-[var(--muted)] md:grid-cols-2 xl:grid-cols-3">
-      <DetailBlock title="Reason Codes">
+      <DetailBlock title="Research Reasons">
         <TextList values={reasonLines} />
       </DetailBlock>
-      <DetailBlock title="Candle Context">
+      <DetailBlock title="Snapshot Context">
         <TextList
           values={[
             `Candles: ${formatInteger(item.metrics.historyBars)}`,
-            `Candle Time: ${formatDateTime(item.candleOpenTime)}`,
+            `Updated: ${formatDateTime(item.candleOpenTime)}`,
           ]}
         />
       </DetailBlock>
       <DetailBlock title="Score Breakdown">
         <ScoreBreakdown item={item} />
       </DetailBlock>
-      <DetailBlock title="Quality Flags">
+      <DetailBlock title="Evidence Quality">
         <TokenList values={qualityLabels} empty="None" />
       </DetailBlock>
-      <DetailBlock title="Signal Codes">
+      <DetailBlock title="Research Codes">
         <TokenList values={signalLabels} empty="None" />
       </DetailBlock>
-      <DetailBlock title="Risk Codes">
+      <DetailBlock title="Risk Context">
         <TokenList values={riskLabels} empty="None" />
       </DetailBlock>
       <DetailBlock title="Quality Codes">
@@ -1079,7 +1079,7 @@ function LatestRankingsDetails({
           ]}
         />
       </DetailBlock>
-      <DetailBlock title="Selected Metrics / Factors">
+      <DetailBlock title="Selected Metrics">
         <TextList values={metricLines} />
       </DetailBlock>
     </div>
@@ -1186,19 +1186,23 @@ function formatCodeExplanationLines(codes: string[], language: Language) {
 function formatLatestRankingsMetricLines(metrics: LatestRankingItem["metrics"]) {
   return [
     ["Rank", formatScore(metrics.rankScore)],
-    ["Final", formatScore(metrics.finalSignalScore)],
-    ["Opportunity", formatScore(metrics.opportunityScore)],
+    ["Risk-Adjusted Score", formatScore(metrics.finalSignalScore)],
+    ["Setup Quality", formatScore(metrics.opportunityScore)],
     ["Confirmation", formatScore(metrics.confirmationScore)],
     ["Risk", formatScore(metrics.riskScore)],
     ["Trend", formatScore(metrics.trendScore)],
     ["Momentum", formatScore(metrics.momentumScore)],
-    ["Volume", formatScore(metrics.volumeScore)],
+    ["Liquidity", formatScore(metrics.volumeScore)],
     ["Structure", formatScore(metrics.structureScore)],
     ["RSI", formatScore(metrics.rsi14)],
     ["BB %", formatScore(metrics.bbPercent)],
     ["BB Width", formatScore(metrics.bbWidthPercentile)],
-    ["Volume Ratio", formatScore(metrics.volumeRatio)],
+    ["Volume / Liquidity", formatScore(metrics.volumeRatio)],
   ].map(([label, value]) => `${label}: ${value}`);
+}
+
+function getCsvDateStamp(date = new Date()) {
+  return date.toISOString().slice(0, 10);
 }
 
 function getSharedLatestRankingsCandleTime(rows: LatestRankingsTableRow[]) {
@@ -1338,17 +1342,17 @@ function formatLatestRankingsCsv(
 ) {
   const headers = [
     "Symbol",
-    "Rank",
+    "Rank Score",
     "Group Code",
-    "Signal Codes",
-    "Action Code",
+    "Research Codes",
+    "Research Priority Code",
     "Setup Code",
     "Risk Codes",
     "Reason Codes",
     "Quality Codes",
     "Price",
-    "Candle Time",
-    "Scanner Version",
+    "Updated",
+    "Ranking Engine Version",
     "Code Schema Version",
     "Dictionary Version",
   ];

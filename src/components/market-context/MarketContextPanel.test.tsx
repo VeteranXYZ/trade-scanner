@@ -73,7 +73,7 @@ describe("MarketContextPanel", () => {
             description: "Backend summary.",
             researchPosture: "constructive",
             keyPoints: ["ETH confirmation: confirms constructive context."],
-            warnings: ["Research-only context. Not a trading signal."],
+            warnings: ["Research-only. Not trading advice."],
           },
         }),
       }),
@@ -146,7 +146,7 @@ function makeMarketContextResponse(
         "BTC 4h tactical context: short term weakness.",
         "ETH confirmation: confirms broader risk.",
       ],
-      warnings: ["Research-only context. Not a trading signal."],
+      warnings: ["Research-only. Not trading advice."],
     },
     rules: {
       researchOnly: true,

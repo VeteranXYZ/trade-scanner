@@ -449,7 +449,7 @@ function buildWarnings({
     warnings.push("Some proxy timeframe data is unavailable.");
   }
 
-  warnings.push("Research-only context. Not a trading signal.");
+  warnings.push("Research-only. Not trading advice.");
 
   return warnings;
 }

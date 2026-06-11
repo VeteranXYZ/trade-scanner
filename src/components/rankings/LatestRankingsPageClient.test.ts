@@ -215,11 +215,11 @@ describe("LatestRankingsPageClient layout", () => {
     const html = renderLatestRankingsVisualPage();
 
     expect(html).toContain("terminal-command-title");
-    expect(html).toContain("Run Summary");
+    expect(html).toContain("Ranking Summary");
     expect(html).toContain("Group Counts");
-    expect(html).toContain("Latest Ranking Rows");
-    expect(html).toContain("Export CSV");
-    expect(html).toContain('aria-label="Refresh"');
+    expect(html).toContain("Ranking Results");
+    expect(html).toContain("Export Rankings");
+    expect(html).toContain('aria-label="Refresh Rankings"');
     expect(html).toContain('data-sort-key="symbol"');
     expect(html).toContain('data-sort-key="rank"');
     expect(html).toContain('data-sort-key="signal"');
@@ -234,7 +234,6 @@ describe("LatestRankingsPageClient layout", () => {
     expect(html).not.toContain("Copy symbols");
     expect(html).not.toContain(">Candle Time<");
     expect(html).not.toContain("Interpretation Key");
-    expect(html).not.toContain("Latest Ranking Summary");
     expect(html).not.toContain("Full Universe Size");
     expect(html).not.toContain("<details");
     expect(html).not.toMatch(/AM|PM|Jun 05/);

@@ -51,13 +51,13 @@ export function SymbolSignalTimeline({
               : "text-sm font-semibold"
           }
         >
-          {isRail ? "Timeline" : "Signal Timeline"}
+          {isRail ? "Timeline" : "Research Timeline"}
         </h2>
       </div>
 
       {items.length === 0 ? (
         <p className={isRail ? "text-[12px] text-[var(--muted)]" : "text-sm text-[var(--muted)]"}>
-          No recent signal timeline is available for this symbol.
+          No recent research timeline is available for this symbol.
         </p>
       ) : (
         <>
@@ -69,8 +69,8 @@ export function SymbolSignalTimeline({
                   : "mb-3 border border-[var(--border)] bg-[var(--panel-2)] px-3 py-2 text-xs text-[var(--muted)]"
               }
             >
-              Only the latest signal is available. More history will appear after future
-              scans.
+              Only the latest ranking result is available. More timeline rows will
+              appear after future ranking runs.
             </p>
           ) : null}
 
@@ -84,7 +84,7 @@ export function SymbolSignalTimeline({
             >
               {isRail
                 ? "Newer secondary rows exist."
-                : "Some newer history rows may come from non-preferred or smaller runs. Current classification uses the selected full-universe scan run."}
+                : "Some newer timeline rows may come from non-preferred or smaller runs. Current classification uses the selected full-universe ranking run."}
             </p>
           ) : null}
 
@@ -131,13 +131,13 @@ export function SymbolSignalTimeline({
                       Time
                     </th>
                     <th className="border-b border-[var(--border-medium)] px-2 py-1.5">
-                      State
+                      Research Group
                     </th>
                     <th className="border-b border-[var(--border-medium)] px-2 py-1.5">
-                      Signal
+                      Research Priority
                     </th>
                     <th className="border-b border-[var(--border-medium)] px-2 py-1.5 text-right">
-                      Rank
+                      Rank Score
                     </th>
                     <th className="border-b border-[var(--border-medium)] px-2 py-1.5">
                       Run Context

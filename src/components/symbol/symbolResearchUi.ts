@@ -417,14 +417,14 @@ export function getSymbolResearchScoreRows(scores: {
   structureScore?: number | null;
 }) {
   return [
-    { label: "Rank", value: formatSymbolResearchScore(scores.rankScore) },
-    { label: "Final Signal", value: formatSymbolResearchScore(scores.finalSignalScore) },
-    { label: "Setup Score", value: formatSymbolResearchScore(scores.opportunityScore) },
+    { label: "Rank Score", value: formatSymbolResearchScore(scores.rankScore) },
+    { label: "Risk-Adjusted Score", value: formatSymbolResearchScore(scores.finalSignalScore) },
+    { label: "Setup Quality", value: formatSymbolResearchScore(scores.opportunityScore) },
     { label: "Confirmation", value: formatSymbolResearchScore(scores.confirmationScore) },
     { label: "Risk", value: formatSymbolResearchScore(scores.riskScore) },
     { label: "Trend", value: formatSymbolResearchScore(scores.trendScore) },
     { label: "Momentum", value: formatSymbolResearchScore(scores.momentumScore) },
-    { label: "Volume", value: formatSymbolResearchScore(scores.volumeScore) },
+    { label: "Liquidity", value: formatSymbolResearchScore(scores.volumeScore) },
     { label: "Structure", value: formatSymbolResearchScore(scores.structureScore) },
   ];
 }
@@ -486,7 +486,7 @@ export function getTimeframeSnapshotTitle(itemCount: number) {
 
 export function getTimeframeSnapshotNote(timeframes: TimeframeSnapshotInput[]) {
   const base =
-    "Snapshot rows may use the selected full-universe signal for the requested timeframe and latest available full-universe signals for other timeframes.";
+    "Snapshot rows may use the selected full-universe ranking result for the requested timeframe and latest available full-universe ranking results for other timeframes.";
   const availabilityNote =
     "Unavailable or planned timeframes are omitted from this snapshot unless the API returns enough detail to explain them.";
 
@@ -561,7 +561,7 @@ export function buildResearchDecisionSummary({
       mtfContext,
       behaviorContext,
     }),
-    currentStance: `Selected ${timeframe} group is ${formatSymbolResearchGroup(group)}.`,
+    currentStance: `Selected ${timeframe} research group is ${formatSymbolResearchGroup(group)}.`,
     multiTimeframeAlignment: mtfContext.text,
     behaviorSupport: behaviorContext.text,
     confidenceNote: getResearchDecisionConfidenceNote({
@@ -586,7 +586,7 @@ export function buildSignalEvaluationReadout(
 ): SignalEvaluationReadout {
   if (!evaluation || evaluation.ok !== true) {
     return unavailableSignalEvaluationReadout(
-      "Signal evaluation is currently unavailable.",
+      "Validation context is currently unavailable.",
     );
   }
 
@@ -596,7 +596,7 @@ export function buildSignalEvaluationReadout(
 
   if (!horizons || !sample || selectedHorizon === null) {
     return unavailableSignalEvaluationReadout(
-      "No completed broad-market signal evaluation sample is available yet.",
+      "No completed broad-market validation sample is available yet.",
     );
   }
 
@@ -604,7 +604,7 @@ export function buildSignalEvaluationReadout(
 
   if (!selectedStats || toFiniteNumber(selectedStats.sampleSize) <= 0) {
     return unavailableSignalEvaluationReadout(
-      "No completed broad-market signal evaluation sample is available yet.",
+      "No completed broad-market validation sample is available yet.",
     );
   }
 
@@ -646,7 +646,7 @@ export function buildSignalEvaluationReadout(
   const caveats = [
     isLimitedSample ? "Sample is limited; use as research context only." : null,
     group === "overheated" && avgReturn !== null && medianReturn !== null && avgReturn > 0 && medianReturn < 0
-      ? "Median outcome leaned lower, while average was affected by large outliers."
+      ? "Median completed change leaned lower, while average was affected by large outliers."
       : null,
     contradictionMessage,
     evaluation.interpretation?.summary?.trim() || null,
@@ -686,7 +686,7 @@ export function buildSymbolResearchSummary(
         ...getFactorBullets(signal.factors, ["risk", "bearish", "bullish", "neutral"]),
         ...getRiskTypeBullets(signal.detectedRiskTypes, dictionary),
       ]).slice(0, 4),
-      "Current grouping reflects the selected VegaRank classification.",
+      "Current research group reflects the selected VegaRank classification.",
     ),
     nextConfirmation: withResearchFallback(
       uniqueResearchBullets(collectResearchText(signal.nextConfirmation)).slice(0, 3),
@@ -713,11 +713,11 @@ export function buildSymbolResearchDiagnostics({
   const hasHistory = (history?.length ?? 0) > 0;
   const hasLatestSignal = Boolean(latestSignal);
   const notice = !hasLatestSignal && hasHistory
-    ? "No selected current signal found; showing history only."
+    ? "No selected current result found; showing timeline only."
     : hasNewerSecondary
       ? "Newer secondary runs exist. Current classification uses selected full-universe run."
       : !hasHistory
-        ? "No recent signal history available."
+        ? "No recent research timeline available."
         : "Current classification uses the selected ranking run.";
 
   return {
@@ -892,7 +892,7 @@ export function buildSymbolResearchTimeframeAvailability({
       timeframe,
       status: "not_returned",
       isSelected,
-      reason: "No latest signal was returned for this timeframe.",
+      reason: "No latest ranking result was returned for this timeframe.",
       dictionary,
     });
   });
@@ -1281,11 +1281,11 @@ function getSignalEvaluationContradiction({
     normalizedLabel === "distribution_risk";
 
   if (isBullishLabel && status === "not_supportive_up") {
-    return "Historical evaluation does not support this bullish label in the current sample.";
+    return "Validation context does not support this positive label in the current sample.";
   }
 
   if (isRiskLabel && status === "supportive_down") {
-    return "Historical evaluation supports caution for this risk label.";
+    return "Validation context supports caution for this risk label.";
   }
 
   return null;
@@ -1375,7 +1375,7 @@ function formatSignalEvaluationWarnings(value: string[] | null | undefined) {
     .map((warning) => {
       switch (warning) {
         case "missing_future_candles":
-          return "Some recent signals do not have enough future candles yet.";
+          return "Some recent ranking results do not have enough future candles yet.";
         case "insufficient_completed_horizons":
           return "Longer horizons are still incomplete.";
         case "limited_sample":
@@ -1503,7 +1503,7 @@ function getResearchDecisionBehaviorContext({
   if (!behaviorReadout || behaviorDiagnostics?.available === false) {
     return {
       status: "unavailable",
-      text: "Historical behavior context is unavailable.",
+      text: "Behavior context is unavailable.",
     };
   }
 
@@ -1512,21 +1512,21 @@ function getResearchDecisionBehaviorContext({
   if (label === "Insufficient sample" || sampleQuality?.hasVerySmallSample) {
     return {
       status: "insufficient",
-      text: "Historical behavior sample is insufficient.",
+      text: "Behavior sample is insufficient.",
     };
   }
 
   if (label === "Downside continuation tendency") {
     return {
       status: "cautionary",
-      text: "Cautionary: prior similar risk signals tended to continue lower in this sample.",
+      text: "Cautionary: prior similar risk results tended to continue lower in this sample.",
     };
   }
 
   if (label === "Weak follow-through") {
     return {
       status: "cautionary",
-      text: "Cautionary: prior similar signals did not consistently follow through in this sample.",
+      text: "Cautionary: prior similar results did not consistently follow through in this sample.",
     };
   }
 
@@ -1536,7 +1536,7 @@ function getResearchDecisionBehaviorContext({
   ) {
     return {
       status: "supportive",
-      text: "Supportive: prior similar signals showed constructive follow-through in this sample.",
+      text: "Supportive: prior similar results showed constructive follow-through in this sample.",
     };
   }
 
@@ -1634,11 +1634,11 @@ function getResearchDecisionConfidenceNote({
   }
 
   if (behaviorDiagnostics?.available === false) {
-    return "Historical behavior context is unavailable.";
+    return "Behavior context is unavailable.";
   }
 
   if (behaviorContext.status === "insufficient") {
-    return "Historical behavior sample is insufficient.";
+    return "Behavior sample is insufficient.";
   }
 
   return behaviorReadout?.sampleConfidenceLabel
@@ -1682,7 +1682,7 @@ function getResearchDecisionKeyCaution({
     behaviorContext.status === "insufficient" ||
     behaviorContext.status === "unavailable"
   ) {
-    return "Historical behavior context is limited.";
+    return "Behavior context is limited.";
   }
 
   if (sampleQuality?.hasNonPreferredRuns) {
@@ -1771,8 +1771,8 @@ function getSetupBullets(
 
 function getScoreContextBullets(signal: ResearchSummarySignalInput) {
   const scores = [
-    ["Rank", signal.rankScore],
-    ["Setup Score", signal.opportunityScore],
+    ["Rank Score", signal.rankScore],
+    ["Setup Quality", signal.opportunityScore],
     ["Confirmation", signal.confirmationScore],
     ["Risk", signal.riskScore],
   ]
