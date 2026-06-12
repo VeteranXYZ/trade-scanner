@@ -621,6 +621,14 @@ export function ArchivePageClient({
     selectedRunFromList?.signalsCreated ??
     rows.length;
   const selectedRun = snapshotData?.run ?? selectedRunFromList;
+  const observationSummary = buildArchiveObservationSummary({
+    response: effectiveObservationData,
+    uiState: forwardObservationUiState,
+  });
+  const readyContextNote = getForwardObservationReadyContextNote({
+    uiState: forwardObservationUiState,
+    readiness: readinessData ?? null,
+  });
 
   return (
     <PageShell className="archive-terminal max-w-none xl:h-full xl:min-h-0 xl:overflow-hidden">
@@ -640,11 +648,68 @@ export function ArchivePageClient({
         onRefresh={refreshData}
       />
       <p className="mb-1 text-[11px] leading-4 text-[var(--muted)]">
-        Browse stored runs and snapshots to review how setups evolved over time.
-        Use it to revisit prior structures and compare what followed.
+        Research-only. Not trading advice. Review stored runs, future-window
+        maturity, and source rows from prior VegaRank snapshots.
       </p>
 
-      <div className="grid min-h-0 flex-1 gap-2 xl:grid-cols-[260px_minmax(0,1fr)] xl:overflow-hidden">
+      <div className="grid min-h-0 flex-1 gap-2 xl:grid-cols-[minmax(0,1fr)_260px] xl:overflow-hidden">
+        <main className="order-1 min-w-0 space-y-2 xl:flex xl:min-h-0 xl:flex-col xl:overflow-y-auto xl:pr-1">
+          <SelectedRunSummaryPanel
+            selectedRun={selectedRun}
+            rowCount={snapshotData?.metadata.rowCount ?? selectedRun?.signalsCreated ?? null}
+            assetClass={snapshotData?.metadata.assetClass ?? assetClass}
+          />
+
+          <ArchiveValidationOverview
+            window={observationWindow}
+            onWindowChange={setObservationWindow}
+            response={effectiveObservationData}
+            readiness={readinessData ?? null}
+            uiState={forwardObservationUiState}
+            selectedRun={selectedRun}
+            isRequested={shouldLoadObservationRows}
+            snapshotError={
+              shouldLoadSnapshotRows && !isVisualCheck && snapshotQuery.isError
+                ? formatQueryError(snapshotQuery.error)
+                : null
+            }
+            snapshotIsLoading={
+              shouldLoadSnapshotRows &&
+              !isVisualCheck &&
+              snapshotQuery.isLoading &&
+              selectedRunId !== null
+            }
+            observationSummary={observationSummary}
+          />
+
+          <SnapshotTable
+            rows={rows}
+            selectedRunId={selectedRunId}
+            rowCountEstimate={selectedRun?.signalsCreated ?? null}
+            observationRows={effectiveObservationData?.rows ?? emptyHistoricalObservationRows}
+            observationRunId={effectiveObservationData?.run.runId ?? null}
+            observationWindow={observationWindow}
+            isRequested={shouldLoadSnapshotRows}
+            isLoading={!isVisualCheck && snapshotQuery.isFetching}
+            isError={!isVisualCheck && snapshotQuery.isError}
+            errorMessage={
+              !isVisualCheck && snapshotQuery.isError
+                ? formatQueryError(snapshotQuery.error)
+                : null
+            }
+          />
+
+          {shouldLoadObservationRows ? (
+            <ArchiveDetails
+              readiness={readinessData ?? null}
+              response={effectiveObservationData}
+              uiState={forwardObservationUiState}
+              summary={observationSummary}
+              readyContextNote={readyContextNote}
+            />
+          ) : null}
+        </main>
+
         <RecentSuccessfulRunsPanel
           timeframe={timeframe}
           snapshots={snapshots}
@@ -662,45 +727,8 @@ export function ArchivePageClient({
           }
           isLoading={!isVisualCheck && snapshotsQuery.isLoading}
           onSelectRun={setManualSelectedRunId}
-          className="order-2 xl:order-1"
+          className="order-2"
         />
-
-        <main className="order-1 min-w-0 space-y-2 xl:order-2 xl:flex xl:min-h-0 xl:flex-col xl:overflow-hidden">
-          <ForwardObservationSection
-            window={observationWindow}
-            onWindowChange={setObservationWindow}
-            response={effectiveObservationData}
-            readiness={readinessData}
-            uiState={forwardObservationUiState}
-            selectedRun={selectedRun}
-            isRequested={shouldLoadObservationRows}
-            snapshotError={
-              shouldLoadSnapshotRows && !isVisualCheck && snapshotQuery.isError
-                ? formatQueryError(snapshotQuery.error)
-                : null
-            }
-            snapshotIsLoading={
-              shouldLoadSnapshotRows &&
-              !isVisualCheck &&
-              snapshotQuery.isLoading &&
-              selectedRunId !== null
-            }
-          />
-
-          <SnapshotTable
-            rows={rows}
-            selectedRunId={selectedRunId}
-            rowCountEstimate={selectedRun?.signalsCreated ?? null}
-            isRequested={shouldLoadSnapshotRows}
-            isLoading={!isVisualCheck && snapshotQuery.isFetching}
-            isError={!isVisualCheck && snapshotQuery.isError}
-            errorMessage={
-              !isVisualCheck && snapshotQuery.isError
-                ? formatQueryError(snapshotQuery.error)
-                : null
-            }
-          />
-        </main>
       </div>
     </PageShell>
   );
@@ -877,7 +905,7 @@ export function RecentSuccessfulRunsPanel({
           </StatusBadge>
         </div>
         <p className="terminal-panel-subtitle text-[9px]">
-          Selected Run
+          Stored run selector
         </p>
       </div>
       {isError ? (
@@ -917,15 +945,12 @@ export function RecentSuccessfulRunsPanel({
                 aria-label={`Select stored run ${run.runId}`}
                 className={formatRecentRunCardClassName(run, isSelected)}
               >
-                <div className="flex min-w-0 items-center gap-1">
-                  <span
-                    className="min-w-0 truncate font-mono text-[11px] font-semibold text-[var(--foreground)]"
-                    title={run.runId}
-                  >
-                    {formatCompactRunId(run.runId)}
-                  </span>
+                <div className="flex min-w-0 flex-wrap items-center gap-1">
                   <span className="shrink-0 border border-[var(--border)] bg-[var(--panel-muted)] px-1 py-0 text-[9px] font-semibold uppercase leading-4 text-[var(--muted)]">
                     {run.timeframe.toUpperCase()}
+                  </span>
+                  <span className="min-w-0 truncate font-mono text-[10px] font-semibold text-[var(--foreground)]">
+                    Completed {formatArchiveDateTime(run.finishedAt)}
                   </span>
                   {badges.length > 0
                     ? badges.map((badge) => (
@@ -941,7 +966,6 @@ export function RecentSuccessfulRunsPanel({
                     : null}
                 </div>
                 <div className="mt-0.5 flex min-w-0 flex-wrap items-center gap-x-2 gap-y-0.5 text-[10px] leading-4 text-[var(--muted)]">
-                  <span className="font-mono">{formatArchiveDateTime(run.finishedAt)}</span>
                   <span>{formatCount(run.symbolsScanned)} rows</span>
                   <span
                     className={
@@ -950,7 +974,13 @@ export function RecentSuccessfulRunsPanel({
                         : "text-[var(--muted)]"
                     }
                   >
-                    {formatFullUniverse(run)}
+                    {formatFullUniverse(run)} Universe
+                  </span>
+                  <span
+                    className="min-w-0 truncate font-mono text-[9px]"
+                    title={run.runId}
+                  >
+                    Run {formatCompactRunId(run.runId)}
                   </span>
                 </div>
               </button>
@@ -1052,6 +1082,109 @@ export function ForwardObservationSection({
   snapshotError?: string | null;
   snapshotIsLoading?: boolean;
 }) {
+  const observationSummary = buildArchiveObservationSummary({
+    response,
+    uiState,
+  });
+
+  return (
+    <ArchiveValidationOverview
+      window={window}
+      onWindowChange={onWindowChange}
+      response={response}
+      readiness={readiness ?? null}
+      uiState={uiState}
+      selectedRun={selectedRun}
+      isRequested={isRequested}
+      snapshotError={snapshotError}
+      snapshotIsLoading={snapshotIsLoading}
+      observationSummary={observationSummary}
+    />
+  );
+}
+
+function SelectedRunSummaryPanel({
+  selectedRun,
+  rowCount,
+  assetClass,
+}: {
+  selectedRun: HistoricalSnapshotRun | null;
+  rowCount: number | null;
+  assetClass: string;
+}) {
+  const completedTime = formatArchiveDateTime(selectedRun?.finishedAt);
+  const summaryText = selectedRun
+    ? `Selected Run · ${selectedRun.timeframe.toUpperCase()} · ${formatFullUniverse(selectedRun)} Universe · ${formatCount(rowCount ?? selectedRun.signalsCreated ?? selectedRun.symbolsScanned)} rows · Completed ${completedTime}`
+    : "No stored run selected.";
+
+  return (
+    <section className="terminal-panel-data shrink-0">
+      <div className="terminal-panel-header">
+        <div className="min-w-0">
+          <h2 className="terminal-panel-title">Selected Run</h2>
+          <p className="mt-1 text-[11px] leading-4 text-[var(--muted)]">
+            {summaryText}
+          </p>
+        </div>
+        <StatusBadge
+          tone={selectedRun ? "accent" : "missing"}
+          className="h-5 justify-center !py-0 text-[10px] [line-height:1]"
+        >
+          Stored Run
+        </StatusBadge>
+      </div>
+      <div className="grid grid-cols-2 gap-1 px-2 pb-2 sm:grid-cols-3 lg:grid-cols-6">
+        <SummaryMetric label="Run ID" value={shortRunId(selectedRun?.runId)} tone="accent" />
+        <SummaryMetric
+          label="Timeframe"
+          value={selectedRun?.timeframe.toUpperCase() ?? "N/A"}
+        />
+        <SummaryMetric
+          label="Universe"
+          value={selectedRun ? `${formatFullUniverse(selectedRun)} Universe` : "N/A"}
+          tone={selectedRun?.isLikelyFullUniverse === true ? "complete" : "partial"}
+        />
+        <SummaryMetric
+          label="Snapshot Rows"
+          value={formatCount(rowCount ?? selectedRun?.signalsCreated ?? selectedRun?.symbolsScanned)}
+          tone={rowCount || selectedRun?.signalsCreated || selectedRun?.symbolsScanned ? "complete" : "missing"}
+        />
+        <SummaryMetric
+          label="Completed"
+          value={completedTime}
+        />
+        <SummaryMetric
+          label="Asset Class"
+          value={assetClass ? formatAssetClass(assetClass) : "N/A"}
+        />
+      </div>
+    </section>
+  );
+}
+
+function ArchiveValidationOverview({
+  window,
+  onWindowChange,
+  response,
+  readiness,
+  uiState,
+  selectedRun = null,
+  isRequested = true,
+  snapshotError = null,
+  snapshotIsLoading = false,
+  observationSummary,
+}: {
+  window: ObservationWindow;
+  onWindowChange: (window: ObservationWindow) => void;
+  response: HistoricalSnapshotObservationsResponse | null;
+  readiness: HistoricalObservationReadinessResponse | null;
+  uiState: ForwardObservationUiState;
+  selectedRun?: HistoricalSnapshotRun | null;
+  isRequested?: boolean;
+  snapshotError?: string | null;
+  snapshotIsLoading?: boolean;
+  observationSummary: ObservationSummary | null;
+}) {
   const rows = response?.rows ?? emptyHistoricalObservationRows;
   const summary = uiState.summary;
   const outcomeSummaryStatus = isRequested
@@ -1063,67 +1196,42 @@ export function ForwardObservationSection({
   const selectedReadiness = readiness?.selectedRun ?? null;
   const selectedReadinessRun =
     selectedRun ?? selectedReadiness?.run ?? uiState.selectedRun;
-  const observationReadiness = getReadyObservationReadinessRun(readiness ?? null);
   const observationRun = uiState.observationRun;
   const readyContextNote = getForwardObservationReadyContextNote({
     uiState,
-    readiness: readiness ?? null,
+    readiness,
   });
-  const observationSummary = useMemo(
-    () =>
-      buildObservationSummary({
-        rows,
-        counts: summary
-          ? {
-              totalRows: summary.totalRows,
-              completeCount: summary.completeCount,
-              partialCount: summary.partialCount,
-              missingCount: summary.missingCount,
-            }
-          : null,
-      }),
-    [rows, summary],
-  );
-  const showObservationSummary =
-    uiState.status === "observation_ready" && rows.length > 0;
 
   return (
-    <section className="terminal-panel overflow-hidden xl:flex xl:min-h-0 xl:flex-1 xl:flex-col">
-      <div className="terminal-panel-header">
-        <div className="flex min-w-0 flex-wrap items-center gap-2">
-          <h2 className="terminal-panel-title">
-            Outcome Summary
-          </h2>
-          <StatusBadge
-            tone={outcomeSummaryStatus.tone}
-            className="h-5 justify-center !py-0 text-[10px] [line-height:1]"
-          >
-            {outcomeSummaryStatus.label}
-          </StatusBadge>
-          <span className="text-[10px] font-semibold uppercase text-[var(--muted)]">
-            Validation Readiness
-          </span>
-        </div>
-        <div className="flex flex-wrap gap-1 border border-[var(--border)] bg-[var(--panel-muted)] p-0.5">
-          {OBSERVATION_WINDOWS.map((option) => (
-            <button
-              key={option}
-              type="button"
-              onClick={() => onWindowChange(option)}
-              aria-pressed={option === window}
-              className={formatSelectedControlClassName(option === window)}
-              style={archiveCompactControlStyle}
+    <div className="grid shrink-0 gap-2 lg:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)]">
+      <ValidationReadinessPanel
+        window={window}
+        onWindowChange={onWindowChange}
+        readiness={readiness}
+        uiState={uiState}
+        selectedRun={selectedReadinessRun}
+        observationRun={observationRun}
+        summary={summary}
+        isRequested={isRequested}
+        snapshotError={snapshotError}
+        snapshotIsLoading={snapshotIsLoading}
+      />
+      <section className="terminal-panel-data min-w-0">
+        <div className="terminal-panel-header">
+          <div className="flex min-w-0 flex-wrap items-center gap-2">
+            <h2 className="terminal-panel-title">Outcome Summary</h2>
+            <StatusBadge
+              tone={outcomeSummaryStatus.tone}
+              className="h-5 justify-center !py-0 text-[10px] [line-height:1]"
             >
-              {option} {option === 1 ? "candle" : "candles"}
-            </button>
-          ))}
+              {outcomeSummaryStatus.label}
+            </StatusBadge>
+          </div>
         </div>
-      </div>
-
-      <div className="flex min-h-0 flex-col gap-1 px-2 py-1 xl:flex-1 xl:overflow-hidden">
+        <div className="space-y-1 px-2 pb-2">
         {!isRequested ? (
           <StatePanel
-            title="Loading Snapshot Rows"
+            title="Validation pending"
             message={
               selectedReadinessRun
                 ? `Selected run ${shortRunId(selectedReadinessRun.runId)} is loading automatically.`
@@ -1141,206 +1249,158 @@ export function ForwardObservationSection({
           />
         ) : summary ? (
           <ObservationSummarySection
-            summary={observationSummary}
+            summary={observationSummary ?? buildObservationSummary({ rows })}
             window={summary.window}
           />
         ) : (
           <StatePanel
-            title="Validation Source unavailable"
-            message="No validation source is available for the selected run."
+            title="Outcome data unavailable"
+            message="Outcome metrics are not available yet."
           />
         )}
-
-        <SelectedScanValidationStrip
-          selectedRun={selectedReadinessRun}
-          validationRun={observationRun}
-          validationReadiness={observationReadiness}
-          summary={summary}
-          window={window}
-        />
 
         {!isRequested ? null : uiState.status !== "observation_ready" ? (
           <ForwardObservationStatePanel
             uiState={uiState}
-            readiness={readiness ?? null}
+            readiness={readiness}
           />
         ) : rows.length === 0 ? (
           <StatePanel
-            title="Snapshot Rows unavailable"
-            message="No snapshot rows are available for the Validation Source."
-          />
-        ) : (
-          <ObservationRowsTable rows={rows} isFetching={uiState.isFetching} />
-        )}
-
-        {isRequested ? (
-          <ArchiveDetails
-            readiness={readiness ?? null}
-            response={response}
-            uiState={uiState}
-            summary={showObservationSummary ? observationSummary : null}
-            readyContextNote={readyContextNote}
+            title="Outcome data unavailable"
+            message="Outcome metrics are not available yet."
           />
         ) : null}
+        {readyContextNote ? (
+          <DetailLine label="Validation source" value={readyContextNote} />
+        ) : null}
       </div>
-    </section>
-  );
-}
-
-function SelectedScanValidationStrip({
-  selectedRun,
-  validationRun,
-  validationReadiness,
-  summary,
-  window,
-}: {
-  selectedRun: HistoricalSnapshotRun | null;
-  validationRun: HistoricalSnapshotRun | null;
-  validationReadiness: HistoricalObservationReadinessRun | null;
-  summary: ForwardObservationSummary | null;
-  window: ObservationWindow;
-}) {
-  const validationWindow = summary?.window ?? window;
-  const validationWindowLabel = formatValidationWindowLabel({
-    summary,
-    window: validationWindow,
-  });
-
-  return (
-    <div className="terminal-panel-data flex min-w-0 flex-wrap items-center gap-x-4 gap-y-1 px-2 py-1 text-[10px] shadow-none">
-      <ArchiveContextStripLine
-        label="Run"
-        runId={selectedRun?.runId ?? null}
-        items={[
-          {
-            value: formatArchiveDateTime(selectedRun?.finishedAt),
-            title: "Finished",
-          },
-          {
-            value: `${formatCount(selectedRun?.symbolsScanned)}/${formatCount(
-              selectedRun?.signalsCreated,
-            )}`,
-            title: "Rows / results",
-          },
-          {
-            value: selectedRun ? formatFullUniverse(selectedRun) : "-",
-            tone:
-              selectedRun?.isLikelyFullUniverse === true
-                ? "complete"
-                : "partial",
-            title: "Universe",
-          },
-        ]}
-      />
-      <ArchiveContextStripLine
-        label="Validation"
-        runId={validationRun?.runId ?? null}
-        items={[
-          {
-            value:
-              validationReadiness?.state === "ready"
-                ? "Source ready"
-                : formatReadinessRunStatus(validationReadiness),
-            tone:
-              validationReadiness?.state === "ready"
-                ? "observation"
-                : "partial",
-            title: "Readiness",
-          },
-          {
-            value: summary
-              ? `${formatCount(summary.completeCount)}/${formatCount(
-                  summary.partialCount,
-                )}/${formatCount(summary.missingCount)}`
-              : "-",
-            title: "Complete / partial / missing",
-          },
-          {
-            value: validationWindowLabel.label,
-            tone: validationWindowLabel.tone,
-            title: `Window ${validationWindow} ${
-              validationWindow === 1 ? "candle" : "candles"
-            }`,
-          },
-        ]}
-      />
+      </section>
     </div>
   );
 }
 
-function formatValidationWindowLabel({
-  summary,
-  window,
+function buildArchiveObservationSummary({
+  response,
+  uiState,
 }: {
-  summary: ForwardObservationSummary | null;
-  window: ObservationWindow;
-}): { label: string; tone: StatusTone } {
-  if (
-    summary &&
-    summary.completeCount === 0 &&
-    (summary.partialCount > 0 || summary.missingCount > 0)
-  ) {
-    return { label: "Window pending", tone: "partial" };
+  response: HistoricalSnapshotObservationsResponse | null;
+  uiState: ForwardObservationUiState;
+}) {
+  const rows = response?.rows ?? emptyHistoricalObservationRows;
+  const summary = uiState.summary;
+
+  if (!summary && rows.length === 0) {
+    return null;
   }
 
-  return {
-    label: `Window ${window} ${window === 1 ? "candle" : "candles"}`,
-    tone: "accent",
-  };
+  return buildObservationSummary({
+    rows,
+    counts: summary
+      ? {
+          totalRows: summary.totalRows,
+          completeCount: summary.completeCount,
+          partialCount: summary.partialCount,
+          missingCount: summary.missingCount,
+        }
+      : null,
+  });
 }
 
-function ArchiveContextStripLine({
-  label,
-  runId,
-  items,
+function ValidationReadinessPanel({
+  window,
+  onWindowChange,
+  readiness,
+  uiState,
+  selectedRun,
+  observationRun,
+  summary,
+  isRequested,
+  snapshotError,
+  snapshotIsLoading,
 }: {
-  label: string;
-  runId: string | null;
-  items: Array<{ value: string; tone?: StatusTone; title?: string }>;
+  window: ObservationWindow;
+  onWindowChange: (window: ObservationWindow) => void;
+  readiness: HistoricalObservationReadinessResponse | null;
+  uiState: ForwardObservationUiState;
+  selectedRun: HistoricalSnapshotRun | null;
+  observationRun: HistoricalSnapshotRun | null;
+  summary: ForwardObservationSummary | null;
+  isRequested: boolean;
+  snapshotError: string | null;
+  snapshotIsLoading: boolean;
 }) {
-  return (
-    <div
-      className="flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-0.5"
-      aria-label={`${label} ${runId ?? "unavailable"}`}
-    >
-      <span className="shrink-0 font-semibold uppercase text-[var(--foreground)]">
-        {label}
-      </span>
-      <ArchiveInlineValue
-        value={shortRunId(runId)}
-        tone="accent"
-        title={runId ?? `${label} unavailable`}
-      />
-      {items.map((item, index) => (
-        <ArchiveInlineValue
-          key={`${label}-${index}-${item.value}`}
-          value={item.value}
-          tone={item.tone}
-          title={item.title}
-        />
-      ))}
-    </div>
-  );
-}
+  const displayState = getValidationReadinessDisplayState({
+    uiState,
+    readiness,
+    summary,
+    isRequested,
+    snapshotError,
+    snapshotIsLoading,
+  });
+  const selectedReadiness = readiness?.selectedRun ?? null;
+  const validationWindow = summary?.window ?? window;
 
-function ArchiveInlineValue({
-  value,
-  tone = "neutral",
-  title,
-}: {
-  value: string;
-  tone?: StatusTone;
-  title?: string;
-}) {
   return (
-    <span
-      title={title}
-      className={`inline-flex h-5 max-w-full items-center justify-center truncate whitespace-nowrap border border-l-2 bg-[var(--panel)] px-1.5 font-mono text-[10px] font-semibold [line-height:1] ${getArchiveStatusToneBorderClass(
-        tone,
-      )} ${getArchiveStatusToneTextClass(tone)}`}
-    >
-      {value}
-    </span>
+    <section className="terminal-panel-data min-w-0">
+      <div className="terminal-panel-header">
+        <div className="flex min-w-0 flex-wrap items-center gap-2">
+          <h2 className="terminal-panel-title">Validation Readiness</h2>
+          <StatusBadge
+            tone={displayState.tone}
+            className="h-5 justify-center !py-0 text-[10px] [line-height:1]"
+          >
+            {displayState.label}
+          </StatusBadge>
+        </div>
+        <div className="flex flex-wrap gap-1 border border-[var(--border)] bg-[var(--panel-muted)] p-0.5">
+          {OBSERVATION_WINDOWS.map((option) => (
+            <button
+              key={option}
+              type="button"
+              onClick={() => onWindowChange(option)}
+              aria-pressed={option === window}
+              className={formatSelectedControlClassName(option === window)}
+              style={archiveCompactControlStyle}
+            >
+              {option} {option === 1 ? "candle" : "candles"}
+            </button>
+          ))}
+        </div>
+      </div>
+      <div className="space-y-1 px-2 pb-2">
+        <p className="text-[11px] leading-4 text-[var(--muted)]">
+          {displayState.message}
+        </p>
+        <div className="grid grid-cols-2 gap-1">
+          <SummaryMetric
+            label="Selected Run"
+            value={shortRunId(selectedRun?.runId)}
+            tone="accent"
+          />
+          <SummaryMetric
+            label="Review Source"
+            value={shortRunId(observationRun?.runId)}
+            tone={observationRun ? "observation" : "missing"}
+          />
+          <SummaryMetric
+            label="Expected Wait"
+            value={summary ? formatApproximateObservationWait(summary.timeframe, validationWindow) : "N/A"}
+          />
+          <SummaryMetric
+            label="Coverage Lag"
+            value={selectedReadiness ? formatCoverageLag(selectedReadiness) : "N/A"}
+          />
+          <SummaryMetric
+            label="Window Unit"
+            value={readiness?.metadata.windowUnit ?? "N/A"}
+          />
+          <SummaryMetric
+            label="Completed Candles"
+            value={`${validationWindow} ${validationWindow === 1 ? "candle" : "candles"}`}
+          />
+        </div>
+      </div>
+    </section>
   );
 }
 
@@ -1372,7 +1432,7 @@ function ArchiveContextBlock({
   );
 }
 
-function ArchiveDetails({
+export function ArchiveDetails({
   readiness,
   response,
   uiState,
@@ -1392,18 +1452,18 @@ function ArchiveDetails({
         uiState.summary.timeframe,
         uiState.summary.window,
       )
-    : "-";
+    : "N/A";
 
   return (
     <details className="shrink-0 border border-[var(--border)] bg-[var(--panel-muted)]">
       <summary className="cursor-pointer bg-[var(--table-header)] px-2 py-1 text-[11px] font-semibold uppercase tracking-normal text-[var(--foreground)]">
-        Source Data
+        Validation Details
       </summary>
       <div className="space-y-1.5 border-t border-[var(--border)] px-2 py-1.5">
         <ObservationDataStatusLegend />
         <DetailLine
           label="Data path"
-          value="Validation metrics use Validation Source; Source Snapshot Rows stay tied to Selected Run."
+          value="Validation metrics use the selected run when ready. If a selected run is still pending, details show the maturity constraint and any supporting stored run context."
         />
         {readyContextNote ? (
           <DetailLine label="Validation note" value={readyContextNote} />
@@ -1436,22 +1496,22 @@ function ArchiveDetails({
             title="Source Data"
             rows={[
               ["Readiness", readiness ? "Loaded" : "Unavailable"],
-              ["Snapshot Rows", response ? formatCount(response.rows.length) : "-"],
+              ["Outcome Rows", response ? formatCount(response.rows.length) : "N/A"],
               [
                 "Returned Rows",
-                response ? formatCount(response.metadata.rowCount) : "-",
+                response ? formatCount(response.metadata.rowCount) : "N/A",
               ],
               [
                 "Window Unit",
-                response?.metadata.windowUnit ?? readiness?.metadata.windowUnit ?? "-",
+                response?.metadata.windowUnit ?? readiness?.metadata.windowUnit ?? "N/A",
               ],
               [
                 "Latest Coverage",
-                coverage ? formatLatestCoverage(coverage) : "-",
+                coverage ? formatLatestCoverage(coverage) : "N/A",
               ],
               [
                 "Coverage Lag",
-                selectedReadiness ? formatCoverageLag(selectedReadiness) : "-",
+                selectedReadiness ? formatCoverageLag(selectedReadiness) : "N/A",
               ],
             ]}
           />
@@ -1461,6 +1521,16 @@ function ArchiveDetails({
             <GroupDistributionTable groups={summary.groups} />
             <NotableHistoricalExamples summary={summary} />
           </>
+        ) : null}
+        {response?.rows.length ? (
+          <details className="border border-[var(--border)] bg-[var(--panel)]">
+            <summary className="cursor-pointer px-2 py-1 text-[11px] font-semibold text-[var(--foreground)]">
+              Validation Source Rows
+            </summary>
+            <div className="border-t border-[var(--border)] p-2">
+              <ObservationRowsTable rows={response.rows} isFetching={uiState.isFetching} />
+            </div>
+          </details>
         ) : null}
         <RawDetails readiness={readiness} response={response} />
       </div>
@@ -1495,7 +1565,7 @@ function RawDetails({
   return (
     <details className="border border-[var(--border)] bg-[var(--panel)]">
       <summary className="cursor-pointer px-2 py-1 text-[11px] font-semibold text-[var(--foreground)]">
-        Source run metadata and row fields
+        Source data metadata and row fields
       </summary>
       <pre className="max-h-80 overflow-auto border-t border-[var(--border)] p-2 text-[10px] leading-4 text-[var(--muted)]">
         {JSON.stringify(raw, null, 2)}
@@ -1657,7 +1727,7 @@ export function ObservationRowsTable({
                   onSortChange={updateSort}
                   align="right"
                 >
-                  Observed Change
+                  Follow-through
                 </DataTableHeaderCell>
                 <DataTableHeaderCell
                   sortKey="max_drawdown"
@@ -1666,7 +1736,7 @@ export function ObservationRowsTable({
                   onSortChange={updateSort}
                   align="right"
                 >
-                  Max Adverse Move
+                  Drawdown Context
                 </DataTableHeaderCell>
                 <DataTableHeaderCell
                   sortKey="data_status"
@@ -2011,6 +2081,34 @@ function getDrawdownSummaryTone(value: number | null): StatusTone {
   return value < 0 ? "warning" : "neutral";
 }
 
+function buildObservationRowBySymbol({
+  rows,
+  selectedRunId,
+  observationRunId,
+}: {
+  rows: HistoricalSnapshotObservationRow[];
+  selectedRunId: string | null | undefined;
+  observationRunId: string | null | undefined;
+}) {
+  const map = new Map<string, HistoricalSnapshotObservationRow>();
+
+  if (!selectedRunId || observationRunId !== selectedRunId) {
+    return map;
+  }
+
+  for (const row of rows) {
+    if (row.scanRunId === selectedRunId) {
+      map.set(row.symbol, row);
+    }
+  }
+
+  return map;
+}
+
+function formatObservationWindow(window: ObservationWindow) {
+  return `${window} ${window === 1 ? "candle" : "candles"}`;
+}
+
 function formatSelectedControlClassName(isSelected: boolean) {
   const base =
     "inline-flex h-6 items-center justify-center whitespace-nowrap border px-2 py-0 text-[10px] font-semibold uppercase [line-height:1] tracking-normal transition focus-visible:outline-[var(--accent)]";
@@ -2199,6 +2297,87 @@ function getOutcomeSummaryStatus({
   };
 }
 
+function getValidationReadinessDisplayState({
+  uiState,
+  readiness,
+  summary,
+  isRequested,
+  snapshotError,
+  snapshotIsLoading,
+}: {
+  uiState: ForwardObservationUiState;
+  readiness: HistoricalObservationReadinessResponse | null;
+  summary: ForwardObservationSummary | null;
+  isRequested: boolean;
+  snapshotError: string | null;
+  snapshotIsLoading: boolean;
+}): { label: string; message: string; tone: StatusTone } {
+  if (!isRequested || snapshotIsLoading) {
+    return {
+      label: "Validation Pending",
+      message: "This run is loading before outcome review can start.",
+      tone: "partial",
+    };
+  }
+
+  if (snapshotError || uiState.status === "readiness_unavailable") {
+    return {
+      label: "Data Missing",
+      message: "Source data is missing or incomplete.",
+      tone: "missing",
+    };
+  }
+
+  if (uiState.status === "not_ready_for_selected_run") {
+    return {
+      label: "Validation Pending",
+      message: "This run is still waiting for enough completed future candles.",
+      tone: "partial",
+    };
+  }
+
+  if (summary && summary.completeCount > 0 && summary.partialCount > 0) {
+    return {
+      label: "Partially Ready",
+      message: "Some rows have partial future-window data.",
+      tone: "partial",
+    };
+  }
+
+  if (summary && summary.completeCount > 0) {
+    return {
+      label: "Ready for Review",
+      message: "This run is ready for outcome review.",
+      tone: "observation",
+    };
+  }
+
+  if (summary && summary.partialCount > 0) {
+    return {
+      label: "Partially Ready",
+      message: "Some rows have partial future-window data.",
+      tone: "partial",
+    };
+  }
+
+  if (
+    readiness?.metadata.diagnosticBlocker === "stale_market_data" ||
+    uiState.blocker === "market_data_coverage"
+  ) {
+    return {
+      label: "Data Missing",
+      message: "Source data is missing or incomplete.",
+      tone: "missing",
+    };
+  }
+
+  return {
+    label: "Validation Pending",
+    message: "This run is still waiting for enough completed future candles.",
+    tone: "partial",
+  };
+}
+
 function ForwardObservationStatePanel({
   uiState,
   readiness,
@@ -2226,7 +2405,7 @@ function ObservationDataStatusLegend() {
   return (
     <div className="terminal-panel mb-3 px-3 py-2 text-xs leading-5 text-[var(--muted)]">
       <span className="font-semibold text-[var(--foreground)]">Validation Status:</span>{" "}
-      Complete has the selected future window, Partial has fewer future candles,
+      Complete has the selected future window, Partial has fewer completed candles,
       Missing has no usable future window.
     </div>
   );
@@ -2239,34 +2418,34 @@ function ObservationSummarySection({ summary }: {
   return (
     <section className="terminal-panel-data flex min-w-0 flex-wrap items-center gap-1 px-2 py-1 shadow-none">
       <SummaryStripStat
-        label="Complete"
+        label="Complete Windows"
         value={formatCount(summary.completeCount)}
         tone="complete"
       />
       <SummaryStripStat
-        label="Partial"
+        label="Partial Windows"
         value={formatCount(summary.partialCount)}
         tone="partial"
       />
       <SummaryStripStat
-        label="Missing"
+        label="Missing Windows"
         value={formatCount(summary.missingCount)}
         tone="missing"
       />
       <SummaryStripStat
-        label="Median Change"
+        label="Median Follow-through"
         value={formatCompactObservationSummaryPercent(
           summary.medianObservedChangePct,
         )}
         tone={getObservedSummaryTone(summary.medianObservedChangePct)}
       />
       <SummaryStripStat
-        label="Positive Rate"
+        label="Positive Follow-through"
         value={formatCompactObservationSummaryPercent(summary.positiveRatePct)}
         tone={getPositiveRateTone(summary.positiveRatePct)}
       />
       <SummaryStripStat
-        label="Max Adverse Move"
+        label="Drawdown Context"
         value={formatCompactObservationSummaryPercent(
           summary.worstMaxDrawdownPct,
         )}
@@ -2331,13 +2510,13 @@ function GroupDistributionTable({
                 <DataTableHeaderCell align="right">Partial</DataTableHeaderCell>
                 <DataTableHeaderCell align="right">Missing</DataTableHeaderCell>
                 <DataTableHeaderCell align="right">
-                  Median Change
+                  Median Follow-through
                 </DataTableHeaderCell>
                 <DataTableHeaderCell align="right">
-                  Average Change
+                  Average Follow-through
                 </DataTableHeaderCell>
                 <DataTableHeaderCell align="right">
-                  Median Adverse Move
+                  Median Drawdown
                 </DataTableHeaderCell>
               </tr>
             </thead>
@@ -2398,15 +2577,15 @@ function NotableHistoricalExamples({
       </p>
       <div className="mt-3 grid gap-3 lg:grid-cols-3">
         <NotableExampleList
-          title="Largest Positive Changes"
+          title="Largest Positive Follow-through"
           examples={summary.notable.largestPositiveObservedChanges}
         />
         <NotableExampleList
-          title="Largest Negative Changes"
+          title="Lowest Follow-through"
           examples={summary.notable.largestNegativeObservedChanges}
         />
         <NotableExampleList
-          title="Largest Adverse Moves"
+          title="Largest Drawdown Context"
           examples={summary.notable.largestObservedDrawdowns}
         />
       </div>
@@ -2443,12 +2622,12 @@ function NotableExampleList({
               </div>
               <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-[var(--muted)]">
                 <span>
-                  Change{" "}
+                  Follow-through{" "}
                   {formatObservationPercent(example.observedChangePct)}
                 </span>
                 {example.maxDrawdownPct !== null ? (
                   <span>
-                    Adverse Move{" "}
+                    Drawdown Context{" "}
                     {formatObservationPercent(example.maxDrawdownPct)}
                   </span>
                 ) : null}
@@ -2468,7 +2647,7 @@ function getForwardObservationPanelTitle(uiState: ForwardObservationUiState) {
     case "readiness_unavailable":
       return "Validation Source unavailable";
     case "not_ready_for_selected_run":
-      return "Selected Run is not mature";
+      return "Validation Pending";
     case "no_observable_run":
       return isMarketCoverageBlocker(uiState)
         ? "Validation Source unavailable"
@@ -2504,10 +2683,10 @@ function getForwardObservationPanelMessage({
       return "Validation Source readiness could not be determined.";
     case "not_ready_for_selected_run":
       if (isWaitingForFutureCandlesDiagnostic(uiState, readiness)) {
-        return "The Selected Run is waiting for completed future candles.";
+        return "This run is still waiting for enough completed future candles.";
       }
 
-      return "The Selected Run is not mature for this forward window.";
+      return "This run is still waiting for enough completed future candles.";
     case "no_observable_run":
       if (isStaleMarketDataDiagnostic(uiState, readiness)) {
         return "Market data appears stale for this forward window.";
@@ -2617,7 +2796,7 @@ function formatObservationDiagnosticBlocker(
     case "observable":
       return "Observable";
     case "waiting_for_future_candles":
-      return "Waiting for future candles";
+      return "Waiting for completed candles";
     case "stale_market_data":
       return "Market data appears stale";
     case "no_runs":
@@ -2647,6 +2826,9 @@ export function SnapshotTable({
   rows,
   selectedRunId,
   rowCountEstimate,
+  observationRows = emptyHistoricalObservationRows,
+  observationRunId = null,
+  observationWindow = 3,
   isRequested,
   isLoading,
   isError = false,
@@ -2656,6 +2838,9 @@ export function SnapshotTable({
   rows: HistoricalSnapshotRow[];
   selectedRunId?: string | null;
   rowCountEstimate?: number | null;
+  observationRows?: HistoricalSnapshotObservationRow[];
+  observationRunId?: string | null;
+  observationWindow?: ObservationWindow;
   isRequested?: boolean;
   isLoading: boolean;
   isError?: boolean;
@@ -2674,6 +2859,15 @@ export function SnapshotTable({
     () => sortDataRows(indexedRows, sortState, getSnapshotRowsSortValue),
     [indexedRows, sortState],
   );
+  const observationRowBySymbol = useMemo(
+    () =>
+      buildObservationRowBySymbol({
+        rows: observationRows,
+        selectedRunId,
+        observationRunId,
+      }),
+    [observationRows, observationRunId, selectedRunId],
+  );
   const updateSort = (
     key: SnapshotRowsSortKey,
     defaultDirection: DataSortDirection,
@@ -2691,13 +2885,13 @@ export function SnapshotTable({
   });
 
   return (
-    <details
+    <section
       className="terminal-panel-data shrink-0 overflow-hidden"
     >
-      <summary className="terminal-panel-header cursor-pointer list-none marker:hidden">
+      <div className="terminal-panel-header">
         <div className="flex min-w-0 items-center gap-2">
           <h2 className="terminal-panel-title">
-            Source Snapshot Rows
+            Snapshot Rows
           </h2>
         </div>
         <StatusBadge
@@ -2714,11 +2908,11 @@ export function SnapshotTable({
         >
           {rowStatusLabel}
         </StatusBadge>
-      </summary>
+      </div>
       <div className="border-t border-[var(--border)] px-2 py-2">
         <p className="mb-2 text-[11px] leading-4 text-[var(--muted)]">
-          Source snapshot rows from Selected Run. Open Research opens current
-          symbol research, not historical replay.
+          Snapshot rows from the Selected Run. Open Research opens current
+          symbol research with archive context, not historical replay.
         </p>
         {!requested ? (
           <div className="terminal-state-panel">
@@ -2745,7 +2939,7 @@ export function SnapshotTable({
           />
         ) : (
           <DataTableScroll className="max-h-72 !overflow-x-auto !overflow-y-auto">
-          <DataTable minWidth="min-w-[1180px]">
+          <DataTable minWidth="min-w-[1420px]">
             <thead className="sticky top-0 z-20 bg-[var(--table-header)] text-[10px] uppercase tracking-normal text-[var(--muted)]">
               <tr>
                 <DataTableHeaderCell
@@ -2785,7 +2979,7 @@ export function SnapshotTable({
                 >
                   Research Label
                 </DataTableHeaderCell>
-                <DataTableHeaderCell>Research Priority</DataTableHeaderCell>
+                <DataTableHeaderCell>Action</DataTableHeaderCell>
                 <DataTableHeaderCell>Risk Context</DataTableHeaderCell>
                 <DataTableHeaderCell
                   sortKey="rank_score"
@@ -2796,92 +2990,131 @@ export function SnapshotTable({
                 >
                   Rank Score
                 </DataTableHeaderCell>
+                <DataTableHeaderCell>Outcome Status</DataTableHeaderCell>
+                <DataTableHeaderCell align="right">Follow-through</DataTableHeaderCell>
+                <DataTableHeaderCell align="right">Drawdown Context</DataTableHeaderCell>
+                <DataTableHeaderCell>Window</DataTableHeaderCell>
                 <DataTableHeaderCell>Score Components</DataTableHeaderCell>
                 <DataTableHeaderCell>Source Versions</DataTableHeaderCell>
                 <DataTableHeaderCell>Open Research</DataTableHeaderCell>
               </tr>
             </thead>
             <tbody>
-              {visibleRows.map(({ row, sourceIndex }) => (
-                <tr
-                  key={row.id}
-                  className="border-t border-[var(--table-grid)] odd:bg-[var(--panel-data)] even:bg-[var(--panel-muted)] hover:bg-[var(--row-hover)]"
-                >
-                  <DataTableCell align="right" className="font-mono tabular-nums">
-                    {sourceIndex + 1}
-                  </DataTableCell>
-                  <DataTableCell className="font-semibold text-[var(--foreground)]">
-                    {row.symbol}
-                  </DataTableCell>
-                  <DataTableCell>
-                    {formatMarket(row)}
-                  </DataTableCell>
-                  <DataTableCell>
-                    <GroupChip
-                      group={normalizeGroupKey(row.group)}
-                      dictionary={dictionary}
-                    />
-                  </DataTableCell>
-                  <DataTableCell>
-                    <DataTableChip title={formatSignalLabel(row.label, dictionary)}>
-                      {formatSignalLabel(row.label, dictionary)}
-                    </DataTableChip>
-                  </DataTableCell>
-                  <DataTableCell
-                    className="max-w-[160px] text-[var(--foreground)]"
-                    truncate
-                    title={formatArchivePrimarySignal(row.primarySignal, dictionary)}
+              {visibleRows.map(({ row, sourceIndex }) => {
+                const observationRow = observationRowBySymbol.get(row.symbol) ?? null;
+
+                return (
+                  <tr
+                    key={row.id}
+                    className="border-t border-[var(--table-grid)] odd:bg-[var(--panel-data)] even:bg-[var(--panel-muted)] hover:bg-[var(--row-hover)]"
                   >
-                    {formatArchivePrimarySignal(row.primarySignal, dictionary)}
-                  </DataTableCell>
-                  <DataTableCell
-                    className="max-w-[240px]"
-                    truncate
-                    title={formatRiskNotes(row)}
-                  >
-                    {formatRiskNotes(row)}
-                  </DataTableCell>
-                  <DataTableCell align="right" className="font-mono tabular-nums">
-                    {formatScore(row.rankScore)}
-                  </DataTableCell>
-                  <DataTableCell
-                    className="max-w-[180px]"
-                    truncate
-                    title={formatComponentScores(row.componentScores)}
-                  >
-                    {formatComponentScores(row.componentScores)}
-                  </DataTableCell>
-                  <DataTableCell
-                    className="max-w-[150px]"
-                    truncate
-                    title={formatVersions(row)}
-                  >
-                    {formatVersions(row)}
-                  </DataTableCell>
-                  <DataTableCell>
-                    <Link
-                      href={buildSymbolResearchHref({
-                        exchange: row.exchange ?? "binance",
-                        symbol: row.symbol,
-                        timeframe: row.timeframe,
-                        assetClass,
-                        from: "archive",
-                        runId: row.scanRunId,
-                        snapshotId: row.id,
-                      })}
-                      className="terminal-mini-action is-accent px-2 py-1"
+                    <DataTableCell align="right" className="font-mono tabular-nums">
+                      {sourceIndex + 1}
+                    </DataTableCell>
+                    <DataTableCell className="font-semibold text-[var(--foreground)]">
+                      {row.symbol}
+                    </DataTableCell>
+                    <DataTableCell>
+                      {formatMarket(row)}
+                    </DataTableCell>
+                    <DataTableCell>
+                      <GroupChip
+                        group={normalizeGroupKey(row.group)}
+                        dictionary={dictionary}
+                      />
+                    </DataTableCell>
+                    <DataTableCell>
+                      <DataTableChip title={formatSignalLabel(row.label, dictionary)}>
+                        {formatSignalLabel(row.label, dictionary)}
+                      </DataTableChip>
+                    </DataTableCell>
+                    <DataTableCell
+                      className="max-w-[160px] text-[var(--foreground)]"
+                      truncate
+                      title={formatArchivePrimarySignal(row.primarySignal, dictionary)}
                     >
-                      Open Research
-                    </Link>
-                  </DataTableCell>
-                </tr>
-              ))}
+                      {formatArchivePrimarySignal(row.primarySignal, dictionary)}
+                    </DataTableCell>
+                    <DataTableCell
+                      className="max-w-[240px]"
+                      truncate
+                      title={formatRiskNotes(row)}
+                    >
+                      {formatRiskNotes(row)}
+                    </DataTableCell>
+                    <DataTableCell align="right" className="font-mono tabular-nums">
+                      {formatScore(row.rankScore)}
+                    </DataTableCell>
+                    <DataTableCell>
+                      {observationRow ? (
+                        <ObservationDataStatusBadge
+                          status={observationRow.dataStatus}
+                          missingReason={observationRow.missingReason}
+                        />
+                      ) : (
+                        <DataTableChip tone="missing">Validation pending</DataTableChip>
+                      )}
+                    </DataTableCell>
+                    <DataTableCell
+                      align="right"
+                      className={`font-mono tabular-nums ${getObservedChangeClass(
+                        observationRow?.observedChangePct,
+                      )}`}
+                    >
+                      {formatObservationPercent(observationRow?.observedChangePct)}
+                    </DataTableCell>
+                    <DataTableCell
+                      align="right"
+                      className={`font-mono tabular-nums ${getDrawdownClass(
+                        observationRow?.maxDrawdownPct,
+                      )}`}
+                    >
+                      {formatObservationPercent(observationRow?.maxDrawdownPct)}
+                    </DataTableCell>
+                    <DataTableCell>
+                      {observationRow
+                        ? formatObservationWindow(observationRow.window)
+                        : formatObservationWindow(observationWindow)}
+                    </DataTableCell>
+                    <DataTableCell
+                      className="max-w-[180px]"
+                      truncate
+                      title={formatComponentScores(row.componentScores)}
+                    >
+                      {formatComponentScores(row.componentScores)}
+                    </DataTableCell>
+                    <DataTableCell
+                      className="max-w-[150px]"
+                      truncate
+                      title={formatVersions(row)}
+                    >
+                      {formatVersions(row)}
+                    </DataTableCell>
+                    <DataTableCell>
+                      <Link
+                        href={buildSymbolResearchHref({
+                          exchange: row.exchange ?? "binance",
+                          symbol: row.symbol,
+                          timeframe: row.timeframe,
+                          assetClass,
+                          from: "archive",
+                          runId: row.scanRunId,
+                          snapshotId: row.id,
+                        })}
+                        className="terminal-mini-action is-accent px-2 py-1"
+                      >
+                        Open Research
+                      </Link>
+                    </DataTableCell>
+                  </tr>
+                );
+              })}
             </tbody>
           </DataTable>
         </DataTableScroll>
         )}
       </div>
-    </details>
+    </section>
   );
 }
 
@@ -2942,6 +3175,32 @@ function StatePanel({ title, message }: { title: string; message: string }) {
         {title}
       </h3>
       <p className="mt-1 text-[11px] leading-4 text-[var(--muted)]">{message}</p>
+    </div>
+  );
+}
+
+function SummaryMetric({
+  label,
+  value,
+  tone = "neutral",
+}: {
+  label: string;
+  value: string;
+  tone?: StatusTone;
+}) {
+  return (
+    <div className="min-w-0 border border-l-2 border-[var(--border)] bg-[var(--panel-muted)] px-2 py-1.5">
+      <span className="block text-[9px] font-semibold uppercase tracking-normal text-[var(--muted)]">
+        {label}
+      </span>
+      <span
+        className={`mt-0.5 truncate font-mono text-[10px] font-semibold leading-4 ${getArchiveStatusToneTextClass(
+          tone,
+        )}`}
+        title={value}
+      >
+        {value}
+      </span>
     </div>
   );
 }
@@ -3902,7 +4161,7 @@ export function formatArchivePrimarySignal(
   const label = value?.trim();
 
   if (!label) {
-    return "-";
+    return "N/A";
   }
 
   const formattedReview = formatScannerReviewValue(label, dictionary);
@@ -3921,29 +4180,7 @@ export function formatArchivePrimarySignal(
 function formatCount(value: number | null | undefined) {
   return typeof value === "number" && Number.isFinite(value)
     ? value.toLocaleString()
-    : "-";
-}
-
-function formatReadinessRunStatus(
-  readinessRun: HistoricalObservationReadinessRun | null | undefined,
-) {
-  if (!readinessRun) {
-    return "Unknown";
-  }
-
-  if (readinessRun.state === "ready") {
-    return "Ready";
-  }
-
-  if (readinessRun.diagnosticBlocker) {
-    return formatObservationDiagnosticBlocker(readinessRun.diagnosticBlocker);
-  }
-
-  return formatMaturityState(
-    readinessRun.state === "unavailable"
-      ? "empty_or_unavailable"
-      : readinessRun.state,
-  );
+    : "N/A";
 }
 
 function getForwardObservationReadyContextNote({
@@ -3968,7 +4205,7 @@ function getForwardObservationReadyContextNote({
     : "mature full-universe run";
 
   if (diagnosticBlocker === "waiting_for_future_candles") {
-    return `Selected Run is still waiting for future candles. Validation Source uses the most recent ${runDescription}.`;
+    return `Selected Run is still waiting for enough completed future candles. Validation Source uses the most recent ${runDescription}.`;
   }
 
   if (diagnosticBlocker === "stale_market_data") {
@@ -3981,13 +4218,13 @@ function getForwardObservationReadyContextNote({
 function formatObservationNumber(value: number | null | undefined) {
   return typeof value === "number" && Number.isFinite(value)
     ? value.toLocaleString(undefined, { maximumFractionDigits: 6 })
-    : "-";
+    : "N/A";
 }
 
 function formatObservationPercent(value: number | null | undefined) {
   return typeof value === "number" && Number.isFinite(value)
     ? `${value.toFixed(2)}%`
-    : "-";
+    : "N/A";
 }
 
 function formatObservationSummaryPercent(value: number | null | undefined) {
@@ -4026,7 +4263,7 @@ function formatCompactMissingReason(value: string) {
     case "insufficient_future_candles":
       return "insufficient candles";
     case "no_future_candles":
-      return "no future candles";
+      return "missing window";
     case "run_after_latest_candle":
       return "after latest candle";
     case "missing_anchor":
@@ -4045,7 +4282,7 @@ function formatForwardObservationSelectionMode(
     case "observable":
       return "Validation Source";
     case "not_ready":
-      return "Selected Run not mature";
+      return "Validation pending";
     case "unavailable":
       return "Unavailable";
   }
@@ -4117,7 +4354,7 @@ function formatObservationReadinessMessage(
   }
 
   if (diagnosticBlocker === "waiting_for_future_candles") {
-    return "Selected Run is waiting for completed future candles.";
+    return "This run is still waiting for enough completed future candles.";
   }
 
   switch (blocker) {
@@ -4170,7 +4407,7 @@ function formatDuration(value: number, unit: "hour" | "day" | "week") {
 }
 
 function shortRunId(value: string | null | undefined) {
-  return value ? value.slice(0, 5) : "-";
+  return value ? value.slice(0, 5) : "N/A";
 }
 
 function formatCompactRunId(value: string | null | undefined) {
@@ -4189,6 +4426,12 @@ function formatFullUniverse(run: HistoricalSnapshotRun) {
   return "Unknown";
 }
 
+function formatAssetClass(value: string) {
+  return value.trim()
+    ? value.trim().replace(/_/g, " ").replace(/\b\w/g, (char) => char.toUpperCase())
+    : "N/A";
+}
+
 function formatMarket(row: HistoricalSnapshotRow) {
   const exchange = row.exchange ?? "binance";
   const market = row.market ?? "spot";
@@ -4203,14 +4446,14 @@ function formatRiskNotes(row: HistoricalSnapshotRow) {
   const notes = row.riskNotes ?? "";
   const text = [notes, riskTypes].filter(Boolean).join(" ");
 
-  return text || "-";
+  return text || "N/A";
 }
 
 function formatComponentScores(
   scores: HistoricalSnapshotRow["componentScores"],
 ) {
   if (!scores) {
-    return "-";
+    return "N/A";
   }
 
   return [
@@ -4230,7 +4473,7 @@ function formatVersions(row: HistoricalSnapshotRow) {
     row.scoringVersion ? `Scoring ${row.scoringVersion}` : null,
   ]
     .filter(Boolean)
-    .join(" / ") || "-";
+    .join(" / ") || "N/A";
 }
 
 function getObservationProbeLimit(window: ObservationWindow) {

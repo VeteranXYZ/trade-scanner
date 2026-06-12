@@ -11,6 +11,7 @@ import {
   buildHistoricalSnapshotsUrl,
   classifyForwardObservationMaturity,
   deriveForwardObservationUiState,
+  ArchiveDetails,
   ForwardObservationSection,
   formatArchiveDateTime,
   formatArchivePrimarySignal,
@@ -26,6 +27,7 @@ import {
   selectForwardObservationResult,
   SnapshotTable,
 } from "./ArchivePageClient";
+import { buildObservationSummary } from "./archiveObservationSummary";
 
 describe("ArchivePageClient API URLs", () => {
   it("uses the public trade API historical snapshot endpoints", () => {
@@ -204,9 +206,9 @@ describe("ArchivePageClient display formatting", () => {
     expect(html).toContain("Validation");
     expect(html).toContain("Outcome Summary");
     expect(html).toContain("Validation Readiness");
-    expect(html).toContain("Loading Snapshot Rows");
+    expect(html).toContain("Validation pending");
     expect(html).not.toContain("Load Snapshot Rows");
-    expect(html).toContain("Source Snapshot Rows");
+    expect(html).toContain("Snapshot Rows");
     expect(html).toContain("terminal-command-bar");
     expect(html).not.toContain(
       "mb-1 flex flex-wrap items-center gap-2 border border-[var(--border-medium)] bg-[var(--panel-muted)] px-2 py-1",
@@ -259,15 +261,24 @@ describe("ArchivePageClient display formatting", () => {
       }),
     );
 
-    expect(html).toContain("Source Snapshot Rows");
-    expect(html).toContain("Source snapshot rows from Selected Run.");
+    expect(html).toContain("Snapshot Rows");
+    expect(html).toContain("Snapshot rows from the Selected Run.");
     expect(html).toContain(
-      "Open Research opens current symbol research, not historical replay.",
+      "Open Research opens current symbol research with archive context, not historical replay.",
     );
     expect(html).toContain("2 rows");
     expect(html).toContain("Overheated caution");
     expect(html).toContain("Risk review");
+    expect(html).toContain("Action");
+    expect(html).toContain("Outcome Status");
+    expect(html).toContain("Follow-through");
+    expect(html).toContain("Drawdown Context");
+    expect(html).toContain("Validation pending");
     expect(html).toContain("from=archive");
+    expect(html).toContain("runId=fcc05284-c7a0-4990-9bcb-5dd165d83c37");
+    expect(html).toContain("snapshotId=overheated-row");
+    expect(html).toContain("timeframe=4h");
+    expect(html).toContain("assetClass=crypto");
     expect(html).not.toContain("Do not chase");
     expect(html).not.toContain("Avoid");
     expect(html).not.toContain("Show More");
@@ -486,27 +497,28 @@ describe("ArchivePageClient display formatting", () => {
     expect(html).toContain('data-testid="recent-runs-panel"');
     expect(html).toContain('data-testid="recent-runs-scroll-container"');
     expect(html).toContain("Recent Runs");
-    expect(html).toContain("Selected Run");
+    expect(html).toContain("Stored run selector");
     expect(html).toContain("xl:min-h-0");
     expect(html).toContain("xl:flex-col");
     expect(html).toContain("xl:overflow-y-auto");
     expect(html).toContain("xl:overscroll-contain");
     expect(html).toContain("aria-pressed=\"true\"");
-    expect(html).toContain(">11111<");
-    expect(html).toContain(">22222<");
-    expect(html).toContain(">33333<");
+    expect(html).toContain("Run 11111");
+    expect(html).toContain("Run 22222");
+    expect(html).toContain("Run 33333");
     expect(html).toContain('title="11111111-1111-4111-8111-111111111111"');
     expect(html).toContain(
       'aria-label="Select stored run 11111111-1111-4111-8111-111111111111"',
     );
     expect(html).not.toContain(">11111111-1111-4111-8111-111111111111<");
     expect(html).toContain("409 rows");
+    expect(html).toContain("Completed 2026-06-02 08:05");
     expect(html).toContain("Selected");
     expect(html).toContain("Latest");
     expect(html).toContain("Validation Source");
     expect(html).toContain("Recommended");
     expect(html).not.toContain(">Observation<");
-    expect(html).toContain("Limited");
+    expect(html).toContain("Limited Universe");
     expect(html).toContain("opacity-80");
     expect(recentRunsPanelClassName).toContain("xl:min-h-0");
     expect(recentRunsPanelClassName).toContain("xl:flex-col");
@@ -536,36 +548,21 @@ describe("ArchivePageClient display formatting", () => {
 
     expect(html).toContain("Outcome Summary");
     expect(html).toContain("Validation Readiness");
+    expect(html).toContain("Partially Ready");
+    expect(html).toContain("Some rows have partial future-window data.");
     expect(html).toContain("Source ready");
-    expect(html).toContain("Validation ready");
     expect(html).toContain("1 candle");
     expect(html).toContain("3 candles");
     expect(html).toContain("5 candles");
     expect(html).toContain("10 candles");
-    expect(html).toContain("Rows");
-    expect(html).toContain("Complete");
-    expect(html).toContain("Partial");
-    expect(html).toContain("Missing");
-    expect(html).toContain("Median Change");
-    expect(html).toContain("Positive Rate");
-    expect(html).toContain("Max Adverse Move");
-    expect(html).toContain("Window");
-    expect(html).toContain("Validation metrics use Validation Source");
-    expect(html).toContain("Group Distribution");
-    expect(html).toContain("Notable Symbols");
-    expect(html).toContain("Validation Status:");
-    expect(html).toContain("Complete has the selected future window");
-    expect(html).toContain("Partial has fewer future candles");
-    expect(html).toContain("Missing has no usable future window");
-    expect(html).toContain("Snapshot Rows");
-    expect(html).toContain("Validation Source");
-    expect(html).toContain("Observed Change");
-    expect(html).toContain("Max Adverse Move");
-    expect(html).toContain("Validation Status");
-    expect(html).toContain("SEIUSDT");
-    expect(html).toContain("RISKUSDT");
-    expect(html).toContain("NEWUSDT");
-    expect(html).toContain("Insufficient future candles");
+    expect(html).toContain("Complete Windows");
+    expect(html).toContain("Partial Windows");
+    expect(html).toContain("Missing Windows");
+    expect(html).toContain("Median Follow-through");
+    expect(html).toContain("Positive Follow-through");
+    expect(html).toContain("Drawdown Context");
+    expect(html).not.toContain("Observed Change");
+    expect(html).not.toContain("Max Adverse Move");
     expect(html).not.toContain("Win rate");
     expect(html).not.toContain("Accuracy");
     expect(html).not.toContain("Worked");
@@ -646,11 +643,11 @@ describe("ArchivePageClient display formatting", () => {
     );
 
     expect(uiState.status).toBe("observation_ready");
-    expect(html).toContain("Validation ready");
+    expect(html).toContain("Ready for Review");
     expect(html).toContain("Selected Run");
-    expect(html).toContain("Validation Source");
-    expect(html).toContain("selected");
-    expect(html).toContain("mature-r");
+    expect(html).toContain("Review Source");
+    expect(html).toContain("selec");
+    expect(html).toContain("matur");
     expect(html).toContain("Outcome Summary");
     expect(html).toContain("3.00%");
     expect(html).not.toContain("Loading Validation Source");
@@ -695,8 +692,8 @@ describe("ArchivePageClient display formatting", () => {
 
     expect(uiState.status).toBe("loading_observation_rows");
     expect(html).toContain("Validation loading");
-    expect(html).toContain("selected");
-    expect(html).toContain("mature-r");
+    expect(html).toContain("selec");
+    expect(html).toContain("matur");
     expect(html).toContain("Loading Snapshot Rows");
     expect(html).not.toContain("Loading Validation Source");
   });
@@ -786,32 +783,26 @@ describe("ArchivePageClient display formatting", () => {
       selectedRun: makeReadinessRun({ run: response.run }),
       observationRun: makeReadinessRun({ run: response.run }),
     });
-    const html = renderToStaticMarkup(
-      createElement(ForwardObservationSection, {
-        window: 3,
-        onWindowChange: () => undefined,
-        response,
-        readiness,
-        uiState: makeUiState({
-          selectedRunId: response.run.runId,
-          readiness,
-          response,
-        }),
-      }),
-    );
+    const uiState = makeUiState({
+      selectedRunId: response.run.runId,
+      readiness,
+      response,
+    });
+    const html = renderArchiveDetails({ response, readiness, uiState });
 
-    expect(html).toContain("Rows");
+    expect(html).toContain("Validation Details");
+    expect(html).toContain("Outcome Rows");
     expect(html).toContain(">5<");
-    expect(html).toContain("Positive");
+    expect(html).toContain("Positive Follow-through");
     expect(html).toContain("2.00%");
-    expect(html).toContain("66.67%");
+    expect(html).toContain("Average Follow-through");
     expect(html).toContain("-12.00%");
     expect(html).toContain("Eligible");
     expect(html).toContain("Watch");
     expect(html).toContain("Risk");
-    expect(html).toContain("Largest Positive Changes");
-    expect(html).toContain("Largest Negative Changes");
-    expect(html).toContain("Largest Adverse Moves");
+    expect(html).toContain("Largest Positive Follow-through");
+    expect(html).toContain("Lowest Follow-through");
+    expect(html).toContain("Largest Drawdown Context");
     expect(html).toContain("ELIGIBLEUSDT");
     expect(html).toContain("WATCHUSDT");
     expect(html).toContain("RISKUSDT");
@@ -871,31 +862,21 @@ describe("ArchivePageClient display formatting", () => {
         missingCount: 1,
       }),
     });
-    const html = renderToStaticMarkup(
-      createElement(ForwardObservationSection, {
-        window: 3,
-        onWindowChange: () => undefined,
-        response,
-        readiness,
-        uiState: makeUiState({
-          selectedRunId: response.run.runId,
-          readiness,
-          response,
-        }),
-      }),
-    );
+    const uiState = makeUiState({
+      selectedRunId: response.run.runId,
+      readiness,
+      response,
+    });
+    const html = renderArchiveDetails({ response, readiness, uiState });
 
-    expect(html).toContain("Outcome Summary");
+    expect(html).toContain("Validation Details");
     expect(html).toContain("Not enough complete rows");
-    expect(html).toContain("Rows partial");
-    expect(html).toContain("Window pending");
-    expect(html).toContain("N/A");
     expect(html).toContain("PARTIALUPUSDT");
     expect(html).toContain("PARTIALDOWNUSDT");
     expect(html).toContain("Insufficient future candles");
-    expect(html).toContain("Largest Positive Changes");
-    expect(html).toContain("Largest Negative Changes");
-    expect(html).toContain("Largest Adverse Moves");
+    expect(html).toContain("Largest Positive Follow-through");
+    expect(html).toContain("Lowest Follow-through");
+    expect(html).toContain("Largest Drawdown Context");
     expect(html).not.toContain("12.00%</span></div></li>");
     expect(html).not.toContain("-9.00%</span></div></li>");
   });
@@ -949,22 +930,30 @@ describe("ArchivePageClient display formatting", () => {
       readiness,
       readinessError: null,
     })).toBeNull();
-    expect(html).toContain("Validation Source unavailable");
+    expect(html).toContain("Data Missing");
     expect(html).toContain("Market data appears stale");
-    expect(html).toContain("Dominant Reason");
-    expect(html).toContain("Diagnostic");
-    expect(html).toContain("Market candle coverage");
-    expect(html).toContain("Latest Coverage");
-    expect(html).toContain("100 / 413");
     expect(html).toContain("Coverage Lag");
     expect(html).toContain("3 candles");
-    expect(html).toContain("Complete");
-    expect(html).toContain("Partial");
-    expect(html).toContain("Missing");
     expect(html).not.toContain("Loading Snapshot Rows");
     expect(html).not.toContain("AAAUSDT");
     expect(html).not.toContain("BBBUSDT");
     expect(html).not.toContain("CCCUSDT");
+
+    const detailsHtml = renderToStaticMarkup(
+      createElement(ArchiveDetails, {
+        readiness,
+        response: null,
+        uiState,
+        readyContextNote: null,
+        summary: null,
+      }),
+    );
+
+    expect(detailsHtml).toContain("Dominant Reason");
+    expect(detailsHtml).toContain("Diagnostic");
+    expect(detailsHtml).toContain("Market candle coverage");
+    expect(detailsHtml).toContain("Latest Coverage");
+    expect(detailsHtml).toContain("100 / 413");
   });
 
   it("classifies maturity and falls back to the most recent observable run", () => {
@@ -1102,12 +1091,12 @@ describe("ArchivePageClient display formatting", () => {
       readiness,
       readinessError: null,
     })).toBe(recommendedRun.runId);
-    expect(html).toContain("Validation ready");
-    expect(html).toContain("11111111");
-    expect(html).toContain("22222222");
-    expect(html).toContain("Window 3 candles");
+    expect(html).toContain("Partially Ready");
+    expect(html).toContain("11111");
+    expect(html).toContain("22222");
+    expect(html).toContain("3 candles");
     expect(html).toContain("Selected Run has stale market data coverage");
-    expect(html).toContain("Observed Change");
+    expect(html).toContain("Median Follow-through");
     expect(html).not.toContain("Validation Source unavailable");
   });
 
@@ -1159,11 +1148,11 @@ describe("ArchivePageClient display formatting", () => {
       readinessError: null,
     })).toBe(observationRun.runId);
     expect(html).toContain(
-      "Selected Run is still waiting for future candles. Validation Source uses the most recent mature full-universe run.",
+      "Selected Run is still waiting for enough completed future candles. Validation Source uses the most recent mature full-universe run.",
     );
-    expect(html).toContain("11111111");
-    expect(html).toContain("22222222");
-    expect(html).toContain("Observed Change");
+    expect(html).toContain("11111");
+    expect(html).toContain("22222");
+    expect(html).toContain("Median Follow-through");
     expect(html).toContain("Validation Source");
     expect(html).not.toContain("Loading Validation Source");
     expect(html).not.toContain("Validation Source unavailable");
@@ -1193,9 +1182,8 @@ describe("ArchivePageClient display formatting", () => {
       readiness: null,
       readinessError: uiState.readinessError,
     })).toBeNull();
-    expect(html).toContain("Validation Source unavailable");
-    expect(html).toContain("Validation Source readiness could not be determined");
-    expect(html).toContain("Source Data");
+    expect(html).toContain("Data Missing");
+    expect(html).toContain("Source data is missing or incomplete.");
     expect(html).not.toContain("Loading Snapshot Rows");
   });
 
@@ -1241,10 +1229,8 @@ describe("ArchivePageClient display formatting", () => {
       readiness,
       readinessError: null,
     })).toBeNull();
-    expect(html).toContain("Selected Run is not mature");
-    expect(html).toContain("The Selected Run is waiting for completed future candles");
-    expect(html).toContain("Waiting for future candles");
-    expect(html).toContain("Missing");
+    expect(html).toContain("Validation Pending");
+    expect(html).toContain("This run is still waiting for enough completed future candles.");
     expect(html).toContain("12 hours");
     expect(html).not.toContain("Loading Snapshot Rows");
   });
@@ -1279,10 +1265,10 @@ describe("ArchivePageClient display formatting", () => {
       readiness,
       readinessError: null,
     })).toBe(selectedRun.runId);
-    expect(html).toContain("Validation ready");
-    expect(html).toContain("11111111");
-    expect(html).toContain("Ready");
-    expect(html).toContain("Observed Change");
+    expect(html).toContain("Partially Ready");
+    expect(html).toContain("11111");
+    expect(html).toContain("Some rows have partial future-window data.");
+    expect(html).toContain("Median Follow-through");
   });
 
   it("derives a fallback summary when rows exist but the API summary is null", () => {
@@ -1332,7 +1318,7 @@ describe("ArchivePageClient display formatting", () => {
       partialCount: 1,
       missingCount: 0,
     });
-    expect(html).toContain("Observed Change");
+    expect(html).toContain("Median Follow-through");
     expect(html).not.toContain("Snapshot Rows not returned");
   });
 
@@ -1379,10 +1365,12 @@ describe("ArchivePageClient display formatting", () => {
     });
     expect(html).toContain("Snapshot Rows not returned");
     expect(html).toContain("Validation Source is available, but no Snapshot Rows were returned.");
-    expect(html).toContain("Rows");
-    expect(html).toContain("Returned Rows");
+    expect(html).toContain("Missing Windows");
     expect(html).toContain(">413<");
-    expect(html).toContain(">0<");
+    const detailsHtml = renderArchiveDetails({ response, readiness, uiState });
+    expect(detailsHtml).toContain("Returned Rows");
+    expect(detailsHtml).toContain("Outcome Rows");
+    expect(detailsHtml).toContain(">0<");
     expect(html).not.toContain(
       "No snapshot rows are available for the Validation Source.",
     );
@@ -1504,6 +1492,36 @@ function renderObservationRowsTable(
       rows: makeObservationRowsForFilters(),
       isFetching: false,
       ...overrides,
+    }),
+  );
+}
+
+function renderArchiveDetails({
+  response,
+  readiness,
+  uiState,
+}: {
+  response: ReturnType<typeof makeObservationResponse>;
+  readiness: ReturnType<typeof makeReadinessResponse>;
+  uiState: ReturnType<typeof makeUiState>;
+}) {
+  return renderToStaticMarkup(
+    createElement(ArchiveDetails, {
+      readiness,
+      response,
+      uiState,
+      readyContextNote: null,
+      summary: buildObservationSummary({
+        rows: response.rows,
+        counts: uiState.summary
+          ? {
+              totalRows: uiState.summary.totalRows,
+              completeCount: uiState.summary.completeCount,
+              partialCount: uiState.summary.partialCount,
+              missingCount: uiState.summary.missingCount,
+            }
+          : null,
+      }),
     }),
   );
 }
