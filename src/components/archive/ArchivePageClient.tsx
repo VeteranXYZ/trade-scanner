@@ -11,11 +11,7 @@ import {
   normalizeGroupKey,
   type ScannerDisplayDictionary,
 } from "@/components/rankings/latestRankingsUi";
-import {
-  firstFiniteResearchMetric,
-  formatResearchMetricLabel,
-  researchMissingStateCopy,
-} from "@/lib/research-state/formatResearchState";
+import { researchMissingStateCopy } from "@/lib/research-state/formatResearchState";
 import { dictionaries } from "@/lib/i18n/dictionaries";
 import { formatScannerReviewValue } from "@/lib/i18n/formatScannerObservation";
 import {
@@ -447,6 +443,9 @@ export function ArchivePageClient({
   const [manualSelectedRunId, setManualSelectedRunId] = useState<string | null>(
     initialUrlState.runId,
   );
+  const [validationRequestKey, setValidationRequestKey] = useState<string | null>(
+    isVisualCheck ? "visual-check" : null,
+  );
   const [refreshingTimeframe, setRefreshingTimeframe] =
     useState<ArchiveTimeframe | null>(null);
   const snapshotsQuery = useQuery({
@@ -464,8 +463,15 @@ export function ArchivePageClient({
       ? manualSelectedRunId
       : snapshots[0]?.runId ?? null;
 
+  const activeValidationRequestKey = buildArchiveValidationRequestKey({
+    timeframe,
+    runId: selectedRunId,
+    window: observationWindow,
+  });
   const shouldLoadSnapshotRows = isVisualCheck || selectedRunId !== null;
-  const shouldLoadObservationRows = isVisualCheck || selectedRunId !== null;
+  const shouldLoadObservationRows =
+    isVisualCheck ||
+    (selectedRunId !== null && validationRequestKey === activeValidationRequestKey);
   const visualSnapshotData =
     selectedRunId && visualCheckData
       ? visualCheckData.snapshotsByRunId[selectedRunId] ?? null
@@ -649,8 +655,11 @@ export function ArchivePageClient({
         rowCount={commandRows}
         isRefreshing={isRefreshing}
         isVisualCheck={isVisualCheck}
+        validationRequested={shouldLoadObservationRows}
+        canLoadValidation={!isVisualCheck && selectedRunId !== null}
         onTimeframeChange={setTimeframe}
         onRefresh={refreshData}
+        onLoadValidation={() => setValidationRequestKey(activeValidationRequestKey)}
       />
       <p className="mb-1 text-[11px] leading-4 text-[var(--muted)]">
         Research-only. Not trading advice. Review stored runs, future-window
@@ -747,8 +756,11 @@ function ArchiveCommandBar({
   rowCount,
   isRefreshing,
   isVisualCheck,
+  validationRequested,
+  canLoadValidation,
   onTimeframeChange,
   onRefresh,
+  onLoadValidation,
 }: {
   timeframe: ArchiveTimeframe;
   selectedRunId: string | null;
@@ -757,8 +769,11 @@ function ArchiveCommandBar({
   rowCount: number;
   isRefreshing: boolean;
   isVisualCheck: boolean;
+  validationRequested: boolean;
+  canLoadValidation: boolean;
   onTimeframeChange: (timeframe: ArchiveTimeframe) => void;
   onRefresh: () => void;
+  onLoadValidation: () => void;
 }) {
   return (
     <header className="terminal-command-bar mb-1">
@@ -797,6 +812,16 @@ function ArchiveCommandBar({
           />
         </div>
         <div className="terminal-command-actions">
+          {!validationRequested ? (
+            <button
+              type="button"
+              onClick={onLoadValidation}
+              disabled={!canLoadValidation}
+              className="terminal-command-action disabled:cursor-not-allowed disabled:opacity-55"
+            >
+              Load Validation
+            </button>
+          ) : null}
           <RefreshIconButton
             onClick={onRefresh}
             disabled={isRefreshing || isVisualCheck}
@@ -2944,13 +2969,14 @@ export function SnapshotTable({
           />
         ) : (
           <DataTableScroll className="max-h-72 !overflow-x-auto !overflow-y-auto">
-          <DataTable minWidth="min-w-[1420px]">
+          <DataTable minWidth="min-w-[900px]" className="table-fixed">
             <thead className="sticky top-0 z-20 bg-[var(--table-header)] text-[10px] uppercase tracking-normal text-[var(--muted)]">
               <tr>
                 <DataTableHeaderCell
                   sortKey="index"
                   sortState={sortState}
                   onSortChange={updateSort}
+                  className="w-[64px]"
                   align="right"
                 >
                   Rank
@@ -2959,6 +2985,7 @@ export function SnapshotTable({
                   sortKey="symbol"
                   sortState={sortState}
                   onSortChange={updateSort}
+                  className="w-[128px]"
                 >
                   Symbol
                 </DataTableHeaderCell>
@@ -2966,6 +2993,7 @@ export function SnapshotTable({
                   sortKey="market"
                   sortState={sortState}
                   onSortChange={updateSort}
+                  className="w-[104px]"
                 >
                   Market
                 </DataTableHeaderCell>
@@ -2974,34 +3002,25 @@ export function SnapshotTable({
                   sortState={sortState}
                   defaultDirection="desc"
                   onSortChange={updateSort}
+                  className="w-[156px]"
                 >
                   Research Group
                 </DataTableHeaderCell>
-                <DataTableHeaderCell
-                  sortKey="label"
-                  sortState={sortState}
-                  onSortChange={updateSort}
-                >
-                  Research Label
-                </DataTableHeaderCell>
-                <DataTableHeaderCell>Research Priority</DataTableHeaderCell>
-                <DataTableHeaderCell>Risk Context</DataTableHeaderCell>
                 <DataTableHeaderCell
                   sortKey="rank_score"
                   sortState={sortState}
                   defaultDirection="desc"
                   onSortChange={updateSort}
+                  className="w-[112px]"
                   align="right"
                 >
                   Rank Score
                 </DataTableHeaderCell>
-                <DataTableHeaderCell>Validation State</DataTableHeaderCell>
-                <DataTableHeaderCell align="right">Follow-through</DataTableHeaderCell>
-                <DataTableHeaderCell align="right">Drawdown Context</DataTableHeaderCell>
-                <DataTableHeaderCell>Window</DataTableHeaderCell>
-                <DataTableHeaderCell>Score Components</DataTableHeaderCell>
-                <DataTableHeaderCell>Source Versions</DataTableHeaderCell>
-                <DataTableHeaderCell>Open Research</DataTableHeaderCell>
+                <DataTableHeaderCell className="w-[136px]">Validation State</DataTableHeaderCell>
+                <DataTableHeaderCell className="w-[120px]" align="right">Follow-through</DataTableHeaderCell>
+                <DataTableHeaderCell className="w-[132px]" align="right">Drawdown</DataTableHeaderCell>
+                <DataTableHeaderCell className="w-[96px]">Window</DataTableHeaderCell>
+                <DataTableHeaderCell className="w-[116px]">Open Research</DataTableHeaderCell>
               </tr>
             </thead>
             <tbody>
@@ -3027,25 +3046,6 @@ export function SnapshotTable({
                         group={normalizeGroupKey(row.group)}
                         dictionary={dictionary}
                       />
-                    </DataTableCell>
-                    <DataTableCell>
-                      <DataTableChip title={formatSignalLabel(row.label, dictionary)}>
-                        {formatSignalLabel(row.label, dictionary)}
-                      </DataTableChip>
-                    </DataTableCell>
-                    <DataTableCell
-                      className="max-w-[160px] text-[var(--foreground)]"
-                      truncate
-                      title={formatArchivePrimarySignal(row.primarySignal, dictionary)}
-                    >
-                      {formatArchivePrimarySignal(row.primarySignal, dictionary)}
-                    </DataTableCell>
-                    <DataTableCell
-                      className="max-w-[240px]"
-                      truncate
-                      title={formatRiskNotes(row)}
-                    >
-                      {formatRiskNotes(row)}
                     </DataTableCell>
                     <DataTableCell align="right" className="font-mono tabular-nums">
                       {formatScore(row.rankScore)}
@@ -3080,20 +3080,6 @@ export function SnapshotTable({
                       {observationRow
                         ? formatObservationWindow(observationRow.window)
                         : formatObservationWindow(observationWindow)}
-                    </DataTableCell>
-                    <DataTableCell
-                      className="max-w-[180px]"
-                      truncate
-                      title={formatComponentScores(row.componentScores)}
-                    >
-                      {formatComponentScores(row.componentScores)}
-                    </DataTableCell>
-                    <DataTableCell
-                      className="max-w-[150px]"
-                      truncate
-                      title={formatVersions(row)}
-                    >
-                      {formatVersions(row)}
                     </DataTableCell>
                     <DataTableCell>
                       <Link
@@ -3265,6 +3251,18 @@ export function buildArchiveSnapshotObservationsQueryKey({
     assetClass,
     window,
   ] as const;
+}
+
+function buildArchiveValidationRequestKey({
+  timeframe,
+  runId,
+  window,
+}: {
+  timeframe: ArchiveTimeframe;
+  runId: string | null;
+  window: ObservationWindow;
+}) {
+  return `${timeframe}:${runId ?? "none"}:${window}`;
 }
 
 export function buildArchiveRefreshScope({
@@ -4450,48 +4448,6 @@ function formatMarket(row: HistoricalSnapshotRow) {
   const market = row.market ?? "spot";
 
   return `${exchange} / ${market}`;
-}
-
-function formatRiskNotes(row: HistoricalSnapshotRow) {
-  const riskTypes = row.riskTypes?.length
-    ? `Risk types: ${row.riskTypes.join(", ")}.`
-    : "";
-  const notes = row.riskNotes ?? "";
-  const text = [notes, riskTypes].filter(Boolean).join(" ");
-
-  return text || "N/A";
-}
-
-function formatComponentScores(
-  scores: HistoricalSnapshotRow["componentScores"],
-) {
-  if (!scores) {
-    return "N/A";
-  }
-
-  return [
-    [formatResearchMetricLabel("setupQualityScore"), scores.opportunityScore],
-    [formatResearchMetricLabel("confidenceScore"), scores.confirmationScore],
-    [
-      formatResearchMetricLabel("riskPenalty"),
-      firstFiniteResearchMetric(scores.riskScore),
-    ],
-    [formatResearchMetricLabel("trendScore"), scores.trendScore],
-    [formatResearchMetricLabel("momentumScore"), scores.momentumScore],
-    [formatResearchMetricLabel("volumeScore"), scores.volumeScore],
-    [formatResearchMetricLabel("structureScore"), scores.structureScore],
-  ]
-    .map(([label, value]) => `${label} ${formatScore(value as number | null)}`)
-    .join(" / ");
-}
-
-function formatVersions(row: HistoricalSnapshotRow) {
-  return [
-    row.scannerVersion ? `Engine ${row.scannerVersion}` : null,
-    row.scoringVersion ? `Scoring ${row.scoringVersion}` : null,
-  ]
-    .filter(Boolean)
-    .join(" / ") || "N/A";
 }
 
 function getObservationProbeLimit(window: ObservationWindow) {

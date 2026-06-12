@@ -323,18 +323,8 @@ export function WatchlistPageClient({
         onResetDefault={resetDefault}
         onClear={clearWatchlist}
       />
-      <section className="terminal-panel-muted mb-2 px-2 py-1.5 text-[11px] leading-4 text-[var(--muted)]">
-        <span className="font-semibold text-[var(--foreground)]">
-          Saved locally in this browser.
-        </span>{" "}
-        Selected symbols are monitored against the latest available research snapshot.
-      </section>
 
-      <main className="min-w-0 space-y-2 xl:flex xl:min-h-0 xl:flex-col xl:overflow-hidden">
-        <WatchlistSummaryCards
-          summary={summary}
-          researchSummary={researchSummary}
-        />
+      <div className="grid min-h-0 flex-1 gap-2 xl:grid-cols-[280px_minmax(0,1fr)] xl:overflow-hidden 2xl:grid-cols-[300px_minmax(0,1fr)]">
         <WatchlistControls
           draftInput={draftInput}
           importInput={importInput}
@@ -354,7 +344,20 @@ export function WatchlistPageClient({
           onRefresh={refreshData}
           isRefreshing={latestIsFetching || marketContextIsFetching}
           isVisualCheck={isVisualCheck}
+          className="order-2 xl:order-1"
         />
+
+        <main className="order-1 min-w-0 space-y-2 xl:order-2 xl:flex xl:min-h-0 xl:flex-col xl:overflow-hidden">
+          <WatchlistBackdropDisclosure
+            data={marketContextData}
+            isLoading={marketContextIsLoading}
+            isError={marketContextIsError}
+          />
+
+          <WatchlistSummaryCards
+            summary={summary}
+            researchSummary={researchSummary}
+          />
 
           {!latestIsError ? (
             <WatchlistSourcePanel
@@ -403,16 +406,11 @@ export function WatchlistPageClient({
 
           <WatchlistResearchSummaryPanel summary={researchSummary} />
 
-          <WatchlistBackdropDisclosure
-            data={marketContextData}
-            isLoading={marketContextIsLoading}
-            isError={marketContextIsError}
-          />
-
           <footer className="terminal-panel px-3 py-1.5 text-[11px] text-[var(--muted)]">
             {shortResearchDisclaimer}
           </footer>
-      </main>
+        </main>
+      </div>
     </PageShell>
   );
 }
@@ -855,6 +853,7 @@ export function WatchlistControls({
   onRefresh,
   isRefreshing,
   isVisualCheck,
+  className = "",
 }: {
   draftInput: string;
   importInput: string;
@@ -877,11 +876,28 @@ export function WatchlistControls({
   onRefresh: () => void;
   isRefreshing: boolean;
   isVisualCheck: boolean;
+  className?: string;
 }) {
   return (
-    <section className="terminal-panel px-2 py-1.5 xl:shrink-0">
-      <div className="flex flex-wrap items-end gap-2">
-        <label className="min-w-[150px] flex-1 md:max-w-[220px]">
+    <aside
+      aria-label="Watchlist controls"
+      className={`terminal-rail xl:flex xl:h-full xl:min-h-0 xl:flex-col xl:overflow-hidden ${className}`}
+    >
+      <div className="terminal-panel-header">
+        <div className="min-w-0">
+          <h2 className="terminal-panel-title text-[11px]">Watchlist Controls</h2>
+          <p className="text-[10px] text-[var(--muted)]">Filters and symbols</p>
+        </div>
+        <RefreshIconButton
+          onClick={onRefresh}
+          disabled={isRefreshing || isVisualCheck}
+          isRefreshing={isRefreshing}
+          label={isVisualCheck ? "Visual Check Data" : "Refresh Watchlist"}
+        />
+      </div>
+
+      <div className="space-y-1.5 p-1.5 xl:min-h-0 xl:flex-1 xl:overflow-y-auto">
+        <label className="block">
           <span className={railFieldLabelClass}>
             Search Symbol
           </span>
@@ -895,7 +911,7 @@ export function WatchlistControls({
             placeholder="BTC"
           />
         </label>
-        <label className="min-w-[150px]">
+        <label className="block">
           <span className={railFieldLabelClass}>
             Research Group
           </span>
@@ -916,7 +932,7 @@ export function WatchlistControls({
             ))}
           </select>
         </label>
-        <label className="min-w-[150px]">
+        <label className="block">
           <span className={railFieldLabelClass}>
             Risk Context
           </span>
@@ -937,7 +953,7 @@ export function WatchlistControls({
             ))}
           </select>
         </label>
-        <label className="min-w-[150px]">
+        <label className="block">
           <span className={railFieldLabelClass}>
             Sort By
           </span>
@@ -975,19 +991,12 @@ export function WatchlistControls({
         >
           Clear Filters
         </button>
-        <RefreshIconButton
-          onClick={onRefresh}
-          disabled={isRefreshing || isVisualCheck}
-          isRefreshing={isRefreshing}
-          label={isVisualCheck ? "Visual Check Data" : "Refresh Watchlist"}
-        />
-      </div>
 
-      <details className={`${railDetailsClass} mt-2`}>
+      <details open className={railDetailsClass}>
         <summary className={railSummaryClass}>
           <span>Selected Symbols</span>
         </summary>
-        <div className="grid gap-2 border-t border-[var(--border)] p-1.5 lg:grid-cols-[minmax(0,1fr)_220px_minmax(0,1fr)]">
+        <div className="space-y-2 border-t border-[var(--border)] p-1.5">
           <section className="space-y-1">
             <h2 className={railSectionLabelClass}>
               Symbols
@@ -1059,7 +1068,8 @@ export function WatchlistControls({
           </section>
         </div>
       </details>
-    </section>
+      </div>
+    </aside>
   );
 }
 
@@ -1074,7 +1084,7 @@ function WatchlistSourcePanel({
 }) {
   return (
     <section className="terminal-panel-muted px-2 py-1.5">
-      <div className="flex min-w-0 items-center gap-1.5 overflow-x-auto [scrollbar-gutter:stable]">
+      <div className="flex min-w-0 flex-nowrap items-center gap-1.5 overflow-hidden">
         <span className="shrink-0 border-r border-[var(--border)] pr-2 text-[10px] font-semibold uppercase text-[var(--muted)]">
           Latest Snapshot Source
         </span>
@@ -1096,7 +1106,7 @@ function WatchlistSourcePanel({
               </span>
               <span className="text-[var(--muted)]">
                 {run
-                  ? `Latest Snapshot ${formatDateTime(run.finishedAt ?? run.startedAt)} / ${signalCount} ranking results / ${missingCount} missing`
+                  ? `${formatDateTime(run.finishedAt ?? run.startedAt)} · ${signalCount}/${missingCount}`
                   : "No latest snapshot"}
               </span>
             </div>
@@ -1113,7 +1123,7 @@ function WatchlistBackdropDisclosure({
   isError,
 }: MarketContextPanelState) {
   return (
-    <details className="terminal-panel xl:shrink-0">
+    <details open className="terminal-panel xl:shrink-0">
       <summary className="flex min-h-7 cursor-pointer list-none items-center justify-between gap-2 px-2 py-1 text-[11px] font-semibold uppercase text-[var(--muted)] marker:hidden">
         <span>Market Context</span>
         <span className="text-[9px] text-[var(--muted-2)]">

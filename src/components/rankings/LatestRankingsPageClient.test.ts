@@ -54,14 +54,14 @@ describe("latest rankings API URL builder", () => {
     );
   });
 
-  it("defaults the latest-rankings limit to 100", () => {
+  it("defaults the latest-rankings limit to all supported rows", () => {
     const url = buildLatestRankingsUrl({
       timeframe: "4h",
       assetClass: "crypto",
       tradeApiBaseUrl: "https://api.vegarank.com",
     });
 
-    expect(url).toContain("limit=100");
+    expect(url).toContain("limit=500");
   });
 });
 

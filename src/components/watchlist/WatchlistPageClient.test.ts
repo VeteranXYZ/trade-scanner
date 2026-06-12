@@ -291,7 +291,7 @@ describe("WatchlistPageClient", () => {
     expect(html).not.toContain('data-sort-key="remove"');
   });
 
-  it("keeps controls compact with collapsed selected-symbol tools", () => {
+  it("keeps controls in a left rail with expanded selected-symbol tools", () => {
     const html = renderWatchlistVisualPage();
     const controlsHtml = extractControlsHtml(html);
     const detailsTag = controlsHtml.match(/<details[^>]*>/)?.[0] ?? "";
@@ -304,7 +304,7 @@ describe("WatchlistPageClient", () => {
     expect(controlsHtml).toContain("Selected Symbols");
     expect(html).toContain("Paste Symbols");
     expect(html).toContain("Copy Watchlist");
-    expect(detailsTag).not.toMatch(/\sopen(?:=|\s|>)/);
+    expect(detailsTag).toMatch(/\sopen(?:=|\s|>)/);
     expect(html).not.toContain("Show more");
     expect(html).not.toContain("Show More");
     expect(html).not.toMatch(/[\u3400-\u9fff]/);
@@ -471,7 +471,7 @@ function renderWatchlistVisualPage() {
 }
 
 function extractControlsHtml(html: string) {
-  return html.match(/<section class="terminal-panel px-2 py-1.5[\s\S]*?<\/section>/)?.[0] ?? "";
+  return html.match(/<aside aria-label="Watchlist controls"[\s\S]*?<\/aside>/)?.[0] ?? "";
 }
 
 function makeResponse(

@@ -672,7 +672,10 @@ export function MtfScreenerCommandBar({
 
   return (
     <header className="terminal-command-bar mb-1">
-      <div className="terminal-command-row text-[var(--terminal-bar-muted)]">
+      <div
+        className="terminal-command-row text-[var(--terminal-bar-muted)]"
+        style={{ flexWrap: "nowrap", overflowX: "auto", scrollbarGutter: "stable" }}
+      >
         <div
           className="terminal-command-brand"
           title={`${title} · ${datasetLabel}`}
@@ -686,7 +689,7 @@ export function MtfScreenerCommandBar({
           </span>
         </div>
 
-        <div className="terminal-command-main">
+        <div className="terminal-command-main flex-none overflow-visible">
           <MtfCommandStat
             label="Latest Snapshot"
             value={statusLabel}
@@ -715,7 +718,10 @@ export function MtfScreenerCommandBar({
           <MtfFreshnessStrip sourceData={sourceData} />
         </div>
 
-        <div className="terminal-command-actions">
+        <div
+          className="terminal-command-actions ml-0"
+          style={{ flexWrap: "nowrap" }}
+        >
           {onExportVisible && onExportAll ? (
             <MtfScreenerExportControls
               visibleRowsCount={visibleRows}
@@ -1869,7 +1875,7 @@ export function MtfScreenerExportControls({
   return (
     <div
       aria-label="Screener CSV export"
-      className="flex flex-wrap items-center gap-1"
+      className={`flex items-center gap-1 ${variant === "terminal" ? "flex-nowrap" : "flex-wrap"}`}
     >
       <button
         type="button"

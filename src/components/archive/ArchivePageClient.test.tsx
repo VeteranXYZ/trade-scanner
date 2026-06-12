@@ -267,12 +267,9 @@ describe("ArchivePageClient display formatting", () => {
       "Open Research opens current symbol research with Archive Context, not historical replay.",
     );
     expect(html).toContain("2 rows");
-    expect(html).toContain("Overheated caution");
-    expect(html).toContain("Risk review");
-    expect(html).toContain("Research Priority");
     expect(html).toContain("Validation State");
     expect(html).toContain("Follow-through");
-    expect(html).toContain("Drawdown Context");
+    expect(html).toContain("Drawdown");
     expect(html).toContain("Validation pending");
     expect(html).toContain("from=archive");
     expect(html).toContain("runId=fcc05284-c7a0-4990-9bcb-5dd165d83c37");
@@ -281,6 +278,9 @@ describe("ArchivePageClient display formatting", () => {
     expect(html).toContain("assetClass=crypto");
     expect(html).not.toContain("Do not chase");
     expect(html).not.toContain("Avoid");
+    expect(html).not.toContain("Research Label");
+    expect(html).not.toContain("Research Priority");
+    expect(html).not.toContain("Score Components");
     expect(html).not.toContain("Show More");
     expect(html).not.toContain("Pagination");
   });

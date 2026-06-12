@@ -19,7 +19,6 @@ import {
   type DataSortValue,
 } from "@/components/table/dataTableSorting";
 import {
-  FilterBar,
   PageShell,
   RefreshIconButton,
   StatCell,
@@ -61,7 +60,7 @@ export type LatestRankingsAssetClass =
   | "special"
   | "all";
 export type LatestRankingsTimeframe = "4h" | "1h" | "1d" | "1w";
-export type LatestRankingsLimit = 100 | 200 | 300 | 500;
+export type LatestRankingsLimit = "all" | 100 | 200 | 300 | 500;
 
 export type LatestRankingsRun = {
   id: string;
@@ -190,7 +189,8 @@ const assetClassOptions: LatestRankingsAssetClass[] = [
   "all",
 ];
 const timeframeOptions: LatestRankingsTimeframe[] = ["4h", "1h", "1d", "1w"];
-const limitOptions: LatestRankingsLimit[] = [100, 200, 300, 500];
+const limitOptions: LatestRankingsLimit[] = ["all", 100, 200, 300, 500];
+const latestRankingsAllLimit = 500;
 type LatestRankingsSortKey =
   | "symbol"
   | "rank"
@@ -289,7 +289,7 @@ export function LatestRankingsPageClient({
   const clearFilters = () => {
     setTimeframe("4h");
     setAssetClass("crypto");
-    setLimit(100);
+    setLimit("all");
     setIncludeLowQuality(false);
     setTableSort({ key: "rank", direction: "desc" });
   };
@@ -336,18 +336,7 @@ export function LatestRankingsPageClient({
         evidence quality, and risk context.
       </p>
 
-      <main className="min-h-0 min-w-0 flex-1 space-y-1.5 xl:flex xl:flex-col xl:overflow-hidden">
-        <LatestRankingsSummaryPanel
-          data={data}
-          timeframe={timeframe}
-          assetClass={assetClass}
-          includeLowQuality={includeLowQuality}
-          finishedAt={finishedAt}
-          totalSignals={totalSignals}
-          returnedItems={returnedItems}
-          lowQualityExcluded={lowQualityExcluded}
-        />
-
+      <div className="grid min-h-0 flex-1 gap-2 xl:grid-cols-[204px_minmax(0,1fr)] xl:overflow-hidden 2xl:grid-cols-[220px_minmax(0,1fr)]">
         <LatestRankingsControls
           timeframe={timeframe}
           assetClass={assetClass}
@@ -358,7 +347,20 @@ export function LatestRankingsPageClient({
           onLimitChange={setLimit}
           onIncludeLowQualityChange={setIncludeLowQuality}
           onClear={clearFilters}
+          className="order-2 xl:order-1"
         />
+
+        <main className="order-1 min-h-0 min-w-0 flex-1 space-y-1.5 xl:order-2 xl:flex xl:flex-col xl:overflow-hidden">
+          <LatestRankingsSummaryPanel
+            data={data}
+            timeframe={timeframe}
+            assetClass={assetClass}
+            includeLowQuality={includeLowQuality}
+            finishedAt={finishedAt}
+            totalSignals={totalSignals}
+            returnedItems={returnedItems}
+            lowQualityExcluded={lowQualityExcluded}
+          />
 
         {hasUnavailableData ? (
           <StatePanel
@@ -389,7 +391,8 @@ export function LatestRankingsPageClient({
             language={language}
           />
         )}
-      </main>
+        </main>
+      </div>
     </PageShell>
   );
 }
@@ -519,6 +522,7 @@ function LatestRankingsControls({
   onLimitChange,
   onIncludeLowQualityChange,
   onClear,
+  className = "",
 }: {
   timeframe: LatestRankingsTimeframe;
   assetClass: LatestRankingsAssetClass;
@@ -529,17 +533,26 @@ function LatestRankingsControls({
   onLimitChange: (value: LatestRankingsLimit) => void;
   onIncludeLowQualityChange: (value: boolean) => void;
   onClear: () => void;
+  className?: string;
 }) {
   const hasActiveFilters =
     timeframe !== "4h" ||
     assetClass !== "crypto" ||
-    limit !== 100 ||
+    limit !== "all" ||
     includeLowQuality;
 
   return (
-    <FilterBar
-      label="Active Filters"
-      actions={
+    <aside
+      aria-label="Rankings filters"
+      className={`terminal-rail xl:flex xl:h-full xl:min-h-0 xl:flex-col xl:overflow-hidden ${className}`}
+    >
+      <div className="terminal-panel-header">
+        <div className="min-w-0">
+          <h2 className="terminal-panel-title text-[11px]">Active Filters</h2>
+          <p className="text-[10px] text-[var(--muted)]">
+            {hasActiveFilters ? "Filtered view" : "Full dataset"}
+          </p>
+        </div>
         <button
           type="button"
           onClick={onClear}
@@ -548,38 +561,41 @@ function LatestRankingsControls({
         >
           Clear Filters
         </button>
-      }
-    >
-      <CompactSelect
-        label="Timeframe"
-        value={timeframe}
-        onChange={(value) => onTimeframeChange(value as LatestRankingsTimeframe)}
-        options={timeframeOptions}
-      />
-      <CompactSelect
-        label="Asset Class"
-        value={assetClass}
-        onChange={(value) => onAssetClassChange(value as LatestRankingsAssetClass)}
-        options={assetClassOptions}
-      />
-      <CompactSelect
-        label="Rows"
-        value={String(limit)}
-        onChange={(value) => onLimitChange(Number(value) as LatestRankingsLimit)}
-        options={limitOptions.map(String)}
-      />
-      <label className="flex h-7 items-center gap-1.5 border border-[var(--border-medium)] bg-[var(--control)] px-2 text-[10px] font-semibold uppercase text-[var(--muted)]">
-        <input
-          type="checkbox"
-          checked={includeLowQuality}
-          onChange={(event) => onIncludeLowQualityChange(event.target.checked)}
-          className="h-3 w-3 shrink-0 accent-[var(--accent)]"
+      </div>
+      <div className="space-y-1.5 p-1.5 xl:min-h-0 xl:flex-1 xl:overflow-y-auto">
+        <CompactSelect
+          label="Timeframe"
+          value={timeframe}
+          onChange={(value) => onTimeframeChange(value as LatestRankingsTimeframe)}
+          options={timeframeOptions}
         />
-        <span className="whitespace-nowrap text-[var(--foreground)]">
-          Show Low Quality
-        </span>
-      </label>
-    </FilterBar>
+        <CompactSelect
+          label="Asset Class"
+          value={assetClass}
+          onChange={(value) => onAssetClassChange(value as LatestRankingsAssetClass)}
+          options={assetClassOptions}
+        />
+        <CompactSelect
+          label="Rows"
+          value={String(limit)}
+          onChange={(value) =>
+            onLimitChange(
+              value === "all" ? "all" : (Number(value) as LatestRankingsLimit),
+            )
+          }
+          options={limitOptions.map(String)}
+        />
+        <label className="flex min-h-7 items-center gap-1.5 border border-[var(--border-medium)] bg-[var(--control)] px-2 text-[10px] font-semibold uppercase text-[var(--muted)]">
+          <input
+            type="checkbox"
+            checked={includeLowQuality}
+            onChange={(event) => onIncludeLowQualityChange(event.target.checked)}
+            className="h-3 w-3 shrink-0 accent-[var(--accent)]"
+          />
+          <span className="text-[var(--foreground)]">Show Low Quality</span>
+        </label>
+      </div>
+    </aside>
   );
 }
 
@@ -595,18 +611,18 @@ function CompactSelect({
   onChange: (value: string) => void;
 }) {
   return (
-    <label className="flex min-w-[116px] items-center gap-1.5">
-      <span className="shrink-0 text-[10px] font-semibold uppercase text-[var(--muted)]">
+    <label className="block">
+      <span className="mb-0.5 block text-[9px] font-semibold uppercase text-[var(--muted)]">
         {label}
       </span>
       <select
         value={value}
         onChange={(event) => onChange(event.target.value)}
-        className={`${controlClass} min-w-[64px]`}
+        className={controlClass}
       >
         {options.map((option) => (
           <option key={option} value={option}>
-            {option}
+            {option === "all" ? "ALL" : option}
           </option>
         ))}
       </select>
@@ -741,7 +757,7 @@ function LatestRankingsResultsTable({
 }) {
   const [expandedItemId, setExpandedItemId] = useState<string | null>(null);
   const sharedCandleTime = getSharedLatestRankingsCandleTime(rows);
-  const tableColumnCount = 9;
+  const tableColumnCount = 8;
 
   return (
     <section className="terminal-panel-data min-h-0 overflow-hidden xl:flex xl:flex-1 xl:flex-col">
@@ -773,7 +789,7 @@ function LatestRankingsResultsTable({
 
       <DataTableScroll className="!overflow-x-auto !overflow-y-auto xl:min-h-0 xl:flex-1">
         <DataTable
-          minWidth="min-w-[900px]"
+          minWidth="min-w-[780px]"
           className="table-fixed"
         >
           <thead className="sticky top-0 z-20 bg-[var(--table-header)]">
@@ -837,9 +853,6 @@ function LatestRankingsResultsTable({
                 align="right"
               >
                 Price
-              </DataTableHeaderCell>
-              <DataTableHeaderCell className="w-[154px]">
-                Updated
               </DataTableHeaderCell>
               <DataTableHeaderCell className="w-[96px]">View Details</DataTableHeaderCell>
             </tr>
@@ -930,7 +943,7 @@ function LatestRankingsRow({
             timeframe,
             assetClass,
             includeLowQuality,
-            limit,
+            limit: getEffectiveLatestRankingsLimit(limit),
             from: "rankings",
             sort: encodeLatestRankingsSortState(sortState),
           })}
@@ -980,9 +993,6 @@ function LatestRankingsRow({
       </DataTableCell>
       <DataTableCell align="right" className="font-mono tabular-nums text-[var(--foreground)]">
         {formatPrice(item.metrics.price)}
-      </DataTableCell>
-      <DataTableCell className="font-mono text-[var(--muted)]">
-        {formatDateTime(item.candleOpenTime)}
       </DataTableCell>
       <DataTableCell>
         <button
@@ -1417,7 +1427,7 @@ async function fetchLatestRankings({
     buildLatestRankingsUrl({
       timeframe,
       assetClass,
-      limit,
+      limit: getEffectiveLatestRankingsLimit(limit),
       includeLowQuality,
     }),
     { signal },
@@ -1435,14 +1445,14 @@ async function fetchLatestRankings({
 export function buildLatestRankingsUrl({
   timeframe,
   assetClass,
-  limit = 100,
+  limit = "all",
   includeLowQuality = false,
   tradeApiBaseUrl = process.env.NEXT_PUBLIC_TRADE_API_BASE_URL,
 }: BuildLatestRankingsUrlParams) {
   const params = new URLSearchParams({
     timeframe,
     assetClass,
-    limit: String(limit),
+    limit: String(getEffectiveLatestRankingsLimit(limit)),
   });
 
   if (includeLowQuality) {
@@ -1579,11 +1589,19 @@ function normalizeLatestRankingsAssetClass(value: string | null): LatestRankings
 }
 
 function normalizeLatestRankingsLimit(value: string | null): LatestRankingsLimit {
+  if (value === null || value.toLowerCase() === "all") {
+    return "all";
+  }
+
   const number = Number(value);
 
   return limitOptions.includes(number as LatestRankingsLimit)
     ? (number as LatestRankingsLimit)
-    : 100;
+    : "all";
+}
+
+function getEffectiveLatestRankingsLimit(limit: LatestRankingsLimit) {
+  return limit === "all" ? latestRankingsAllLimit : limit;
 }
 
 function encodeLatestRankingsSortState(
