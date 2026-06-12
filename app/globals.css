@@ -273,7 +273,9 @@ body:has(.home-terminal) {
   html:has(.watchlist-terminal),
   body:has(.watchlist-terminal),
   html:has(.archive-terminal),
-  body:has(.archive-terminal) {
+  body:has(.archive-terminal),
+  html:has(.home-terminal),
+  body:has(.home-terminal) {
     height: 100%;
     overflow: hidden;
   }
@@ -282,7 +284,8 @@ body:has(.home-terminal) {
   body:has(.rankings-terminal) > main,
   body:has(.symbol-terminal) > main,
   body:has(.watchlist-terminal) > main,
-  body:has(.archive-terminal) > main {
+  body:has(.archive-terminal) > main,
+  body:has(.home-terminal) > main {
     min-height: 0;
     height: calc(100dvh - var(--app-header-height));
     overflow: hidden;

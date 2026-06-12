@@ -84,7 +84,6 @@ describe("public navigation surface", () => {
     expect(html).toContain("Local Watchlist");
     expect(html).toContain('href="/archive"');
     expect(html).toContain("Research Archive");
-    expect(html).toContain("Research-only. Not trading advice.");
     expect(html).toContain("No trading instructions");
     expect(html).toContain("Rankings");
     expect(html).toContain("Symbol Research");
@@ -93,6 +92,9 @@ describe("public navigation surface", () => {
     expect(html).toContain("Copyright © 2026 VegaRank");
     expect(html).toContain('href="https://github.com/VeteranXYZ"');
     expect(html).toContain(">Hiei<");
+    expect(html).not.toContain("Research-only. Not trading advice.");
+    expect(html).not.toContain("Manual research review only");
+    expect(html).not.toContain("no wallet or exchange connection");
     expect(html).toContain("2026-06-12 16:30 UTC");
     expect(html).toContain("Research Rows");
     expect(html).not.toContain('href="/scanner"');

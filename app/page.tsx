@@ -1,10 +1,8 @@
 import Link from "next/link";
-import { shortResearchDisclaimer } from "@/components/researchCopy";
 import {
   PageHeader,
   PageSection,
   PageShell,
-  ResearchNotice,
   StatCell,
   StatStrip,
   StatusBadge,
@@ -131,15 +129,14 @@ const researchStatusRows = [
     "Rank Score / Setup Quality / Risk Context / Evidence Reliability",
   ],
   ["Validation", "Archive snapshots are available when stored runs exist"],
-  ["Boundary", shortResearchDisclaimer],
 ] as const;
 
 export default async function HomePage() {
   const latestSnapshot = await getLatestResearchSnapshot();
 
   return (
-    <PageShell className="home-terminal max-w-none gap-3 overflow-x-hidden">
-      <div className="grid gap-3 xl:grid-cols-[minmax(0,1.25fr)_minmax(420px,0.75fr)]">
+    <PageShell className="home-terminal max-w-none gap-2 overflow-x-hidden xl:h-full xl:min-h-0">
+      <div className="grid gap-2 xl:grid-cols-[minmax(0,1.25fr)_minmax(420px,0.75fr)]">
         <PageHeader
           className="mb-0"
           eyebrow="Research workspace"
@@ -184,17 +181,15 @@ export default async function HomePage() {
 
       <ResearchWorkflow />
 
-      <div className="grid gap-3 xl:grid-cols-[minmax(0,1fr)_minmax(440px,0.8fr)]">
+      <div className="grid gap-2 xl:grid-cols-[minmax(0,1fr)_minmax(440px,0.8fr)]">
         <SuggestedResearchPaths />
         <ResearchStatusPanel />
       </div>
 
-      <ResearchNotice className="max-w-5xl text-[10px] leading-4 text-[var(--muted)]" tone="neutral">
-        <span className="font-semibold text-[var(--foreground)]">
-          {shortResearchDisclaimer}
-        </span>{" "}
-        Manual research review only; no wallet or exchange connection. Copyright ©{" "}
-        2026 VegaRank. Powered by{" "}
+      <footer className="terminal-panel-muted flex flex-wrap items-center gap-x-2 gap-y-1 px-3 py-1 text-[10px] font-semibold leading-4 text-[var(--muted)]">
+        <span>Copyright © 2026 VegaRank</span>
+        <span className="text-[var(--muted-2)]">·</span>
+        <span>Powered by</span>
         <a
           href="https://github.com/VeteranXYZ"
           className="font-semibold text-[var(--accent)] underline-offset-2 hover:underline"
@@ -203,8 +198,7 @@ export default async function HomePage() {
         >
           Hiei
         </a>
-        .
-      </ResearchNotice>
+      </footer>
     </PageShell>
   );
 }
@@ -220,7 +214,7 @@ function LatestSnapshotPanel({ snapshot }: { snapshot: SnapshotStatus }) {
           {snapshot.available ? "Current Snapshot" : "Snapshot status unavailable"}
         </StatusBadge>
       }
-      bodyClassName="space-y-2 px-3 py-2"
+      bodyClassName="space-y-1.5 px-3 py-1.5"
     >
       <StatStrip label="Snapshot">
         <StatCell label="Timeframe" value={snapshot.fields.timeframe} tone="info" />
@@ -261,12 +255,12 @@ function SnapshotMetric({
   tone?: StatusTone;
 }) {
   return (
-    <div className="min-w-0 border border-[var(--border)] bg-[var(--panel-muted)] px-2 py-1.5">
+    <div className="min-w-0 border border-[var(--border)] bg-[var(--panel-muted)] px-2 py-1">
       <div className="truncate text-[10px] font-semibold uppercase text-[var(--muted)]">
         {label}
       </div>
       <div
-        className={`mt-1 truncate font-mono text-[13px] font-semibold tabular-nums ${
+        className={`mt-0.5 truncate font-mono text-[12px] font-semibold tabular-nums ${
           tone === "eligible"
             ? "text-[var(--eligible)]"
             : tone === "watch"
@@ -286,13 +280,13 @@ function ResearchWorkflow() {
       title="Research Workflow"
       description="Move from market discovery to symbol-level research, local monitoring, and archive validation."
       tone="summary"
-      bodyClassName="px-3 py-3"
+      bodyClassName="px-3 py-2"
     >
       <div className="grid min-w-0 gap-2 lg:grid-cols-5">
         {workflowItems.map((item) => (
           <article
             key={item.href}
-            className="terminal-panel-muted flex min-h-44 min-w-0 flex-col justify-between px-3 py-2"
+            className="terminal-panel-muted flex min-h-[7.5rem] min-w-0 flex-col justify-between px-2.5 py-1.5"
           >
             <div className="min-w-0">
               <div className="flex items-center justify-between gap-2">
@@ -301,23 +295,23 @@ function ResearchWorkflow() {
                 </span>
                 <StatusBadge tone={getWorkflowTone(item.tone)}>{item.loop}</StatusBadge>
               </div>
-              <h2 className="mt-2 text-[13px] font-semibold leading-5 text-[var(--foreground)]">
+              <h2 className="mt-1.5 text-[12px] font-semibold leading-4 text-[var(--foreground)]">
                 {item.page}
               </h2>
-              <p className="mt-1 text-[11px] leading-5 text-[var(--muted)]">
+              <p className="mt-1 text-[10px] leading-4 text-[var(--muted)]">
                 {item.copy}
               </p>
             </div>
             <Link
               href={item.href}
-              className="terminal-mini-action mt-3 h-7 justify-center px-2"
+              className="terminal-mini-action mt-2 h-6 justify-center px-2"
             >
               {item.action}
             </Link>
           </article>
         ))}
       </div>
-      <div className="mt-2 border border-[var(--border)] bg-[var(--panel-muted)] px-2 py-1.5 text-[11px] font-semibold text-[var(--foreground)]">
+      <div className="mt-2 border border-[var(--border)] bg-[var(--panel-muted)] px-2 py-1 text-[10px] font-semibold text-[var(--foreground)]">
         Discover → Compare → Research → Monitor → Validate
       </div>
     </PageSection>
@@ -329,17 +323,17 @@ function SuggestedResearchPaths() {
     <PageSection
       title="Suggested Research Paths"
       tone="takeaway"
-      bodyClassName="divide-y divide-[var(--border)] px-3 py-1"
+      bodyClassName="divide-y divide-[var(--border)] px-3 py-0.5"
     >
       {researchPaths.map((item) => (
-        <div key={item.label} className="grid gap-2 py-2 md:grid-cols-[180px_minmax(0,1fr)]">
+        <div key={item.label} className="grid gap-2 py-1.5 md:grid-cols-[180px_minmax(0,1fr)]">
           <div className="min-w-0">
             <div className="text-[11px] font-semibold text-[var(--foreground)]">
               {item.label}
             </div>
             <PathRail steps={item.path} />
           </div>
-          <p className="text-[11px] leading-5 text-[var(--muted)]">{item.copy}</p>
+          <p className="text-[10px] leading-4 text-[var(--muted)]">{item.copy}</p>
         </div>
       ))}
     </PageSection>
@@ -370,14 +364,14 @@ function ResearchStatusPanel() {
     <PageSection
       title="Research Status"
       tone="snapshot"
-      bodyClassName="divide-y divide-[var(--border)] px-3 py-1"
+      bodyClassName="divide-y divide-[var(--border)] px-3 py-0.5"
     >
       {researchStatusRows.map(([label, value]) => (
-        <div key={label} className="grid gap-2 py-2 sm:grid-cols-[150px_minmax(0,1fr)]">
+        <div key={label} className="grid gap-2 py-1.5 sm:grid-cols-[150px_minmax(0,1fr)]">
           <div className="text-[10px] font-semibold uppercase text-[var(--muted)]">
             {label}
           </div>
-          <div className="text-[11px] leading-5 text-[var(--foreground)]">{value}</div>
+          <div className="text-[10px] leading-4 text-[var(--foreground)]">{value}</div>
         </div>
       ))}
     </PageSection>
