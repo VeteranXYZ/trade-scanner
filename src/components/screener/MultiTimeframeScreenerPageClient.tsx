@@ -667,10 +667,7 @@ export function MtfScreenerCommandBar({
 
   return (
     <header className="terminal-command-bar mb-1">
-      <div
-        className="terminal-command-row text-[var(--terminal-bar-muted)]"
-        style={{ flexWrap: "nowrap", overflowX: "auto", scrollbarGutter: "stable" }}
-      >
+      <div className="terminal-command-row text-[var(--terminal-bar-muted)]">
         <div
           className="terminal-command-brand"
           title={title}
@@ -709,10 +706,7 @@ export function MtfScreenerCommandBar({
           <MtfFreshnessStrip sourceData={sourceData} />
         </div>
 
-        <div
-          className="terminal-command-actions ml-0"
-          style={{ flexWrap: "nowrap" }}
-        >
+        <div className="terminal-command-actions ml-0">
           {onExportVisible && onExportAll ? (
             <MtfScreenerExportControls
               visibleRowsCount={visibleRows}

@@ -393,6 +393,9 @@ a:focus-visible {
 }
 
 .terminal-command-bar {
+  --terminal-command-control-size: 1.5rem;
+  --terminal-command-row-block-size: 2rem;
+
   overflow: hidden;
   border: 1px solid var(--terminal-bar-border);
   background: var(--terminal-bar);
@@ -402,20 +405,29 @@ a:focus-visible {
 
 .terminal-command-row {
   display: flex;
+  min-height: var(--terminal-command-row-block-size);
   min-width: 0;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   align-items: center;
   gap: 0.25rem;
+  overflow-x: auto;
   padding: 0.25rem 0.5rem;
+  scrollbar-gutter: stable;
+  scrollbar-width: none;
   font-size: 10px;
   font-weight: 600;
   line-height: 1;
   text-transform: uppercase;
 }
 
+.terminal-command-row::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+}
+
 .terminal-command-brand {
   display: flex;
-  height: 1.5rem;
+  height: var(--terminal-command-control-size);
   min-width: 0;
   flex-shrink: 0;
   align-items: center;
@@ -431,8 +443,7 @@ a:focus-visible {
   flex: 1 1 auto;
   align-items: center;
   gap: 0.25rem;
-  overflow-x: auto;
-  scrollbar-gutter: stable;
+  overflow: visible;
 }
 
 .terminal-command-actions {
@@ -441,7 +452,7 @@ a:focus-visible {
   flex: 0 0 auto;
   min-width: 0;
   max-width: 100%;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   align-items: center;
   justify-content: flex-end;
   gap: 0.25rem;
@@ -491,7 +502,7 @@ a:focus-visible {
 .terminal-command-chip {
   display: inline-flex;
   max-width: 100%;
-  min-height: 1.5rem;
+  min-height: var(--terminal-command-control-size);
   align-items: center;
   justify-content: center;
   gap: 0.25rem;
@@ -508,7 +519,7 @@ a:focus-visible {
 
 .terminal-command-action {
   display: inline-flex;
-  height: 1.5rem;
+  height: var(--terminal-command-control-size);
   align-items: center;
   justify-content: center;
   white-space: nowrap;
@@ -546,8 +557,8 @@ a:focus-visible {
 
 .terminal-icon-action {
   display: inline-flex;
-  width: 1.5rem;
-  height: 1.5rem;
+  width: var(--terminal-command-control-size, 1.5rem);
+  height: var(--terminal-command-control-size, 1.5rem);
   align-items: center;
   justify-content: center;
   flex: 0 0 auto;

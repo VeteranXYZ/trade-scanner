@@ -286,7 +286,7 @@ const symbolResearchTimeframes = ["4h", "1d", "1w", "1h"] as const;
 const symbolResearchExchanges = ["binance", "coinbase"] as const;
 const symbolResearchMarketContextAssetClass = "crypto";
 const symbolResearchMainClass =
-  "symbol-terminal flex min-h-[calc(100dvh-var(--app-header-height))] w-full max-w-none flex-col overflow-x-hidden bg-[var(--workspace-background)] px-1.5 py-1.5 text-[var(--foreground)] sm:px-2 xl:h-full xl:min-h-0 xl:overflow-hidden";
+  "symbol-terminal flex min-h-[calc(100dvh-var(--app-header-height))] w-full max-w-none flex-col overflow-x-hidden bg-[var(--workspace-background)] px-2 py-2 text-[var(--foreground)] sm:px-3 xl:h-full xl:min-h-0 xl:overflow-hidden";
 
 export function SymbolResearchPageClient({
   exchange,
