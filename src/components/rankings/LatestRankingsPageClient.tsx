@@ -330,12 +330,6 @@ export function LatestRankingsPageClient({
         }}
         onExportCsv={downloadVisibleCsv}
       />
-      <p className="mb-1 text-[11px] leading-4 text-[var(--muted)]">
-        Review the latest ranked research results across the current market
-        universe. Rankings reflect technical structure, confirmation strength,
-        evidence quality, and risk context.
-      </p>
-
       <div className="grid min-h-0 flex-1 gap-2 xl:grid-cols-[204px_minmax(0,1fr)] xl:overflow-hidden 2xl:grid-cols-[220px_minmax(0,1fr)]">
         <LatestRankingsControls
           timeframe={timeframe}

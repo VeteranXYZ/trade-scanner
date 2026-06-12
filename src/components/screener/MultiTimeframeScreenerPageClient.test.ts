@@ -251,7 +251,6 @@ describe("MultiTimeframeScreenerTable", () => {
     const commandHtml = renderToStaticMarkup(
       createElement(MtfScreenerCommandBar, {
         title: "Multi-Timeframe Screener",
-        datasetLabel: "Latest joined snapshots",
         statusLabel: "Loaded",
         statusTone: "complete",
         totalRows: 2,
@@ -276,8 +275,8 @@ describe("MultiTimeframeScreenerTable", () => {
     expect(commandHtml).toContain("Multi-Timeframe Screener");
     expect(commandHtml).toContain("Screener");
     expect(commandHtml).toContain("Multi-Timeframe Screener");
-    expect(commandHtml).toContain("Crypto");
-    expect(commandHtml).toContain("research context");
+    expect(commandHtml).not.toContain("Crypto");
+    expect(commandHtml).not.toContain("research context");
     expect(commandHtml).not.toContain("MTF Joined");
     expect(commandHtml).not.toContain("Research only");
     expect(commandHtml).toContain("Loaded");
@@ -291,8 +290,8 @@ describe("MultiTimeframeScreenerTable", () => {
     expect(commandHtml).toContain("Latest Snapshot");
     expect(commandHtml).toContain("4h");
     expect(commandHtml).toContain("8/0");
-    expect(commandHtml).toContain("Export Screener");
-    expect(commandHtml).toContain("Export All Snapshots");
+    expect(commandHtml).toContain("Export CSV");
+    expect(commandHtml).toContain("Export All");
     expect(tableHtml).toContain("Joined Snapshot");
     expect(tableHtml).toContain("Showing 1 of 2 symbols");
     expect(tableHtml).toContain("Multi-Timeframe");
@@ -315,7 +314,7 @@ describe("MultiTimeframeScreenerTable", () => {
     );
 
     expect(html).toContain("Screener CSV export");
-    expect(html.match(/disabled=\"\"/g)).toHaveLength(2);
+    expect(html.match(/disabled=\"\"/g)).toHaveLength(1);
   });
 
   it("renders compact risk notes with hidden details available", () => {
@@ -388,8 +387,7 @@ describe("MultiTimeframeScreenerTable", () => {
     expect(html).toContain("View Summary");
     expect(html).toContain("2/5");
     expect(html).toContain("High-Priority Rows");
-    expect(html).toContain("Market Backdrop");
-    expect(html).toContain("research rankings unchanged");
+    expect(html).not.toContain("Market Backdrop");
     expect(html).toContain("BTCUSDT");
     expect(html).toContain("ETHUSDT");
     expect(html).toContain("Research Group Key");
@@ -399,7 +397,6 @@ describe("MultiTimeframeScreenerTable", () => {
     const html = renderToStaticMarkup(createElement(MtfScreenerVisualCheckPage));
 
     expect(html).toContain("Visual check");
-    expect(html).toContain("Mock joined rows");
     expect(html).toContain("1000PEPEUSDT");
     expect(html).toContain("1000000MOGUSDT");
     expect(html).toContain("ONDOUSDT");
@@ -408,7 +405,7 @@ describe("MultiTimeframeScreenerTable", () => {
     expect(html).toContain("Showing 70 of 70 symbols");
     expect(html).toContain("Filters");
     expect(html).toContain("Search symbol");
-    expect(html).toContain("Market Backdrop");
+    expect(html).toContain("Market Context");
     expect(html).not.toContain("BTC, ETH, SEI");
     expect(html).toContain("Snapshot Review");
     expect(html).toContain("+2");

@@ -3,11 +3,6 @@
 import { useQuery } from "@tanstack/react-query";
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
-import { MarketContextPanel } from "@/components/market-context/MarketContextPanel";
-import {
-  fetchMarketContext,
-  type MarketContextPanelState,
-} from "@/components/market-context/marketContextUi";
 import { shortResearchDisclaimer } from "@/components/researchCopy";
 import { formatDateTime } from "@/components/rankings/latestRankingsUi";
 import {
@@ -115,15 +110,6 @@ export function WatchlistPageClient({
     retry: false,
     staleTime: Number.POSITIVE_INFINITY,
   });
-  const marketContextQuery = useQuery({
-    queryKey: ["market-context", assetClass],
-    queryFn: ({ signal }) => fetchMarketContext({ assetClass, signal }),
-    enabled: !isVisualCheck,
-    refetchOnWindowFocus: false,
-    retry: false,
-    staleTime: 60_000,
-  });
-
   useEffect(() => {
     if (isVisualCheck) {
       return;
@@ -151,14 +137,6 @@ export function WatchlistPageClient({
   const latestIsError = !isVisualCheck && latestQuery.isError;
   const latestError = latestIsError ? latestQuery.error : null;
   const latestIsFetching = !isVisualCheck && latestQuery.isFetching;
-  const marketContextData =
-    visualCheckData?.marketContextData ?? marketContextQuery.data;
-  const marketContextIsLoading =
-    !isVisualCheck && marketContextQuery.isLoading;
-  const marketContextIsError = !isVisualCheck && marketContextQuery.isError;
-  const marketContextIsFetching =
-    !isVisualCheck && marketContextQuery.isFetching;
-
   const mtfRows = useMemo(
     () => buildMtfScreenerRowsFromResponse(latestData),
     [latestData],
@@ -300,7 +278,6 @@ export function WatchlistPageClient({
     }
 
     void latestQuery.refetch();
-    void marketContextQuery.refetch();
   };
   const clearFilters = () => {
     setFilters(defaultWatchlistFilters);
@@ -314,7 +291,7 @@ export function WatchlistPageClient({
         sourceData={latestData}
         isLoading={latestIsLoading}
         isError={latestIsError}
-        isRefreshing={latestIsFetching || marketContextIsFetching}
+        isRefreshing={latestIsFetching}
         isVisualCheck={isVisualCheck}
         visibleRows={sortedRows.length}
         totalRows={watchlistRows.length}
@@ -342,18 +319,12 @@ export function WatchlistPageClient({
           onSortStateChange={setSortState}
           onClearFilters={clearFilters}
           onRefresh={refreshData}
-          isRefreshing={latestIsFetching || marketContextIsFetching}
+          isRefreshing={latestIsFetching}
           isVisualCheck={isVisualCheck}
           className="order-2 xl:order-1"
         />
 
         <main className="order-1 min-w-0 space-y-2 xl:order-2 xl:flex xl:min-h-0 xl:flex-col xl:overflow-hidden">
-          <WatchlistBackdropDisclosure
-            data={marketContextData}
-            isLoading={marketContextIsLoading}
-            isError={marketContextIsError}
-          />
-
           <WatchlistSummaryCards
             summary={summary}
             researchSummary={researchSummary}
@@ -1114,30 +1085,6 @@ function WatchlistSourcePanel({
         })}
       </div>
     </section>
-  );
-}
-
-function WatchlistBackdropDisclosure({
-  data,
-  isLoading,
-  isError,
-}: MarketContextPanelState) {
-  return (
-    <details open className="terminal-panel xl:shrink-0">
-      <summary className="flex min-h-7 cursor-pointer list-none items-center justify-between gap-2 px-2 py-1 text-[11px] font-semibold uppercase text-[var(--muted)] marker:hidden">
-        <span>Market Context</span>
-        <span className="text-[9px] text-[var(--muted-2)]">
-          Secondary research context
-        </span>
-      </summary>
-      <MarketContextPanel
-        variant="compact"
-        data={data}
-        isLoading={isLoading}
-        isError={isError}
-        className="border-x-0 border-b-0 shadow-none"
-      />
-    </details>
   );
 }
 

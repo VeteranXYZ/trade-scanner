@@ -9,6 +9,7 @@ const navItems = [
   { href: "/rankings", labelKey: "scanner" },
   { href: "/screener", label: "Screener" },
   { href: "/watchlist", label: "Watchlist" },
+  { href: "/symbol/binance/BTCUSDT", label: "Symbol" },
   { href: "/archive", labelKey: "history" },
 ] as const;
 

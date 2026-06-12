@@ -26,6 +26,8 @@ describe("public navigation surface", () => {
     expect(html).toContain(">Screener<");
     expect(html).toContain('href="/watchlist"');
     expect(html).toContain(">Watchlist<");
+    expect(html).toContain('href="/symbol/binance/BTCUSDT"');
+    expect(html).toContain(">Symbol<");
     expect(html).toContain('href="/archive"');
     expect(html).toContain(">Archive<");
     expect(html).not.toContain('href="/scanner"');

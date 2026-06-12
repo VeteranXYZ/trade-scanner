@@ -661,11 +661,6 @@ export function ArchivePageClient({
         onRefresh={refreshData}
         onLoadValidation={() => setValidationRequestKey(activeValidationRequestKey)}
       />
-      <p className="mb-1 text-[11px] leading-4 text-[var(--muted)]">
-        Research-only. Not trading advice. Review stored runs, future-window
-        maturity, and source rows from prior VegaRank snapshots.
-      </p>
-
       <div className="grid min-h-0 flex-1 gap-2 xl:grid-cols-[minmax(0,1fr)_260px] xl:overflow-hidden">
         <main className="order-1 min-w-0 space-y-2 xl:flex xl:min-h-0 xl:flex-col xl:overflow-y-auto xl:pr-1">
           <SelectedRunSummaryPanel

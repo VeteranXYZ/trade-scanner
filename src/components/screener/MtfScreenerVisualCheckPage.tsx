@@ -14,6 +14,7 @@ import {
   getMtfScreenerTableSortValue,
   MtfScreenerCommandBar,
   MtfScreenerDetailRail,
+  MtfMarketContextStrip,
   MtfResearchBucketsPanel,
   MtfScreenerControls,
   MtfScreenerTable,
@@ -123,7 +124,6 @@ export function MtfScreenerVisualCheckPage() {
     <PageShell className="screener-terminal max-w-none [--screener-sticky-offset:0rem] xl:h-full xl:min-h-0 xl:overflow-hidden">
       <MtfScreenerCommandBar
         title={mtfScreenerVisualCheckCopy.title}
-        datasetLabel="Mock joined rows"
         statusLabel={mtfScreenerVisualCheckCopy.eyebrow}
         statusTone="info"
         totalRows={rows.length}
@@ -142,6 +142,8 @@ export function MtfScreenerVisualCheckPage() {
         onBucketSelect={applyPreset}
         onClear={clearFilters}
       />
+
+      <MtfMarketContextStrip isError />
 
       <div className="grid min-h-0 flex-1 gap-2 xl:grid-cols-[200px_minmax(0,1fr)_236px] xl:overflow-hidden 2xl:grid-cols-[204px_minmax(0,1fr)_252px]">
         <MtfScreenerControls
@@ -174,7 +176,6 @@ export function MtfScreenerVisualCheckPage() {
           isFullTableActive={isFullTableActive}
           activeFilterCount={activeFilterLabels.length}
           sortState={tableSortState}
-          marketContextIsError
           className="order-3 xl:order-3"
         />
       </div>

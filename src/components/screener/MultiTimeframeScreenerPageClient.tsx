@@ -243,7 +243,6 @@ export function MultiTimeframeScreenerPageClient({
     <PageShell className="screener-terminal max-w-none [--screener-sticky-offset:0rem] xl:h-full xl:min-h-0 xl:overflow-hidden">
       <MtfScreenerCommandBar
         title={mtfScreenerProductionCopy.title}
-        datasetLabel="Latest joined snapshots"
         statusLabel={getMtfQueryStatusLabel({
           isLoading: latestQuery.isLoading,
           isError: latestQuery.isError,
@@ -266,11 +265,6 @@ export function MultiTimeframeScreenerPageClient({
         onExportVisible={() => exportRows("visible_rows")}
         onExportAll={() => exportRows("all_joined_rows")}
       />
-      <p className="mb-1 text-[11px] leading-4 text-[var(--muted)]">
-        Compare joined multi-timeframe research snapshots across symbols. Use the
-        screener to review structure, confirmation, and risk context across
-        timeframes.
-      </p>
 
       <MtfResearchBucketsPanel
         rows={rows}
@@ -278,6 +272,12 @@ export function MultiTimeframeScreenerPageClient({
         isFullTableActive={isFullTableActive}
         onBucketSelect={applyPreset}
         onClear={clearFilters}
+      />
+
+      <MtfMarketContextStrip
+        data={marketContextQuery.data}
+        isLoading={marketContextQuery.isLoading}
+        isError={marketContextQuery.isError}
       />
 
       <div className="grid min-h-0 flex-1 gap-2 xl:grid-cols-[200px_minmax(0,1fr)_236px] xl:overflow-hidden 2xl:grid-cols-[204px_minmax(0,1fr)_252px]">
@@ -320,9 +320,6 @@ export function MultiTimeframeScreenerPageClient({
           isFullTableActive={isFullTableActive}
           activeFilterCount={activeFilterLabels.length}
           sortState={tableSortState}
-          marketContextData={marketContextQuery.data}
-          marketContextIsLoading={marketContextQuery.isLoading}
-          marketContextIsError={marketContextQuery.isError}
           navigationContext={navigationContext}
           className="order-3 xl:order-3"
         />
@@ -631,7 +628,6 @@ function downloadCsvFile({
 
 export function MtfScreenerCommandBar({
   title,
-  datasetLabel,
   statusLabel,
   statusTone = "neutral",
   totalRows,
@@ -647,7 +643,6 @@ export function MtfScreenerCommandBar({
   onExportAll,
 }: {
   title: string;
-  datasetLabel: string;
   statusLabel: string;
   statusTone?: StatusTone;
   totalRows: number;
@@ -678,15 +673,11 @@ export function MtfScreenerCommandBar({
       >
         <div
           className="terminal-command-brand"
-          title={`${title} · ${datasetLabel}`}
+          title={title}
         >
-          <h1 className="terminal-command-title">Multi-Timeframe Screener</h1>
-          <span className="shrink-0 font-mono text-[10px] text-[var(--terminal-bar-muted)]">
-            Crypto
-          </span>
-          <span className="shrink-0 text-[9px] font-medium normal-case text-[var(--terminal-bar-muted)] opacity-75">
-            research context
-          </span>
+          <h1 className="terminal-command-title whitespace-nowrap">
+            Multi-Timeframe Screener
+          </h1>
         </div>
 
         <div className="terminal-command-main flex-none overflow-visible">
@@ -1138,9 +1129,6 @@ export function MtfScreenerDetailRail({
   isFullTableActive,
   activeFilterCount,
   sortState,
-  marketContextData,
-  marketContextIsLoading = false,
-  marketContextIsError = false,
   navigationContext,
   className = "",
 }: {
@@ -1151,9 +1139,6 @@ export function MtfScreenerDetailRail({
   isFullTableActive: boolean;
   activeFilterCount: number;
   sortState?: DataSortState<MtfScreenerTableSortKey> | null;
-  marketContextData?: MarketContextResponse | null;
-  marketContextIsLoading?: boolean;
-  marketContextIsError?: boolean;
   navigationContext?: ResearchNavigationContext;
   className?: string;
 }) {
@@ -1240,12 +1225,6 @@ export function MtfScreenerDetailRail({
           </div>
         </div>
 
-        <MtfDetailMarketBackdrop
-          data={marketContextData}
-          isLoading={marketContextIsLoading}
-          isError={marketContextIsError}
-        />
-
         <div className="border-t border-[var(--border)] pt-2">
           <div className="mb-1 flex items-center justify-between gap-2 text-[10px] font-semibold uppercase text-[var(--muted)]">
             <span>High-Priority Rows</span>
@@ -1313,14 +1292,14 @@ export function MtfScreenerDetailRail({
   );
 }
 
-function MtfDetailMarketBackdrop({
+export function MtfMarketContextStrip({
   data,
   isLoading,
   isError,
 }: {
   data?: MarketContextResponse | null;
-  isLoading: boolean;
-  isError: boolean;
+  isLoading?: boolean;
+  isError?: boolean;
 }) {
   const view = buildMarketContextPanelView({ data, isLoading, isError });
   const broadRegime =
@@ -1328,30 +1307,37 @@ function MtfDetailMarketBackdrop({
   const ethConfirmation = view.chips.find(
     (chip) => chip.label === "ETH confirmation",
   );
+  const confidence = view.chips.find((chip) => chip.label === "Confidence");
   const tone = getMtfMarketBackdropTone(broadRegime?.tone);
+  const statusTone: StatusTone = tone === "repair" ? "info" : tone;
 
   return (
-    <div className="border-t border-[var(--border)] pt-2">
-      <div className="mb-1 text-[10px] font-semibold uppercase text-[var(--muted)]">
-        Market Backdrop
-      </div>
-      <div
-        className={`border border-l-2 border-[var(--border)] bg-[var(--panel-muted)] px-2 py-1.5 ${getMtfResearchBucketBorderClass(tone)}`}
-        title={view.description}
-      >
-        <div className="flex min-w-0 items-center justify-between gap-2">
-          <span className="min-w-0 truncate text-[11px] font-semibold text-[var(--foreground)]">
-            {view.title}
-          </span>
-          <span className={getMtfDetailFocusPillClass(tone)}>
-            {broadRegime?.value ?? "Unavailable"}
-          </span>
-        </div>
-        <p className="mt-1 truncate text-[10px] leading-4 text-[var(--muted)]">
-          {getMtfMarketBackdropLine(view.unavailable, ethConfirmation?.value)}
-        </p>
-      </div>
-    </div>
+    <section
+      className={`terminal-panel flex min-w-0 flex-nowrap items-center gap-1.5 overflow-hidden px-2 py-1.5 ${getMtfResearchBucketBorderClass(tone)}`}
+      title={view.description}
+    >
+      <span className="shrink-0 border-r border-[var(--border)] pr-2 text-[10px] font-semibold uppercase text-[var(--muted)]">
+        Market Context
+      </span>
+      <StatusBadge tone={statusTone} className="shrink-0 text-[10px]">
+        {isLoading ? "Loading" : broadRegime?.value ?? "Unavailable"}
+      </StatusBadge>
+      <span className="min-w-0 truncate text-[10px] font-semibold uppercase text-[var(--muted)]">
+        Broad regime: {broadRegime?.value ?? "Unavailable"}
+      </span>
+      <span className="min-w-0 truncate text-[10px] font-semibold uppercase text-[var(--muted)]">
+        ETH: {ethConfirmation?.value ?? "N/A"}
+      </span>
+      <span className="min-w-0 truncate text-[10px] font-semibold uppercase text-[var(--muted)]">
+        Confidence: {confidence?.value ?? "N/A"}
+      </span>
+      <span className="min-w-0 truncate text-[10px] text-[var(--muted)]">
+        {getMtfMarketBackdropLine(
+          view.unavailable || Boolean(isError),
+          ethConfirmation?.value,
+        )}
+      </span>
+    </section>
   );
 }
 
@@ -1871,6 +1857,7 @@ export function MtfScreenerExportControls({
     variant === "terminal"
       ? "terminal-command-action disabled:cursor-not-allowed disabled:opacity-50"
       : "ui-button h-7 px-2 text-[11px] font-semibold disabled:cursor-not-allowed disabled:opacity-50";
+  const showExportAll = allRowsCount > visibleRowsCount;
 
   return (
     <div
@@ -1882,17 +1869,25 @@ export function MtfScreenerExportControls({
         onClick={onExportVisible}
         disabled={visibleRowsCount === 0}
         className={buttonClass}
+        title={
+          showExportAll
+            ? "Export the current filtered screener rows."
+            : "Export the full current screener."
+        }
       >
-        {variant === "terminal" ? "Export Screener" : "Export Screener Rows"}
+        {variant === "terminal" ? "Export CSV" : "Export Current Rows"}
       </button>
-      <button
-        type="button"
-        onClick={onExportAll}
-        disabled={allRowsCount === 0}
-        className={buttonClass}
-      >
-        {variant === "terminal" ? "Export All Snapshots" : "Export All Joined Snapshots"}
-      </button>
+      {showExportAll ? (
+        <button
+          type="button"
+          onClick={onExportAll}
+          disabled={allRowsCount === 0}
+          className={buttonClass}
+          title="Export all joined snapshot rows, ignoring active screener filters."
+        >
+          {variant === "terminal" ? "Export All" : "Export All Rows"}
+        </button>
+      ) : null}
     </div>
   );
 }
