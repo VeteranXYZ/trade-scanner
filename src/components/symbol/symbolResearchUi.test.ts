@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { dictionaries } from "@/lib/i18n/dictionaries";
+import { formatResearchDateTimeUtc } from "@/lib/research-state/formatResearchState";
 import {
   buildSignalEvaluationReadout,
   buildResearchDecisionSummary,
@@ -380,6 +381,7 @@ describe("symbol research UI helpers", () => {
   });
 
   it("formats insufficient-history unavailable state without hiding the timeframe", () => {
+    const selectedRunFinishedAt = "2026-06-01T04:00:00.000Z";
     const content = buildSymbolResearchUnavailableContent({
       symbol: "SEIUSDT",
       timeframe: "1w",
@@ -393,7 +395,7 @@ describe("symbol research UI helpers", () => {
         symbolsScanned: 192,
         symbolsSkipped: 221,
         signalsCreated: 192,
-        finishedAt: "2026-06-01T04:00:00.000Z",
+        finishedAt: selectedRunFinishedAt,
         isLikelyFullUniverse: true,
       },
       symbolCoverage: {
@@ -417,7 +419,10 @@ describe("symbol research UI helpers", () => {
           value: "1w full-universe run, success, scanned 192 / 413, skipped 221",
         },
         { label: "Snapshot Rows", value: "192" },
-        { label: "Selected Run Completed", value: "2026-05-31 21:00" },
+        {
+          label: "Selected Run Completed",
+          value: formatResearchDateTimeUtc(selectedRunFinishedAt),
+        },
       ]),
     );
     expect(content.suggestions).toEqual([

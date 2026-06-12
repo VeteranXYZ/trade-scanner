@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   firstFiniteResearchMetric,
+  formatResearchDateTimeUtc,
   formatResearchInteger,
   formatResearchMetric,
   formatResearchMetricLabel,
@@ -17,6 +18,15 @@ describe("research state formatting", () => {
     expect(formatResearchMetric(72.256)).toBe("72.3");
     expect(formatResearchInteger(1200.8)).toBe("1,200");
     expect(formatResearchInteger(null)).toBe("N/A");
+  });
+
+  it("formats research timestamps in UTC with N/A fallbacks", () => {
+    expect(formatResearchDateTimeUtc("2026-06-01T04:00:00.000Z")).toBe(
+      "2026-06-01 04:00",
+    );
+    expect(formatResearchDateTimeUtc(null)).toBe("N/A");
+    expect(formatResearchDateTimeUtc(undefined)).toBe("N/A");
+    expect(formatResearchDateTimeUtc("not-a-date")).toBe("N/A");
   });
 
   it("keeps UI metric labels readable without exposing camelCase names", () => {

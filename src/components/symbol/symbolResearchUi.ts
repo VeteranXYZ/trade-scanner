@@ -1,6 +1,7 @@
 import { formatDisplayDateTime } from "@/lib/utils/format";
 import {
   firstFiniteResearchMetric,
+  formatResearchDateTimeUtc,
   formatResearchMetric,
   formatResearchMetricLabel,
   researchStateNotAvailableLabel,
@@ -785,7 +786,7 @@ export function buildSymbolResearchDiagnostics({
       },
       {
         label: "Selected Run Completed",
-        value: formatSymbolResearchDateTime(currentSelection?.selectedRunFinishedAt),
+        value: formatResearchDateTimeUtc(currentSelection?.selectedRunFinishedAt),
       },
       {
         label: "Current Snapshot Time",
@@ -848,7 +849,7 @@ export function buildSymbolResearchUnavailableContent(
     },
     {
       label: "Selected Run Completed",
-      value: formatSymbolResearchDateTime(input.selectedRun?.finishedAt),
+      value: formatResearchDateTimeUtc(input.selectedRun?.finishedAt),
     },
   ];
 

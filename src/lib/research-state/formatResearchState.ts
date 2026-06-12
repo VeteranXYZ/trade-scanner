@@ -1,3 +1,5 @@
+import { formatDisplayDateTime } from "@/lib/utils/format";
+
 export const researchStateNotAvailableLabel = "N/A";
 
 export const researchMetricLabels = {
@@ -38,6 +40,15 @@ export function formatResearchInteger(value: number | null | undefined) {
   }
 
   return Math.trunc(value).toLocaleString();
+}
+
+export function formatResearchDateTimeUtc(
+  value: string | number | Date | null | undefined,
+) {
+  return formatDisplayDateTime(value, {
+    fallback: researchStateNotAvailableLabel,
+    timeZone: "utc",
+  });
 }
 
 export function formatResearchMetricLabel(key: ResearchMetricKey) {
