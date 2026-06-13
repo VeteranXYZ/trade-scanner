@@ -89,12 +89,12 @@ describe("public navigation surface", () => {
     expect(html).toContain("Symbol Research");
     expect(html).toContain("Watchlist");
     expect(html).toContain("→");
-    expect(html).toContain("Copyright © 2026 VegaRank");
+    expect(html).toContain("Research-only. Not trading advice.");
+    expect(html).toContain("Manual research review only");
+    expect(html).toContain("no wallet or exchange connection");
+    expect(html).toContain("© 2026 VegaRank");
     expect(html).toContain('href="https://github.com/VeteranXYZ"');
     expect(html).toContain(">Hiei<");
-    expect(html).not.toContain("Research-only. Not trading advice.");
-    expect(html).not.toContain("Manual research review only");
-    expect(html).not.toContain("no wallet or exchange connection");
     expect(html).toContain("2026-06-12 16:30 UTC");
     expect(html).toContain("Research Rows");
     expect(html).not.toContain('href="/scanner"');

@@ -3,8 +3,6 @@ import {
   PageHeader,
   PageSection,
   PageShell,
-  StatCell,
-  StatStrip,
   StatusBadge,
   type StatusTone,
 } from "@/components/ui/workspace";
@@ -64,6 +62,7 @@ const workflowItems = [
     copy: "Review the latest ranked research candidates and grouped market structures.",
     action: "Open Rankings",
     tone: "rows",
+    priority: "start",
   },
   {
     step: "02",
@@ -73,6 +72,7 @@ const workflowItems = [
     copy: "Compare joined 1h, 4h, 1d, and 1w research rows.",
     action: "Open Screener",
     tone: "screener",
+    priority: "standard",
   },
   {
     step: "03",
@@ -82,6 +82,7 @@ const workflowItems = [
     copy: "Inspect setup quality, evidence reliability, risk context, and archive context for one symbol.",
     action: "Open Symbol",
     tone: "summary",
+    priority: "core",
   },
   {
     step: "04",
@@ -91,6 +92,7 @@ const workflowItems = [
     copy: "Monitor selected symbols against the latest multi-timeframe snapshot.",
     action: "Open Watchlist",
     tone: "selected",
+    priority: "standard",
   },
   {
     step: "05",
@@ -100,6 +102,7 @@ const workflowItems = [
     copy: "Review stored snapshots and later observation context.",
     action: "Open Archive",
     tone: "observation",
+    priority: "loop",
   },
 ] as const;
 
@@ -136,7 +139,7 @@ export default async function HomePage() {
 
   return (
     <PageShell className="home-terminal max-w-none gap-2 overflow-x-hidden xl:h-full xl:min-h-0">
-      <div className="grid gap-2 xl:grid-cols-[minmax(0,1.25fr)_minmax(420px,0.75fr)]">
+      <div className="grid items-start gap-2 xl:grid-cols-[minmax(0,1.25fr)_minmax(420px,0.75fr)]">
         <PageHeader
           className="mb-0"
           eyebrow="Research workspace"
@@ -150,10 +153,10 @@ export default async function HomePage() {
           }
           tone="screener"
           description={
-            <span className="flex flex-col gap-2">
+            <span className="flex flex-col gap-1.5">
               <span>
                 Rank crypto market structures by setup quality, evidence reliability,
-                and risk context. Built to decide what to research first, not what to
+                and risk context. Built to decide what to research first — not what to
                 trade.
               </span>
               <span className="flex flex-wrap gap-1.5">
@@ -162,17 +165,15 @@ export default async function HomePage() {
                 <StatusBadge tone="info">Local watchlist</StatusBadge>
                 <StatusBadge tone="observation">Archive validation</StatusBadge>
               </span>
+              <span className="flex flex-wrap gap-1.5 pt-0.5">
+                <Link href="/rankings" className="terminal-mini-action is-accent h-7 px-2.5">
+                  Open Rankings
+                </Link>
+                <Link href="/screener" className="terminal-mini-action h-7 px-2.5">
+                  Open Screener
+                </Link>
+              </span>
             </span>
-          }
-          actions={
-            <div className="flex flex-wrap gap-1.5">
-              <Link href="/rankings" className="terminal-mini-action is-accent h-7 px-2.5">
-                Open Rankings
-              </Link>
-              <Link href="/screener" className="terminal-mini-action h-7 px-2.5">
-                Open Screener
-              </Link>
-            </div>
           }
         />
 
@@ -186,18 +187,24 @@ export default async function HomePage() {
         <ResearchStatusPanel />
       </div>
 
-      <footer className="terminal-panel-muted flex flex-wrap items-center gap-x-2 gap-y-1 px-3 py-1 text-[10px] font-semibold leading-4 text-[var(--muted)]">
-        <span>Copyright © 2026 VegaRank</span>
-        <span className="text-[var(--muted-2)]">·</span>
-        <span>Powered by</span>
-        <a
-          href="https://github.com/VeteranXYZ"
-          className="font-semibold text-[var(--accent)] underline-offset-2 hover:underline"
-          rel="noreferrer"
-          target="_blank"
-        >
-          Hiei
-        </a>
+      <footer className="terminal-panel-muted flex flex-wrap items-center justify-between gap-x-4 gap-y-1 px-3 py-1 text-[10px] font-semibold leading-4 text-[var(--muted)]">
+        <span>
+          Research-only. Not trading advice. Manual research review only; no wallet
+          or exchange connection.
+        </span>
+        <span className="flex items-center gap-1.5">
+          <span>© 2026 VegaRank</span>
+          <span className="text-[var(--muted-2)]">·</span>
+          <span>Powered by</span>
+          <a
+            href="https://github.com/VeteranXYZ"
+            className="font-semibold text-[var(--accent)] underline-offset-2 hover:underline"
+            rel="noreferrer"
+            target="_blank"
+          >
+            Hiei
+          </a>
+        </span>
       </footer>
     </PageShell>
   );
@@ -216,13 +223,22 @@ function LatestSnapshotPanel({ snapshot }: { snapshot: SnapshotStatus }) {
       }
       bodyClassName="space-y-1.5 px-3 py-1.5"
     >
-      <StatStrip label="Snapshot">
-        <StatCell label="Timeframe" value={snapshot.fields.timeframe} tone="info" />
-        <StatCell label="Asset Class" value={snapshot.fields.assetClass} />
-        <StatCell label="Universe" value={snapshot.fields.universe} />
-        <StatCell label="Risk Context" value={snapshot.fields.riskContext} tone="risk" />
-        <StatCell label="Updated" value={snapshot.fields.updated} tone="observation" />
-      </StatStrip>
+      <div className="terminal-panel-muted space-y-1 px-2 py-1.5">
+        <div className="flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-1 text-[11px] font-semibold text-[var(--foreground)]">
+          <span>{snapshot.fields.timeframe}</span>
+          <span className="text-[var(--muted-2)]">·</span>
+          <span>{snapshot.fields.assetClass}</span>
+          <span className="text-[var(--muted-2)]">·</span>
+          <span>{snapshot.fields.universe}</span>
+          <span className="text-[var(--muted-2)]">·</span>
+          <span className="text-[var(--risk)]">
+            Risk Context {snapshot.fields.riskContext}
+          </span>
+        </div>
+        <div className="text-[10px] font-semibold text-[var(--muted)]">
+          Updated {snapshot.fields.updated}
+        </div>
+      </div>
 
       <div className="grid min-w-0 grid-cols-2 gap-2 md:grid-cols-5">
         <SnapshotMetric label="Scanned" value={snapshot.fields.scanned} />
@@ -286,7 +302,9 @@ function ResearchWorkflow() {
         {workflowItems.map((item) => (
           <article
             key={item.href}
-            className="terminal-panel-muted flex min-h-[7.5rem] min-w-0 flex-col justify-between px-2.5 py-1.5"
+            className={`terminal-panel-muted flex min-h-[7.5rem] min-w-0 flex-col justify-between px-2.5 py-1.5 ${getWorkflowCardClass(
+              item.priority,
+            )}`}
           >
             <div className="min-w-0">
               <div className="flex items-center justify-between gap-2">
@@ -326,13 +344,16 @@ function SuggestedResearchPaths() {
       bodyClassName="divide-y divide-[var(--border)] px-3 py-0.5"
     >
       {researchPaths.map((item) => (
-        <div key={item.label} className="grid gap-2 py-1.5 md:grid-cols-[180px_minmax(0,1fr)]">
+        <div
+          key={item.label}
+          className="grid items-center gap-2 py-1.5 md:grid-cols-[150px_minmax(260px,0.72fr)_minmax(0,1fr)]"
+        >
           <div className="min-w-0">
             <div className="text-[11px] font-semibold text-[var(--foreground)]">
               {item.label}
             </div>
-            <PathRail steps={item.path} />
           </div>
+          <PathRail steps={item.path} />
           <p className="text-[10px] leading-4 text-[var(--muted)]">{item.copy}</p>
         </div>
       ))}
@@ -342,9 +363,12 @@ function SuggestedResearchPaths() {
 
 function PathRail({ steps }: { steps: readonly string[] }) {
   return (
-    <div className="mt-1 flex min-w-0 flex-wrap items-center gap-1">
+    <div className="flex min-w-0 flex-nowrap items-center gap-1 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
       {steps.map((step, index) => (
-        <span key={`${step}-${index}`} className="inline-flex items-center gap-1">
+        <span
+          key={`${step}-${index}`}
+          className="inline-flex shrink-0 items-center gap-1"
+        >
           {index > 0 ? (
             <span className="font-mono text-[10px] font-semibold text-[var(--muted-2)]">
               →
@@ -357,6 +381,21 @@ function PathRail({ steps }: { steps: readonly string[] }) {
       ))}
     </div>
   );
+}
+
+function getWorkflowCardClass(
+  priority: (typeof workflowItems)[number]["priority"] | undefined,
+) {
+  switch (priority) {
+    case "start":
+      return "border-l-2 border-l-[var(--accent-border)] bg-[var(--panel-data)]";
+    case "core":
+      return "border-l-2 border-l-[var(--eligible-border)] bg-[var(--panel-data)]";
+    case "loop":
+      return "border-l-2 border-l-[var(--observation-border)] bg-[var(--panel-data)]";
+    default:
+      return "";
+  }
 }
 
 function ResearchStatusPanel() {
