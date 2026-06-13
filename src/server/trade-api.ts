@@ -1797,6 +1797,7 @@ function buildSymbolBehaviorDiagnostics({
 
 type SymbolResearchUnavailableReason =
   | "insufficient_history"
+  | "no_latest_signal_for_symbol"
   | "not_in_selected_run"
   | "unknown";
 
@@ -1898,12 +1899,12 @@ function getSymbolResearchUnavailableReason({
   scanRun: Awaited<ReturnType<PgRankingResultsStore["getLatestRankingRun"]>>;
   coverage: SymbolResearchCandleCoverageRecord;
 }): SymbolResearchUnavailableReason {
-  if (!scanRun) {
-    return "unknown";
-  }
-
   if (coverage.candleCount < SYMBOL_RESEARCH_REQUIRED_CANDLES) {
     return "insufficient_history";
+  }
+
+  if (!scanRun) {
+    return "no_latest_signal_for_symbol";
   }
 
   return "not_in_selected_run";
@@ -1926,16 +1927,25 @@ function getSymbolResearchUnavailableMessage({
   };
 }) {
   if (unavailableReason === "insufficient_history") {
-    const runDescription = selectedRun?.isLikelyFullUniverse
+    const candleLabel = getSymbolResearchCandleLabel(timeframe);
+
+    if (!selectedRun) {
+      return `No ${timeframe} ranking result for ${symbol}. ${symbol} has only ${symbolCoverage.candleCount} ${candleLabel}. VegaRank currently requires ${symbolCoverage.requiredCandles} candles.`;
+    }
+
+    const runDescription = selectedRun.isLikelyFullUniverse
       ? `The latest full-universe ${timeframe} ranking run completed`
       : `The selected ${timeframe} ranking run completed`;
     const skippedDescription =
       typeof selectedRun?.symbolsSkipped === "number" && selectedRun.symbolsSkipped > 0
         ? ` and skipped ${selectedRun.symbolsSkipped} symbols`
         : "";
-    const candleLabel = getSymbolResearchCandleLabel(timeframe);
 
     return `No ${timeframe} ranking result for ${symbol}. ${runDescription}${skippedDescription}, and ${symbol} was skipped because it has only ${symbolCoverage.candleCount} ${candleLabel}. VegaRank currently requires ${symbolCoverage.requiredCandles} candles.`;
+  }
+
+  if (unavailableReason === "no_latest_signal_for_symbol") {
+    return `No ${timeframe} ranking result is available yet for ${symbol}.`;
   }
 
   if (unavailableReason === "not_in_selected_run") {

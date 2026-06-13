@@ -49,6 +49,13 @@ Supported VegaRank timeframes:
 - `4h`
 - `1d`
 
+The provider validates client-supported CCXT timeframes when the client exposes
+them. In production dry-run testing, Coinbase did not expose direct `4h` through
+the real CCXT client. The manual Coinbase backfill command therefore derives
+VegaRank `4h` candles from fetched `1h` candles in the market-data backfill
+layer. The direct provider fetch path still fails clearly if a requested
+timeframe is not supported by the client.
+
 CCXT OHLCV rows are mapped from:
 
 ```text
@@ -78,6 +85,9 @@ Those helpers are not wired into production jobs in Phase 32D.
 
 Phase 32E adds a manual Coinbase supplemental import and backfill path. See
 `docs/coinbase-supplemental-backfill-activation.md`.
+
+Phase 32F-B/C adds the manual Coinbase `4h` derivation path from normalized `1h`
+candles and keeps `1w` derived from stored `1d` candles.
 
 ## Deferred Work
 

@@ -1736,6 +1736,108 @@ describe("trade-api symbol research", () => {
     });
   });
 
+  it("returns a manual Coinbase symbol research signal by exact exchange and symbol", async () => {
+    getSymbolResearchLatestSignalPgMock.mockResolvedValue({
+      symbol: makeResearchSymbol("AERO-USDC", {
+        exchange: "coinbase",
+        baseAsset: "AERO",
+        quoteAsset: "USDC",
+      }),
+      scanRun: makeRun("coinbase-run-1", {
+        exchange: "coinbase",
+        mode: "manual",
+        timeframe: "1d",
+        universe: "manual-symbols",
+        symbolsTotal: 1,
+        symbolsScanned: 1,
+        signalsCreated: 1,
+        params: { exchange: "coinbase", symbols: ["AERO-USDC"] },
+      }),
+      signal: makeResearchSignal({
+        id: "coinbase-signal-1",
+        scanRunId: "coinbase-run-1",
+        exchange: "coinbase",
+        symbol: "AERO-USDC",
+        timeframe: "1d",
+        rankScore: 20.98,
+        scanRunSymbolsTotal: 1,
+        scanRunSymbolsScanned: 1,
+        scanRunSignalsCreated: 1,
+      }),
+    });
+    getSymbolCandlesPgMock.mockResolvedValue([
+      makeResearchCandle({ openTime: 1000, close: 1.1, timeframe: "1d" }),
+      makeResearchCandle({ openTime: 2000, close: 1.2, timeframe: "1d" }),
+    ]);
+
+    const response = await requestTradeApi(
+      "/api/symbol/research?exchange=coinbase&market=spot&symbol=AERO-USDC&timeframe=1d&assetClass=crypto",
+    );
+    const body = JSON.parse(response.body);
+
+    expect(response.status).toBe(200);
+    expect(body.symbol).toMatchObject({
+      exchange: "coinbase",
+      market: "spot",
+      symbol: "AERO-USDC",
+    });
+    expect(body.latest.scanRun).toMatchObject({
+      id: "coinbase-run-1",
+      exchange: "coinbase",
+      timeframe: "1d",
+    });
+    expect(body.latest.signal).toMatchObject({
+      id: "coinbase-signal-1",
+      scanRunId: "coinbase-run-1",
+      exchange: "coinbase",
+      symbol: "AERO-USDC",
+      timeframe: "1d",
+    });
+    expect(body.scoreBreakdown.rankScore).toBe(20.98);
+    expect(getSymbolResearchLatestSignalPgMock).toHaveBeenCalledWith({
+      exchange: "coinbase",
+      market: "spot",
+      symbol: "AERO-USDC",
+      timeframe: "1d",
+      assetClass: "crypto",
+      includeNonScanner: false,
+      includeMarketContext: false,
+    });
+  });
+
+  it("does not report a selected Binance run when no Coinbase signal exists", async () => {
+    getSymbolResearchLatestSignalPgMock.mockResolvedValue({
+      symbol: makeResearchSymbol("AERO-USDC", {
+        exchange: "coinbase",
+        baseAsset: "AERO",
+        quoteAsset: "USDC",
+      }),
+      scanRun: null,
+      signal: null,
+    });
+    getSymbolCandleCoveragePgMock.mockResolvedValue({
+      timeframe: "1d",
+      candleCount: 250,
+      firstOpenTime: "2026-01-01T00:00:00.000Z",
+      lastOpenTime: "2026-06-01T00:00:00.000Z",
+    });
+
+    const response = await requestTradeApi(
+      "/api/symbol/research?exchange=coinbase&market=spot&symbol=AERO-USDC&timeframe=1d&assetClass=crypto",
+    );
+    const body = JSON.parse(response.body);
+
+    expect(response.status).toBe(404);
+    expect(body.errorCode).toBe("NO_LATEST_SIGNAL");
+    expect(body.unavailableReason).toBe("no_latest_signal_for_symbol");
+    expect(body.selectedRun).toBeNull();
+    expect(body.latest.scanRun).toBeNull();
+    expect(body.symbol).toMatchObject({
+      exchange: "coinbase",
+      symbol: "AERO-USDC",
+    });
+  });
+
   it("returns a stable research response shape", async () => {
     getSymbolResearchLatestSignalPgMock.mockResolvedValue({
       symbol: makeResearchSymbol("SEIUSDT"),
@@ -2329,7 +2431,12 @@ function resetSignalEvaluationMocks() {
 function makeRun(
   id: string,
   overrides: Partial<{
+    exchange: string;
+    market: string;
+    mode: string;
     timeframe: string;
+    universe: string;
+    status: string;
     symbolsTotal: number;
     symbolsScanned: number;
     signalsCreated: number;
@@ -2339,12 +2446,12 @@ function makeRun(
 ) {
   return {
     id,
-    exchange: "binance",
-    market: "spot",
-    mode: "single",
+    exchange: overrides.exchange ?? "binance",
+    market: overrides.market ?? "spot",
+    mode: overrides.mode ?? "single",
     timeframe: overrides.timeframe ?? "4h",
-    universe: "all-symbols",
-    status: "success",
+    universe: overrides.universe ?? "all-symbols",
+    status: overrides.status ?? "success",
     symbolsTotal: overrides.symbolsTotal ?? 2,
     symbolsScanned: overrides.symbolsScanned ?? 2,
     signalsCreated: overrides.signalsCreated ?? 2,
@@ -2357,15 +2464,24 @@ function makeRun(
   };
 }
 
-function makeResearchSymbol(symbol: string) {
+function makeResearchSymbol(
+  symbol: string,
+  overrides: Partial<{
+    exchange: string;
+    market: string;
+    baseAsset: string;
+    quoteAsset: string;
+    status: string;
+  }> = {},
+) {
   return {
     id: 1,
-    exchange: "binance",
-    market: "spot",
+    exchange: overrides.exchange ?? "binance",
+    market: overrides.market ?? "spot",
     symbol,
-    baseAsset: symbol.replace(/USDT$/, ""),
-    quoteAsset: "USDT",
-    status: "TRADING",
+    baseAsset: overrides.baseAsset ?? symbol.replace(/[-/]?USDT$/, ""),
+    quoteAsset: overrides.quoteAsset ?? "USDT",
+    status: overrides.status ?? "TRADING",
     quoteVolume: 1000000,
     priceChangePercent: 1.2,
     isEnabled: true,
@@ -2393,6 +2509,8 @@ function makeResearchSignal(
     scanRunSymbolsTotal: number | null;
     scanRunSymbolsScanned: number | null;
     scanRunSignalsCreated: number | null;
+    exchange: string;
+    market: string;
   }> = {},
 ) {
   const readableSignalLabel = overrides.signalLabel ?? "confirmed";
@@ -2442,8 +2560,8 @@ function makeResearchSignal(
     id: overrides.id ?? "signal-1",
     scanRunId: overrides.scanRunId ?? "full-run",
     symbolId: 1,
-    exchange: "binance",
-    market: "spot",
+    exchange: overrides.exchange ?? "binance",
+    market: overrides.market ?? "spot",
     symbol: overrides.symbol ?? "SEIUSDT",
     timeframe: overrides.timeframe ?? "4h",
     scanTime: overrides.scanTime ?? "2026-05-31T00:00:01.000Z",

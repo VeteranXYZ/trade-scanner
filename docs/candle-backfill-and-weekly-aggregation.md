@@ -75,14 +75,44 @@ Complete weeks require seven aligned daily candles. Partial weeks are dropped by
 default. The latest partial week can be included only when explicitly requested.
 Earlier partial weeks remain diagnostic-only coverage.
 
+## Intraday Aggregation
+
+`src/lib/market-data/intradayAggregation.ts` aggregates normalized hourly
+candles to 4h candles.
+
+Policy:
+
+- 4h buckets align to UTC `00:00`, `04:00`, `08:00`, `12:00`, `16:00`, and
+  `20:00`
+- 4h `openTime` is the bucket start
+- 4h `closeTime` is bucket start plus four hours minus one millisecond
+- `open` comes from the first hourly candle in the bucket
+- `high` is the max hourly high
+- `low` is the min hourly low
+- `close` comes from the fourth hourly candle
+- `volume` is summed
+- `quoteVolume` is summed when at least one hourly candle provides it
+
+Complete 4h buckets require four consecutive aligned hourly candles. Partial
+buckets are dropped by default. Diagnostics report complete buckets, partial
+buckets, dropped partial buckets, and input gaps.
+
 ## Coinbase Boundary
 
-Coinbase `1h`, `4h`, and `1d` remain direct adapter paths through the CCXT
-provider module.
+Coinbase `1h` and `1d` remain direct adapter paths through the CCXT provider
+module.
 
-Coinbase `1w` direct fetch remains unsupported in the provider. The Phase 32D
-weekly helper prepares a later activation path where Coinbase weekly candles can
-be derived from daily candles with documented coverage checks.
+Coinbase direct `4h` may not be exposed by the real CCXT client. The manual
+Coinbase backfill command derives `4h` candles from fetched `1h` candles using
+the intraday aggregation helper.
+
+Coinbase `1w` direct fetch remains unsupported in the provider. The manual
+Coinbase backfill command derives `1w` candles from stored `1d` candles with
+documented coverage checks.
+
+Symbol Research can query manual Coinbase scanner results by exact exchange,
+market, symbol, and timeframe. Rankings latest remains on the current Binance
+full-universe selection until Coinbase production universe rollout.
 
 ## Deferred Work
 
@@ -90,7 +120,7 @@ Still deferred:
 
 - live production backfill
 - production cron enablement
-- Coinbase `1w` production activation
+- Coinbase production universe rollout
 - storage and backfill activation
 - watchlist Coinbase support
 - production-depth pagination wired into jobs

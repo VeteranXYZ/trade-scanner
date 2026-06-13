@@ -170,6 +170,134 @@ describe("PgSymbolResearchStore", () => {
     expect(latest.signal).toBeNull();
   });
 
+  it("loads the latest Coinbase signal by exact exchange, symbol, and timeframe", async () => {
+    const queries: string[] = [];
+    const paramsList: unknown[][] = [];
+    const store = new PgSymbolResearchStore(
+      makePool((sql, params, callIndex) => {
+        queries.push(sql);
+        paramsList.push(params);
+
+        if (callIndex === 0) {
+          return {
+            rows: [
+              makeSymbolRow("AERO-USDC", {
+                exchange: "coinbase",
+                base_asset: "AERO",
+                quote_asset: "USDC",
+              }),
+            ],
+          };
+        }
+
+        return {
+          rows: [
+            makeSignalRow({
+              id: "coinbase-signal-1",
+              scan_run_id: "coinbase-run-1",
+              exchange: "coinbase",
+              symbol: "AERO-USDC",
+              timeframe: "1d",
+              rank_score: "20.98",
+              scan_run_exchange: "coinbase",
+              scan_run_market: "spot",
+              scan_run_mode: "manual",
+              scan_run_timeframe: "1d",
+              scan_run_universe: "manual-symbols",
+              scan_run_status: "success",
+              scan_run_symbols_total: "1",
+              scan_run_symbols_scanned: "1",
+              scan_run_signals_created: "1",
+              scan_run_symbols_skipped: "0",
+              scan_run_failed_symbols: "0",
+              scan_run_params: { exchange: "coinbase", symbols: ["AERO-USDC"] },
+            }),
+          ],
+        };
+      }),
+    );
+
+    const latest = await store.getSymbolResearchLatestSignalPg({
+      exchange: "coinbase",
+      market: "spot",
+      symbol: "aero-usdc",
+      timeframe: "1d",
+      assetClass: "crypto",
+    });
+
+    expect(latest.symbol?.symbol).toBe("AERO-USDC");
+    expect(latest.scanRun).toMatchObject({
+      id: "coinbase-run-1",
+      exchange: "coinbase",
+      market: "spot",
+      mode: "manual",
+      timeframe: "1d",
+      universe: "manual-symbols",
+      status: "success",
+      symbolsTotal: 1,
+      symbolsScanned: 1,
+      signalsCreated: 1,
+    });
+    expect(latest.signal).toMatchObject({
+      id: "coinbase-signal-1",
+      scanRunId: "coinbase-run-1",
+      exchange: "coinbase",
+      symbol: "AERO-USDC",
+      timeframe: "1d",
+      rankScore: 20.98,
+    });
+    expect(paramsList).toHaveLength(2);
+    expect(paramsList[1]).toEqual([
+      "coinbase",
+      "spot",
+      "AERO-USDC",
+      "1d",
+      "crypto",
+    ]);
+    expect(queries[1]).toContain("s.exchange = $1");
+    expect(queries[1]).toContain("ss.timeframe = $4");
+    expect(queries[1]).toContain("sr.finished_at DESC NULLS LAST");
+    expect(queries[1]).not.toContain("symbols_total >= $2");
+    expect(queries[1]).not.toContain("universe = 'all-symbols'");
+  });
+
+  it("returns no selected run when no exact Coinbase signal exists", async () => {
+    const queries: string[] = [];
+    const store = new PgSymbolResearchStore(
+      makePool((sql, _params, callIndex) => {
+        queries.push(sql);
+
+        if (callIndex === 0) {
+          return {
+            rows: [
+              makeSymbolRow("AERO-USDC", {
+                exchange: "coinbase",
+                base_asset: "AERO",
+                quote_asset: "USDC",
+              }),
+            ],
+          };
+        }
+
+        return { rows: [] };
+      }),
+    );
+
+    const latest = await store.getSymbolResearchLatestSignalPg({
+      exchange: "coinbase",
+      market: "spot",
+      symbol: "AERO-USDC",
+      timeframe: "1d",
+    });
+
+    expect(latest.symbol?.symbol).toBe("AERO-USDC");
+    expect(latest.scanRun).toBeNull();
+    expect(latest.signal).toBeNull();
+    expect(queries).toHaveLength(2);
+    expect(queries[1]).not.toContain("symbols_total >= $2");
+    expect(queries[1]).not.toContain("universe = 'all-symbols'");
+  });
+
   it("loads history by symbol and timeframe ordered by scan_time desc", async () => {
     const queries: string[] = [];
     const paramsList: unknown[][] = [];
@@ -343,24 +471,27 @@ function makePool(
   } as unknown as Pool;
 }
 
-function makeSymbolRow(symbol: string) {
+function makeSymbolRow(
+  symbol: string,
+  overrides: Partial<Record<string, unknown>> = {},
+) {
   return {
     id: "1",
-    exchange: "binance",
-    market: "spot",
+    exchange: overrides.exchange ?? "binance",
+    market: overrides.market ?? "spot",
     symbol,
-    base_asset: symbol.replace(/USDT$/, ""),
-    quote_asset: "USDT",
-    status: "TRADING",
-    quote_volume: "1000000",
-    price_change_percent: "1.2",
-    is_enabled: true,
-    asset_class: "crypto",
-    is_scanner_eligible: true,
-    is_backtest_eligible: true,
-    is_market_context: false,
-    metadata: {},
-    updated_at: "2026-05-31T00:00:00.000Z",
+    base_asset: overrides.base_asset ?? symbol.replace(/[-/]?USDT$/, ""),
+    quote_asset: overrides.quote_asset ?? "USDT",
+    status: overrides.status ?? "TRADING",
+    quote_volume: overrides.quote_volume ?? "1000000",
+    price_change_percent: overrides.price_change_percent ?? "1.2",
+    is_enabled: overrides.is_enabled ?? true,
+    asset_class: overrides.asset_class ?? "crypto",
+    is_scanner_eligible: overrides.is_scanner_eligible ?? true,
+    is_backtest_eligible: overrides.is_backtest_eligible ?? true,
+    is_market_context: overrides.is_market_context ?? false,
+    metadata: overrides.metadata ?? {},
+    updated_at: overrides.updated_at ?? "2026-05-31T00:00:00.000Z",
   };
 }
 
@@ -396,14 +527,14 @@ function makeSignalRow(
     id: overrides.id,
     scan_run_id: overrides.scan_run_id,
     symbol_id: "1",
-    exchange: "binance",
-    market: "spot",
+    exchange: overrides.exchange ?? "binance",
+    market: overrides.market ?? "spot",
     symbol: overrides.symbol,
     timeframe: overrides.timeframe ?? "4h",
     scan_time: overrides.scan_time ?? "2026-05-31T00:00:01.000Z",
     candle_open_time: "2026-05-30T20:00:00.000Z",
     price_at_signal: "1.23",
-    rank_score: "50",
+    rank_score: overrides.rank_score ?? "50",
     final_signal_score: "52",
     opportunity_score: "55",
     confirmation_score: "60",
@@ -426,16 +557,28 @@ function makeSignalRow(
     created_at: "2026-05-31T00:00:02.000Z",
     scan_run_started_at: "2026-05-31T00:00:00.000Z",
     scan_run_finished_at: "2026-05-31T00:01:00.000Z",
-    scan_run_symbols_total: "413",
-    scan_run_symbols_scanned: "409",
-    scan_run_signals_created: "409",
-    scan_run_params: { assetClass: "crypto", allSymbols: true },
-    asset_class: "crypto",
-    is_scanner_eligible: true,
-    is_backtest_eligible: true,
-    is_market_context: false,
-    candle_count: "1000",
-    first_open_time: "2024-01-01T00:00:00.000Z",
+    scan_run_exchange: overrides.scan_run_exchange ?? overrides.exchange ?? "binance",
+    scan_run_market: overrides.scan_run_market ?? overrides.market ?? "spot",
+    scan_run_mode: overrides.scan_run_mode ?? "single",
+    scan_run_timeframe: overrides.scan_run_timeframe ?? overrides.timeframe ?? "4h",
+    scan_run_universe: overrides.scan_run_universe ?? "all-symbols",
+    scan_run_status: overrides.scan_run_status ?? "success",
+    scan_run_symbols_total: overrides.scan_run_symbols_total ?? "413",
+    scan_run_symbols_scanned: overrides.scan_run_symbols_scanned ?? "409",
+    scan_run_signals_created: overrides.scan_run_signals_created ?? "409",
+    scan_run_symbols_skipped: overrides.scan_run_symbols_skipped ?? "4",
+    scan_run_failed_symbols: overrides.scan_run_failed_symbols ?? "0",
+    scan_run_params: overrides.scan_run_params ?? {
+      assetClass: "crypto",
+      allSymbols: true,
+    },
+    scan_run_error_message: overrides.scan_run_error_message ?? null,
+    asset_class: overrides.asset_class ?? "crypto",
+    is_scanner_eligible: overrides.is_scanner_eligible ?? true,
+    is_backtest_eligible: overrides.is_backtest_eligible ?? true,
+    is_market_context: overrides.is_market_context ?? false,
+    candle_count: overrides.candle_count ?? "1000",
+    first_open_time: overrides.first_open_time ?? "2024-01-01T00:00:00.000Z",
   };
 }
 

@@ -146,10 +146,19 @@ type ScanSignalRow = {
   created_at: Date | string;
   scan_run_started_at?: Date | string | null;
   scan_run_finished_at?: Date | string | null;
+  scan_run_exchange?: string | null;
+  scan_run_market?: string | null;
+  scan_run_mode?: string | null;
+  scan_run_timeframe?: string | null;
+  scan_run_universe?: string | null;
+  scan_run_status?: string | null;
   scan_run_symbols_total?: number | string | null;
   scan_run_symbols_scanned?: number | string | null;
   scan_run_signals_created?: number | string | null;
+  scan_run_symbols_skipped?: number | string | null;
+  scan_run_failed_symbols?: number | string | null;
   scan_run_params?: Record<string, unknown> | null;
+  scan_run_error_message?: string | null;
   asset_class: string | null;
   is_scanner_eligible: boolean | null;
   is_backtest_eligible: boolean | null;
@@ -211,6 +220,24 @@ export class PgSymbolResearchStore {
       return { symbol: null, scanRun: null, signal: null };
     }
 
+    if (exchange.toLowerCase() !== "binance") {
+      const latestSignal = await this.getLatestSignalForSymbol({
+        exchange,
+        market,
+        symbol,
+        timeframe,
+        assetClass,
+        includeNonScanner,
+        includeMarketContext,
+      });
+
+      return {
+        symbol: symbolRecord,
+        scanRun: latestSignal?.scanRun ?? null,
+        signal: latestSignal?.signal ?? null,
+      };
+    }
+
     const scannerStore = new PgRankingResultsStore(this.pool);
     const preferFullUniverse = assetClass === "crypto" && !includeNonScanner;
     const scanRun = await scannerStore.getLatestRankingRun({
@@ -256,13 +283,13 @@ export class PgSymbolResearchStore {
       symbol.toUpperCase(),
       timeframe,
     ];
-  const filters = [
-    "s.exchange = $1",
-    "s.market = $2",
-    "s.symbol = $3",
-    "ss.timeframe = $4",
-    currentScanSignalCodeContractCondition("ss"),
-  ];
+    const filters = [
+      "s.exchange = $1",
+      "s.market = $2",
+      "s.symbol = $3",
+      "ss.timeframe = $4",
+      currentScanSignalCodeContractCondition("ss"),
+    ];
 
     addSignalEligibilityFilters({
       filters,
@@ -311,13 +338,13 @@ export class PgSymbolResearchStore {
       symbol.toUpperCase(),
       timeframes,
     ];
-  const filters = [
-    "s.exchange = $1",
-    "s.market = $2",
-    "s.symbol = $3",
-    "ss.timeframe = ANY($4::text[])",
-    currentScanSignalCodeContractCondition("ss"),
-  ];
+    const filters = [
+      "s.exchange = $1",
+      "s.market = $2",
+      "s.symbol = $3",
+      "ss.timeframe = ANY($4::text[])",
+      currentScanSignalCodeContractCondition("ss"),
+    ];
 
     addSignalEligibilityFilters({
       filters,
@@ -511,14 +538,14 @@ export class PgSymbolResearchStore {
       symbol.toUpperCase(),
       timeframe,
     ];
-  const filters = [
-    "ss.scan_run_id = $1",
-    "s.exchange = $2",
-    "s.market = $3",
-    "s.symbol = $4",
-    "ss.timeframe = $5",
-    currentScanSignalCodeContractCondition("ss"),
-  ];
+    const filters = [
+      "ss.scan_run_id = $1",
+      "s.exchange = $2",
+      "s.market = $3",
+      "s.symbol = $4",
+      "ss.timeframe = $5",
+      currentScanSignalCodeContractCondition("ss"),
+    ];
 
     addSignalEligibilityFilters({
       filters,
@@ -539,6 +566,65 @@ export class PgSymbolResearchStore {
     );
 
     return result.rows[0] ? toSymbolResearchSignalRecord(result.rows[0]) : null;
+  }
+
+  private async getLatestSignalForSymbol({
+    exchange,
+    market,
+    symbol,
+    timeframe,
+    assetClass = "crypto",
+    includeNonScanner = false,
+    includeMarketContext = false,
+  }: SymbolResearchSignalFilters): Promise<{
+    scanRun: ScanRunRecord;
+    signal: SymbolResearchSignalRecord;
+  } | null> {
+    const params: unknown[] = [
+      exchange.toLowerCase(),
+      market.toLowerCase(),
+      symbol.toUpperCase(),
+      timeframe,
+    ];
+    const filters = [
+      "s.exchange = $1",
+      "s.market = $2",
+      "s.symbol = $3",
+      "ss.timeframe = $4",
+      currentScanSignalCodeContractCondition("ss"),
+    ];
+
+    addSignalEligibilityFilters({
+      filters,
+      params,
+      assetClass,
+      includeNonScanner,
+      includeMarketContext,
+    });
+
+    const result = await this.pool.query<ScanSignalRow>(
+      `
+        ${selectSignalWithSymbolCoverageSql()}
+        WHERE ${filters.join("\n          AND ")}
+        ORDER BY
+          sr.finished_at DESC NULLS LAST,
+          sr.started_at DESC,
+          ss.scan_time DESC,
+          ss.created_at DESC
+        LIMIT 1
+      `,
+      params,
+    );
+    const row = result.rows[0];
+
+    if (!row) {
+      return null;
+    }
+
+    return {
+      scanRun: toSymbolResearchScanRunRecord(row),
+      signal: toSymbolResearchSignalRecord(row),
+    };
   }
 }
 
@@ -573,12 +659,21 @@ function selectSignalWithSymbolCoverageSql() {
   return `
     SELECT
       ss.*,
+      sr.exchange AS scan_run_exchange,
+      sr.market AS scan_run_market,
+      sr.mode AS scan_run_mode,
+      sr.timeframe AS scan_run_timeframe,
+      sr.universe AS scan_run_universe,
+      sr.status AS scan_run_status,
       sr.started_at AS scan_run_started_at,
       sr.finished_at AS scan_run_finished_at,
       sr.symbols_total AS scan_run_symbols_total,
       sr.symbols_scanned AS scan_run_symbols_scanned,
       sr.signals_created AS scan_run_signals_created,
+      sr.symbols_skipped AS scan_run_symbols_skipped,
+      sr.failed_symbols AS scan_run_failed_symbols,
       sr.params AS scan_run_params,
+      sr.error_message AS scan_run_error_message,
       s.asset_class,
       s.is_scanner_eligible,
       s.is_backtest_eligible,
@@ -701,6 +796,31 @@ function toSymbolResearchSignalRecord(
     candleCount: Number(row.candle_count ?? 0),
     firstOpenTime: row.first_open_time
       ? new Date(row.first_open_time).toISOString()
+      : null,
+  };
+}
+
+function toSymbolResearchScanRunRecord(row: ScanSignalRow): ScanRunRecord {
+  return {
+    id: row.scan_run_id,
+    exchange: row.scan_run_exchange ?? row.exchange,
+    market: row.scan_run_market ?? row.market,
+    mode: row.scan_run_mode ?? "single",
+    timeframe: row.scan_run_timeframe ?? row.timeframe,
+    universe: row.scan_run_universe ?? "manual",
+    status: row.scan_run_status ?? "success",
+    symbolsTotal: Number(row.scan_run_symbols_total ?? 0),
+    symbolsScanned: Number(row.scan_run_symbols_scanned ?? 0),
+    signalsCreated: Number(row.scan_run_signals_created ?? 0),
+    symbolsSkipped: Number(row.scan_run_symbols_skipped ?? 0),
+    failedSymbols: Number(row.scan_run_failed_symbols ?? 0),
+    params: row.scan_run_params ?? {},
+    errorMessage: row.scan_run_error_message ?? null,
+    startedAt: row.scan_run_started_at
+      ? new Date(row.scan_run_started_at).toISOString()
+      : new Date(row.scan_time).toISOString(),
+    finishedAt: row.scan_run_finished_at
+      ? new Date(row.scan_run_finished_at).toISOString()
       : null,
   };
 }

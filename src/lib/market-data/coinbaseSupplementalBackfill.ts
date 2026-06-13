@@ -12,6 +12,10 @@ import {
   aggregateDailyCandlesToWeekly,
   type WeeklyAggregationDiagnostics,
 } from "./weeklyAggregation";
+import {
+  aggregateHourlyCandlesToFourHour,
+  type FourHourAggregationDiagnostics,
+} from "./intradayAggregation";
 import { parseMarketSymbol, type MarketListing } from "./symbolIdentity";
 import type {
   CandleUpsertStats,
@@ -57,13 +61,15 @@ export type CoinbaseSymbolBackfillResult = {
   coverageBefore: SymbolCandleCoverage;
   coverageAfter: SymbolCandleCoverage;
   diagnostics?: CandleContinuityDiagnostics;
+  fourHourDiagnostics?: FourHourAggregationDiagnostics;
   weeklyDiagnostics?: WeeklyAggregationDiagnostics;
   plan?: BackfillPlan;
 };
 
 const coinbaseExchange = "coinbase";
 const spotMarket = "spot";
-const directCoinbaseTimeframes = new Set<Timeframe>(["1h", "4h", "1d"]);
+const directCoinbaseTimeframes = new Set<Timeframe>(["1h", "1d"]);
+const fourHourSourceSafetyCandles = 8;
 
 export async function backfillCoinbaseCandlesForSymbol({
   store,
@@ -87,6 +93,17 @@ export async function backfillCoinbaseCandlesForSymbol({
       store,
       symbol,
       targetCandles,
+    });
+  }
+
+  if (timeframe === "4h") {
+    return backfillCoinbaseFourHourCandlesFromHourly({
+      store,
+      provider,
+      symbol,
+      targetCandles,
+      providerMaxCandlesPerRequest,
+      endTimeMs,
     });
   }
 
@@ -117,7 +134,7 @@ export async function backfillCoinbaseDirectCandles({
   store: CoinbaseBackfillStore;
   provider: MarketDataProvider;
   symbol: PgSymbol;
-  timeframe: Exclude<CoinbaseBackfillTimeframe, "1w">;
+  timeframe: Exclude<CoinbaseBackfillTimeframe, "4h" | "1w">;
   targetCandles: number;
   providerMaxCandlesPerRequest: number;
   endTimeMs: number;
@@ -176,6 +193,82 @@ export async function backfillCoinbaseDirectCandles({
     coverageBefore,
     coverageAfter,
     diagnostics: normalized.diagnostics,
+    plan,
+  };
+}
+
+export async function backfillCoinbaseFourHourCandlesFromHourly({
+  store,
+  provider,
+  symbol,
+  targetCandles,
+  providerMaxCandlesPerRequest,
+  endTimeMs,
+}: {
+  store: CoinbaseBackfillStore;
+  provider: MarketDataProvider;
+  symbol: PgSymbol;
+  targetCandles: number;
+  providerMaxCandlesPerRequest: number;
+  endTimeMs: number;
+}): Promise<CoinbaseSymbolBackfillResult> {
+  const coverageBefore = await store.getCandleCoverageForSymbol({
+    exchange: coinbaseExchange,
+    market: spotMarket,
+    symbol: symbol.symbol,
+    timeframe: "4h",
+  });
+  const listing = pgSymbolToCoinbaseListing(symbol);
+  const plan = buildBackfillPlan({
+    timeframe: "1h",
+    targetCandles: targetCandles * 4 + fourHourSourceSafetyCandles,
+    maxCandlesPerRequest: providerMaxCandlesPerRequest,
+    endTimeMs,
+  });
+  const fetchedCandles: Candle[] = [];
+
+  for (const window of plan.windows) {
+    const result = await provider.fetchCandles({
+      listing,
+      timeframe: "1h",
+      startTime: window.startTimeMs,
+      endTime: window.endTimeMs,
+      limit: window.requestLimit,
+    });
+
+    fetchedCandles.push(...filterCandlesToWindow(result, window));
+  }
+
+  const normalizedHourly = normalizeCandles(fetchedCandles, "1h");
+  const aggregated = aggregateHourlyCandlesToFourHour(normalizedHourly.candles);
+  const fourHourCandles = aggregated.fourHourCandles.slice(-targetCandles);
+  const stats = await store.upsertCandles({
+    exchange: coinbaseExchange,
+    market: spotMarket,
+    symbol: symbol.symbol,
+    timeframe: "4h",
+    candles: fourHourCandles,
+  });
+  const coverageAfter = await store.getCandleCoverageForSymbol({
+    exchange: coinbaseExchange,
+    market: spotMarket,
+    symbol: symbol.symbol,
+    timeframe: "4h",
+  });
+
+  return {
+    symbol: symbol.symbol,
+    timeframe: "4h",
+    requestedWindows: plan.windows.length,
+    fetchedCandles: fetchedCandles.length,
+    normalizedCandles: fourHourCandles.length,
+    inserted: stats.inserted,
+    updated: stats.updated,
+    gapCount: aggregated.diagnostics.gapsDetected,
+    coverageBefore,
+    coverageAfter,
+    diagnostics: normalizedHourly.diagnostics,
+    fourHourDiagnostics: aggregated.diagnostics,
     plan,
   };
 }

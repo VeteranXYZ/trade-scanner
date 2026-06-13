@@ -102,6 +102,12 @@ async function main() {
               `coinbase:backfill ${result.symbol} weekly completeWeeks=${result.weeklyDiagnostics.completeWeeks} partialWeeks=${result.weeklyDiagnostics.partialWeeks} droppedPartialWeeks=${result.weeklyDiagnostics.droppedPartialWeeks} gapsDetected=${result.weeklyDiagnostics.gapsDetected}`,
             );
           }
+
+          if (result.fourHourDiagnostics) {
+            console.info(
+              `coinbase:backfill ${result.symbol} fourHour source1h=${result.fetchedCandles} generated4h=${result.normalizedCandles} completeBuckets=${result.fourHourDiagnostics.completeBuckets} partialBuckets=${result.fourHourDiagnostics.partialBuckets} droppedPartialBuckets=${result.fourHourDiagnostics.droppedPartialBuckets} gapsDetected=${result.fourHourDiagnostics.gapsDetected}`,
+            );
+          }
         }),
       ),
     );
@@ -131,6 +137,11 @@ async function main() {
         inserted: result.inserted,
         updated: result.updated,
         gaps: result.gapCount,
+        generated4h: result.fourHourDiagnostics
+          ? result.normalizedCandles
+          : undefined,
+        droppedPartialFourHourBuckets:
+          result.fourHourDiagnostics?.droppedPartialBuckets,
         droppedPartialWeeks: result.weeklyDiagnostics?.droppedPartialWeeks,
       })),
     });

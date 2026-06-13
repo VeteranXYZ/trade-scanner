@@ -12,10 +12,12 @@ This phase enables manual development and staging workflows for:
 - Coinbase USDC spot market discovery
 - Binance-first supplemental universe selection
 - Coinbase-only symbol import into Postgres
-- Coinbase `1h`, `4h`, and `1d` candle backfill through the CCXT adapter
+- Coinbase `1h` and `1d` candle backfill through the CCXT adapter
+- Coinbase `4h` candle creation from fetched `1h` candles
 - Coinbase `1w` candle creation from stored daily candles
 - exchange-aware scanner storage when manually invoked
 - dashed Coinbase symbol validation for backend routes
+- exact Coinbase Symbol Research lookup after manual scanner runs
 
 Production cron jobs remain unchanged.
 
@@ -61,8 +63,14 @@ Direct Coinbase adapter paths:
 
 ```bash
 pnpm backfill:coinbase-usdc -- --timeframe=1h --limit-symbols=5 --target-candles=300
-pnpm backfill:coinbase-usdc -- --timeframe=4h --limit-symbols=5 --target-candles=300
 pnpm backfill:coinbase-usdc -- --timeframe=1d --limit-symbols=5 --target-candles=300
+```
+
+Coinbase `4h` is derived from `1h` candles because the real CCXT Coinbase client
+may not expose a direct `4h` timeframe:
+
+```bash
+pnpm backfill:coinbase-usdc -- --timeframe=4h --limit-symbols=5 --target-candles=300
 ```
 
 Target explicit symbols:
@@ -78,6 +86,11 @@ The script uses provider-neutral backfill windows from
 - `exchange = coinbase`
 - `market = spot`
 - `symbol = BTC-USDC`
+
+For `4h`, the command fetches enough `1h` candles for the requested target plus
+a small source buffer, normalizes and deduplicates the `1h` input, aggregates
+complete UTC 4h buckets, drops partial buckets by default, and logs generated
+`4h` count, dropped partial buckets, and detected gaps.
 
 ## Weekly Aggregation
 
@@ -124,6 +137,22 @@ pnpm scanner:run:pg -- --exchange=coinbase --symbols=ABC-USDC --timeframe=4h --l
 
 The scanner preserves the stored symbol exchange in scan run metadata and scan
 signal rows. Scoring math and codebook meanings are unchanged.
+
+## Symbol Research
+
+Manual Coinbase scanner results can be queried by exact exchange, market,
+symbol, and timeframe:
+
+```bash
+curl "http://127.0.0.1:3000/api/symbol/research?exchange=coinbase&symbol=ABC-USDC&timeframe=1d&assetClass=crypto"
+```
+
+Symbol Research looks for the latest stored Coinbase signal for the exact
+requested identity. If one exists, `latest.scanRun.exchange` remains
+`coinbase` and the dashed symbol is preserved.
+
+`/api/rankings/latest` remains anchored to the existing Binance full-universe
+selection until a later Coinbase production universe rollout.
 
 ## Still Deferred
 
