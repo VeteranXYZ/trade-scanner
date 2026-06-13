@@ -898,21 +898,26 @@ describe("ArchivePageClient display formatting", () => {
     expect(text).toContain(
       "Research-only diagnostics based on complete archive outcome windows.",
     );
-    expect(text).toContain("Data Maturity");
-    expect(text).toContain("Data Mature");
+    expect(text).toContain("Window Coverage");
+    expect(text).toContain("Window Coverage Mature");
+    expect(text).toContain("Diagnostic Availability");
     expect(text).toContain("Score Bucket Separation");
-    expect(text).toContain("Clear Separation");
-    expect(text).toContain("Research Group Comparison");
-    expect(text).toContain("High Priority");
-    expect(text).toContain("Watch");
-    expect(text).toContain("Risk Context Summary");
-    expect(text).toContain("Risk Context Present");
+    expect(text).toContain("Score buckets are available.");
+    expect(text).toContain("Research Groups");
+    expect(text).toContain("Research group comparison is available across");
+    expect(text).toContain("Risk Context");
+    expect(text).toContain("Risk context comparison is present, but complete-window support is limited.");
     expect(text).toContain("Evidence Reliability");
-    expect(text).toContain("Confidence Bucket");
+    expect(text).toContain("Not Stored");
+    expect(text).toContain(
+      "Confidence/evidence fields are not stored in the current archive rows.",
+    );
     expect(text).toContain("Diagnostics do not change scoring automatically.");
+    expect(text).not.toContain("Risk Context Details");
+    expect(text).not.toContain("Evidence Reliability Details");
   });
 
-  it("shows Ranking Quality Diagnostics data maturity counts", () => {
+  it("shows Ranking Quality Diagnostics window coverage counts", () => {
     const response = makeObservationResponse({
       rows: [
         makeObservationRow({
@@ -946,13 +951,15 @@ describe("ArchivePageClient display formatting", () => {
     });
     const text = markupText(renderRankingQualityDiagnosticsPanel({ response }));
 
+    expect(text).toContain("Window Coverage");
     expect(text).toMatch(/Complete Windows\s+2/);
     expect(text).toMatch(/Partial Windows\s+1/);
     expect(text).toMatch(/Missing Windows\s+1/);
     expect(text).toContain("Data Not Mature");
+    expect(text).toContain("Diagnostic Availability");
   });
 
-  it("labels limited and not mature ranking quality samples conservatively", () => {
+  it("separates window coverage from limited diagnostic availability", () => {
     const limitedResponse = makeObservationResponse({
       rows: Array.from({ length: 12 }, (_, index) =>
         makeObservationRow({
@@ -998,6 +1005,66 @@ describe("ArchivePageClient display formatting", () => {
     ).toContain("Data Not Mature");
   });
 
+  it("does not render a full research group table for unknown-only groups", () => {
+    const response = makeObservationResponse({
+      rows: Array.from({ length: 12 }, (_, index) =>
+        makeObservationRow({
+          id: `unknown-group-${index}`,
+          symbol: `UNKNOWN${index}USDT`,
+          group: null,
+          rankScore: index < 6 ? 80 : 20,
+          dataStatus: "complete",
+          missingReason: null,
+        }),
+      ),
+    });
+    const text = markupText(renderRankingQualityDiagnosticsPanel({ response }));
+
+    expect(text).toContain("Research Groups");
+    expect(text).toContain("Unavailable");
+    expect(text).toContain(
+      "Current archive rows do not include enough research-group variation for comparison.",
+    );
+    expect(text).not.toContain("Research Group Comparison");
+  });
+
+  it("uses a conservative risk context state for no-risk-only rows", () => {
+    const response = makeObservationResponse({
+      rows: Array.from({ length: 24 }, (_, index) =>
+        makeObservationRow({
+          id: `no-risk-${index}`,
+          symbol: `NORISK${index}USDT`,
+          group: index < 12 ? "eligible" : "watch",
+          rankScore: index < 12 ? 82 : 64,
+          dataStatus: "complete",
+          missingReason: null,
+        }),
+      ),
+    });
+    const text = markupText(renderRankingQualityDiagnosticsPanel({ response }));
+
+    expect(text).toContain("Risk Context");
+    expect(text).toContain("Unavailable");
+    expect(text).toContain(
+      "Risk context diagnostics are limited by available archive fields.",
+    );
+    expect(text).not.toContain("Risk Context Details");
+  });
+
+  it("labels confidence-unknown archive rows as not stored", () => {
+    const response = makeObservationResponse({
+      rows: makeRankingQualityRows(),
+    });
+    const text = markupText(renderRankingQualityDiagnosticsPanel({ response }));
+
+    expect(text).toContain("Evidence Reliability");
+    expect(text).toContain("Not Stored");
+    expect(text).toContain(
+      "Confidence/evidence fields are not stored in the current archive rows.",
+    );
+    expect(text).not.toContain("Evidence Reliability Details");
+  });
+
   it("keeps missing windows separate from negative outcomes in ranking quality copy", () => {
     const response = makeObservationResponse({
       rows: [
@@ -1035,7 +1102,7 @@ describe("ArchivePageClient display formatting", () => {
 
     expect(text).toContain("Evidence Reliability");
     expect(text).toContain("Data Support");
-    expect(text).toContain("Confidence Bucket");
+    expect(text).toContain("Not Stored");
     expect(text).not.toMatch(/\bprobability\b/i);
     expect(text).not.toMatch(/\bchance\b/i);
     expect(text).not.toMatch(/\bprediction accuracy\b/i);
@@ -1104,7 +1171,7 @@ describe("ArchivePageClient display formatting", () => {
     expect(emptyText).toContain("Diagnostics unavailable from current archive data");
     expect(emptyText).toContain("Data Not Mature");
     expect(missingOutcomeText).toContain("Ranking Quality Diagnostics");
-    expect(missingOutcomeText).toContain("N/A");
+    expect(missingOutcomeText).toContain("Diagnostic Availability");
   });
 
   it("renders stale market coverage as a compact unavailable state", () => {

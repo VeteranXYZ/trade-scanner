@@ -48,7 +48,6 @@ import {
   MIN_COMPLETE_WINDOWS_FOR_INTERPRETATION,
   type RankingQualityEvaluation,
   type RankingQualityInputRow,
-  type RankingQualityMetricSummary,
   type RankingQualityNotice,
   type RankingQualitySeparationDiagnostic,
 } from "@/lib/ranking-quality/rankingQualityEvaluation";
@@ -1576,17 +1575,31 @@ export function ArchiveDetails({
   );
 }
 
-type ArchiveRankingQualityMaturityLabel =
-  | "Data Mature"
+type ArchiveWindowCoverageLabel =
+  | "Window Coverage Mature"
   | "Limited Sample"
   | "Data Not Mature";
 
-type ArchiveRankingQualityMaturity = {
-  label: ArchiveRankingQualityMaturityLabel;
+type ArchiveWindowCoverage = {
+  label: ArchiveWindowCoverageLabel;
   rowCount: number;
   completeCount: number;
   partialCount: number;
   missingCount: number;
+};
+
+type RankingQualityAvailabilityStatus =
+  | "Available"
+  | "Limited Sample"
+  | "Unavailable"
+  | "Not Stored"
+  | "No Variation"
+  | "N/A";
+
+type RankingQualityAvailabilityItem = {
+  label: string;
+  status: RankingQualityAvailabilityStatus;
+  note: string;
 };
 
 export function RankingQualityDiagnosticsPanel({
@@ -1598,27 +1611,20 @@ export function RankingQualityDiagnosticsPanel({
 }) {
   const rows = response?.rows ?? emptyHistoricalObservationRows;
   const evaluation = buildArchiveRankingQualityEvaluation(rows);
-  const maturity = getArchiveRankingQualityMaturity({
+  const windowCoverage = getArchiveWindowCoverage({
     evaluation,
     summary,
   });
-  const scoreDiagnostic = getRankingQualityDiagnostic(
-    evaluation,
-    "top_score_vs_bottom_score",
-  );
-  const riskDiagnostic = getRankingQualityDiagnostic(
-    evaluation,
-    "risk_context_vs_no_risk_context",
-  );
-  const confidenceDiagnostic = getRankingQualityDiagnostic(
-    evaluation,
-    "high_confidence_vs_low_confidence",
-  );
   const hasRows = rows.length > 0;
+  const availability = buildRankingQualityAvailability({
+    evaluation,
+    hasRows,
+  });
   const followUpNotes = buildRankingQualityFollowUpNotes({
     evaluation,
-    maturity,
+    windowCoverage,
     hasRows,
+    availability,
   });
 
   return (
@@ -1627,10 +1633,10 @@ export function RankingQualityDiagnosticsPanel({
         <span className="inline-flex min-w-0 flex-wrap items-center gap-2">
           <span>Ranking Quality Diagnostics</span>
           <StatusBadge
-            tone={getRankingQualityMaturityTone(maturity.label)}
+            tone={getWindowCoverageTone(windowCoverage.label)}
             className="h-5 justify-center !py-0 text-[10px] [line-height:1]"
           >
-            {maturity.label}
+            {windowCoverage.label}
           </StatusBadge>
         </span>
       </summary>
@@ -1638,7 +1644,7 @@ export function RankingQualityDiagnosticsPanel({
         <p className="text-[11px] leading-4 text-[var(--muted)]">
           Research-only diagnostics based on complete archive outcome windows.
         </p>
-        <RankingQualityDataMaturityBlock maturity={maturity} />
+        <RankingQualityWindowCoverageBlock windowCoverage={windowCoverage} />
         <DetailLine
           label="Window rule"
           value="Only complete outcome windows are used for primary diagnostics. Partial and missing windows are tracked separately."
@@ -1649,70 +1655,7 @@ export function RankingQualityDiagnosticsPanel({
             message="Complete archive outcome windows are needed before ranking quality can be interpreted."
           />
         ) : (
-          <>
-            <RankingQualitySeparationBlock
-              title="Score Bucket Separation"
-              diagnostic={scoreDiagnostic}
-              leftLabel="Top Bucket"
-              leftValue={formatRankingQualityBucketLabel(
-                evaluation,
-                scoreDiagnostic?.leftCode,
-              )}
-              rightLabel="Bottom Bucket"
-              rightValue={formatRankingQualityBucketLabel(
-                evaluation,
-                scoreDiagnostic?.rightCode,
-              )}
-            />
-            <RankingQualitySummaryTable
-              title="Research Group Comparison"
-              labelHeader="Research Group"
-              summaries={evaluation.groupSummaries}
-              emptyMessage="No research group diagnostics are available yet."
-            />
-            <RankingQualitySeparationBlock
-              title="Risk Context Summary"
-              diagnostic={riskDiagnostic}
-              leftLabel="Risk Context"
-              leftValue={formatRankingQualityRiskContextLabel(
-                riskDiagnostic?.leftCode,
-              )}
-              rightLabel="Baseline Context"
-              rightValue={formatRankingQualityRiskContextLabel(
-                riskDiagnostic?.rightCode,
-              )}
-            />
-            <RankingQualitySummaryTable
-              title="Risk Context Details"
-              labelHeader="Context"
-              summaries={evaluation.riskContextSummaries}
-              emptyMessage="No risk context diagnostics are available yet."
-              formatLabel={formatRankingQualityRiskContextLabel}
-            />
-            <RankingQualitySeparationBlock
-              title="Evidence Reliability"
-              diagnostic={confidenceDiagnostic}
-              leftLabel="Confidence Bucket"
-              leftValue={formatRankingQualityConfidenceLabel(
-                confidenceDiagnostic?.leftCode,
-              )}
-              rightLabel="Baseline Bucket"
-              rightValue={formatRankingQualityConfidenceLabel(
-                confidenceDiagnostic?.rightCode,
-              )}
-              deltaLabel="Data Support Delta"
-              deltaValue={formatRankingQualityDelta(
-                confidenceDiagnostic?.metricDeltas.completeRatePct,
-              )}
-            />
-            <RankingQualitySummaryTable
-              title="Evidence Reliability Details"
-              labelHeader="Confidence Bucket"
-              summaries={evaluation.confidenceBuckets}
-              emptyMessage="No evidence reliability buckets are available yet."
-              formatLabel={formatRankingQualityConfidenceLabel}
-            />
-          </>
+          <RankingQualityAvailabilitySection items={availability} />
         )}
         <RankingQualityFollowUpNotes notes={followUpNotes} />
       </div>
@@ -1745,185 +1688,82 @@ function toRankingQualityInputRow(
   };
 }
 
-function RankingQualityDataMaturityBlock({
-  maturity,
+function RankingQualityWindowCoverageBlock({
+  windowCoverage,
 }: {
-  maturity: ArchiveRankingQualityMaturity;
+  windowCoverage: ArchiveWindowCoverage;
 }) {
   return (
     <section className="border border-[var(--border)] bg-[var(--panel-muted)] px-2 py-1.5">
       <div className="mb-1 flex min-w-0 flex-wrap items-center gap-2">
         <h3 className="text-[10px] font-semibold uppercase tracking-normal text-[var(--foreground)]">
-          Data Maturity
+          Window Coverage
         </h3>
         <StatusBadge
-          tone={getRankingQualityMaturityTone(maturity.label)}
+          tone={getWindowCoverageTone(windowCoverage.label)}
           className="h-5 justify-center !py-0 text-[10px] [line-height:1]"
         >
-          {maturity.label}
+          {windowCoverage.label}
         </StatusBadge>
       </div>
       <div className="grid grid-cols-2 gap-1 sm:grid-cols-4">
         <SummaryMetric
           label="Complete Windows"
-          value={formatCount(maturity.completeCount)}
-          tone={maturity.completeCount > 0 ? "complete" : "missing"}
+          value={formatCount(windowCoverage.completeCount)}
+          tone={windowCoverage.completeCount > 0 ? "complete" : "missing"}
         />
         <SummaryMetric
           label="Partial Windows"
-          value={formatCount(maturity.partialCount)}
-          tone={maturity.partialCount > 0 ? "partial" : "neutral"}
+          value={formatCount(windowCoverage.partialCount)}
+          tone={windowCoverage.partialCount > 0 ? "partial" : "neutral"}
         />
         <SummaryMetric
           label="Missing Windows"
-          value={formatCount(maturity.missingCount)}
-          tone={maturity.missingCount > 0 ? "missing" : "neutral"}
+          value={formatCount(windowCoverage.missingCount)}
+          tone={windowCoverage.missingCount > 0 ? "missing" : "neutral"}
         />
         <SummaryMetric
           label="Data Support"
-          value={formatCount(maturity.rowCount)}
-          tone={maturity.rowCount > 0 ? "observation" : "missing"}
+          value={formatCount(windowCoverage.rowCount)}
+          tone={windowCoverage.rowCount > 0 ? "observation" : "missing"}
         />
       </div>
     </section>
   );
 }
 
-function RankingQualitySeparationBlock({
-  title,
-  diagnostic,
-  leftLabel,
-  leftValue,
-  rightLabel,
-  rightValue,
-  deltaLabel = "Follow-through Delta",
-  deltaValue,
+function RankingQualityAvailabilitySection({
+  items,
 }: {
-  title: string;
-  diagnostic: RankingQualitySeparationDiagnostic | null;
-  leftLabel: string;
-  leftValue: string;
-  rightLabel: string;
-  rightValue: string;
-  deltaLabel?: string;
-  deltaValue?: string;
-}) {
-  const interpretation = diagnostic?.interpretationLabel ?? "Data Not Mature";
-
-  return (
-    <section className="border border-[var(--border)] bg-[var(--panel-muted)] px-2 py-1.5">
-      <div className="mb-1 flex min-w-0 flex-wrap items-center gap-2">
-        <h3 className="text-[10px] font-semibold uppercase tracking-normal text-[var(--foreground)]">
-          {title}
-        </h3>
-        <StatusBadge
-          tone={getRankingQualityInterpretationTone(interpretation)}
-          className="h-5 justify-center !py-0 text-[10px] [line-height:1]"
-        >
-          {interpretation}
-        </StatusBadge>
-      </div>
-      <dl className="grid gap-x-3 gap-y-1 sm:grid-cols-2 lg:grid-cols-4">
-        <RankingQualityDetailItem label={leftLabel} value={leftValue} />
-        <RankingQualityDetailItem label={rightLabel} value={rightValue} />
-        <RankingQualityDetailItem
-          label={deltaLabel}
-          value={
-            deltaValue ??
-            formatRankingQualityDelta(
-              diagnostic?.metricDeltas.medianFollowThroughPct,
-            )
-          }
-        />
-        <RankingQualityDetailItem
-          label="Drawdown Context Delta"
-          value={formatRankingQualityDelta(
-            diagnostic?.metricDeltas.medianDrawdownPct,
-          )}
-        />
-      </dl>
-    </section>
-  );
-}
-
-function RankingQualitySummaryTable({
-  title,
-  labelHeader,
-  summaries,
-  emptyMessage,
-  formatLabel,
-}: {
-  title: string;
-  labelHeader: string;
-  summaries: RankingQualityMetricSummary[];
-  emptyMessage: string;
-  formatLabel?: (code: string | null | undefined, fallback?: string) => string;
+  items: RankingQualityAvailabilityItem[];
 }) {
   return (
     <section className="border border-[var(--border)] bg-[var(--panel-muted)] px-2 py-1.5">
       <h3 className="text-[10px] font-semibold uppercase tracking-normal text-[var(--foreground)]">
-        {title}
+        Diagnostic Availability
       </h3>
-      {summaries.length === 0 ? (
-        <p className="mt-1 text-[11px] leading-4 text-[var(--muted)]">
-          {emptyMessage}
-        </p>
-      ) : (
-        <div className="mt-1 overflow-x-auto">
-          <table className="w-full min-w-[520px] border-collapse text-left text-[10px]">
-            <thead className="uppercase tracking-normal text-[var(--muted)]">
-              <tr className="border-b border-[var(--table-grid)]">
-                <th className="py-1 pr-2 font-semibold">{labelHeader}</th>
-                <th className="px-2 py-1 text-right font-semibold">Complete</th>
-                <th className="px-2 py-1 text-right font-semibold">Partial</th>
-                <th className="px-2 py-1 text-right font-semibold">Missing</th>
-                <th className="py-1 pl-2 text-right font-semibold">Status</th>
-              </tr>
-            </thead>
-            <tbody>
-              {summaries.map((item) => (
-                <tr key={item.code} className="border-b border-[var(--table-grid)] last:border-b-0">
-                  <td className="py-1 pr-2 font-semibold text-[var(--foreground)]">
-                    {formatLabel?.(item.code, item.label) ?? item.label}
-                  </td>
-                  <td className="px-2 py-1 text-right font-mono text-[var(--complete)]">
-                    {formatCount(item.completeCount)}
-                  </td>
-                  <td className="px-2 py-1 text-right font-mono text-[var(--partial)]">
-                    {formatCount(item.partialCount)}
-                  </td>
-                  <td className="px-2 py-1 text-right font-mono text-[var(--missing)]">
-                    {formatCount(item.missingCount)}
-                  </td>
-                  <td className="py-1 pl-2 text-right text-[var(--muted)]">
-                    {item.interpretationLabel}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
+      <div className="mt-1 grid gap-1">
+        {items.map((item) => (
+          <div
+            key={item.label}
+            className="grid gap-1 border border-l-2 border-[var(--border)] bg-[var(--panel)] px-2 py-1 sm:grid-cols-[150px_120px_minmax(0,1fr)] sm:items-center"
+          >
+            <span className="text-[10px] font-semibold uppercase tracking-normal text-[var(--foreground)]">
+              {item.label}
+            </span>
+            <StatusBadge
+              tone={getRankingQualityAvailabilityTone(item.status)}
+              className="h-5 w-fit justify-center !py-0 text-[10px] [line-height:1]"
+            >
+              {item.status}
+            </StatusBadge>
+            <span className="text-[11px] leading-4 text-[var(--muted)]">
+              {item.note}
+            </span>
+          </div>
+        ))}
+      </div>
     </section>
-  );
-}
-
-function RankingQualityDetailItem({
-  label,
-  value,
-}: {
-  label: string;
-  value: string;
-}) {
-  return (
-    <div className="min-w-0">
-      <dt className="text-[9px] font-semibold uppercase tracking-normal text-[var(--muted)]">
-        {label}
-      </dt>
-      <dd className="truncate font-mono text-[10px] font-semibold text-[var(--foreground)]">
-        {value}
-      </dd>
-    </div>
   );
 }
 
@@ -1944,18 +1784,18 @@ function RankingQualityFollowUpNotes({ notes }: { notes: string[] }) {
   );
 }
 
-function getArchiveRankingQualityMaturity({
+function getArchiveWindowCoverage({
   evaluation,
   summary,
 }: {
   evaluation: RankingQualityEvaluation;
   summary: ForwardObservationSummary | null;
-}): ArchiveRankingQualityMaturity {
+}): ArchiveWindowCoverage {
   const rowCount = summary?.totalRows ?? evaluation.summary.rowCount;
   const completeCount = summary?.completeCount ?? evaluation.summary.completeCount;
   const partialCount = summary?.partialCount ?? evaluation.summary.partialCount;
   const missingCount = summary?.missingCount ?? evaluation.summary.missingCount;
-  const label = classifyArchiveRankingQualityMaturity({
+  const label = classifyArchiveWindowCoverage({
     rowCount,
     completeCount,
     partialCount,
@@ -1972,7 +1812,7 @@ function getArchiveRankingQualityMaturity({
   };
 }
 
-function classifyArchiveRankingQualityMaturity({
+function classifyArchiveWindowCoverage({
   rowCount,
   completeCount,
   partialCount,
@@ -1984,7 +1824,7 @@ function classifyArchiveRankingQualityMaturity({
   partialCount: number;
   missingCount: number;
   evaluation: RankingQualityEvaluation;
-}): ArchiveRankingQualityMaturityLabel {
+}): ArchiveWindowCoverageLabel {
   if (rowCount <= 0 || completeCount <= 0) {
     return "Data Not Mature";
   }
@@ -1993,7 +1833,7 @@ function classifyArchiveRankingQualityMaturity({
     completeCount >= MIN_COMPLETE_WINDOWS_FOR_INTERPRETATION &&
     evaluation.summary.sampleWarning === null
   ) {
-    return "Data Mature";
+    return "Window Coverage Mature";
   }
 
   return partialCount + missingCount >= completeCount
@@ -2012,70 +1852,212 @@ function getRankingQualityDiagnostic(
   );
 }
 
-function formatRankingQualityBucketLabel(
+function buildRankingQualityAvailability({
+  evaluation,
+  hasRows,
+}: {
+  evaluation: RankingQualityEvaluation;
+  hasRows: boolean;
+}): RankingQualityAvailabilityItem[] {
+  return [
+    getScoreBucketAvailability(evaluation, hasRows),
+    getResearchGroupAvailability(evaluation, hasRows),
+    getRiskContextAvailability(evaluation, hasRows),
+    getEvidenceReliabilityAvailability(evaluation, hasRows),
+  ];
+}
+
+function getScoreBucketAvailability(
   evaluation: RankingQualityEvaluation,
-  code: string | null | undefined,
-) {
-  return (
-    evaluation.scoreBuckets.find((bucket) => bucket.code === code)?.label ?? "N/A"
+  hasRows: boolean,
+): RankingQualityAvailabilityItem {
+  const diagnostic = getRankingQualityDiagnostic(
+    evaluation,
+    "top_score_vs_bottom_score",
   );
-}
+  const knownScoreBucketCount = evaluation.scoreBuckets.filter(
+    (bucket) => bucket.code !== "score_unknown",
+  ).length;
 
-function formatRankingQualityRiskContextLabel(
-  code: string | null | undefined,
-  fallback = "N/A",
-) {
-  switch (code) {
-    case "risk_context":
-      return "Risk Context Present";
-    case "no_risk_context":
-      return "No Risk Context";
-    default:
-      return fallback;
+  if (!hasRows || evaluation.scoreBuckets.length === 0) {
+    return {
+      label: "Score Bucket Separation",
+      status: "Unavailable",
+      note: "Archive outcome rows are not loaded.",
+    };
   }
-}
 
-function formatRankingQualityConfidenceLabel(
-  code: string | null | undefined,
-  fallback = "N/A",
-) {
-  switch (code) {
-    case "confidence_high":
-      return "High Confidence";
-    case "confidence_mid":
-      return "Mid Confidence";
-    case "confidence_low":
-      return "Low Confidence";
-    case "confidence_unknown":
-      return "Confidence Unknown";
-    default:
-      return fallback;
+  if (knownScoreBucketCount < 2) {
+    return {
+      label: "Score Bucket Separation",
+      status: knownScoreBucketCount === 0 ? "Unavailable" : "No Variation",
+      note: "Score bucket comparison needs at least two stored rank-score buckets.",
+    };
   }
+
+  if (!diagnostic || diagnostic.sampleWarning !== null) {
+    return {
+      label: "Score Bucket Separation",
+      status: "Limited Sample",
+      note: "Score buckets do not yet provide enough interpretable separation for this selected run.",
+    };
+  }
+
+  return {
+    label: "Score Bucket Separation",
+    status: "Available",
+    note: `Score buckets are available. Current separation status: ${diagnostic.interpretationLabel}.`,
+  };
 }
 
-function formatRankingQualityDelta(value: number | null | undefined) {
-  return typeof value === "number" && Number.isFinite(value)
-    ? formatObservationPercent(value)
-    : "N/A";
+function getResearchGroupAvailability(
+  evaluation: RankingQualityEvaluation,
+  hasRows: boolean,
+): RankingQualityAvailabilityItem {
+  const knownGroups = evaluation.groupSummaries.filter(
+    (summary) => summary.code !== "unknown",
+  );
+  const diagnostic = getRankingQualityDiagnostic(
+    evaluation,
+    "high_priority_vs_watch_neutral",
+  );
+
+  if (!hasRows || knownGroups.length <= 1) {
+    return {
+      label: "Research Groups",
+      status: "Unavailable",
+      note: "Current archive rows do not include enough research-group variation for comparison.",
+    };
+  }
+
+  if (!diagnostic || diagnostic.sampleWarning !== null) {
+    return {
+      label: "Research Groups",
+      status: "Limited Sample",
+      note: `Research group comparison has ${formatCount(knownGroups.length)} groups, but complete-window support is limited.`,
+    };
+  }
+
+  return {
+    label: "Research Groups",
+    status: "Available",
+    note: `Research group comparison is available across ${formatCount(knownGroups.length)} stored groups.`,
+  };
+}
+
+function getRiskContextAvailability(
+  evaluation: RankingQualityEvaluation,
+  hasRows: boolean,
+): RankingQualityAvailabilityItem {
+  const hasRiskContext = evaluation.riskContextSummaries.some(
+    (summary) => summary.code === "risk_context",
+  );
+  const hasNoRiskContext = evaluation.riskContextSummaries.some(
+    (summary) => summary.code === "no_risk_context",
+  );
+  const diagnostic = getRankingQualityDiagnostic(
+    evaluation,
+    "risk_context_vs_no_risk_context",
+  );
+
+  if (!hasRows || (!hasRiskContext && !hasNoRiskContext) || !hasRiskContext) {
+    return {
+      label: "Risk Context",
+      status: "Unavailable",
+      note: "Risk context diagnostics are limited by available archive fields.",
+    };
+  }
+
+  if (!hasNoRiskContext) {
+    return {
+      label: "Risk Context",
+      status: "No Variation",
+      note: "Risk context comparison needs both Risk Context Present and No Risk Context rows.",
+    };
+  }
+
+  if (!diagnostic || diagnostic.sampleWarning !== null) {
+    return {
+      label: "Risk Context",
+      status: "Limited Sample",
+      note: "Risk context comparison is present, but complete-window support is limited.",
+    };
+  }
+
+  return {
+    label: "Risk Context",
+    status: "Available",
+    note: `Risk context comparison is available. Current context status: ${diagnostic.interpretationLabel}.`,
+  };
+}
+
+function getEvidenceReliabilityAvailability(
+  evaluation: RankingQualityEvaluation,
+  hasRows: boolean,
+): RankingQualityAvailabilityItem {
+  const knownConfidenceBuckets = evaluation.confidenceBuckets.filter(
+    (summary) => summary.code !== "confidence_unknown",
+  );
+  const diagnostic = getRankingQualityDiagnostic(
+    evaluation,
+    "high_confidence_vs_low_confidence",
+  );
+
+  if (!hasRows || knownConfidenceBuckets.length === 0) {
+    return {
+      label: "Evidence Reliability",
+      status: "Not Stored",
+      note: "Confidence/evidence fields are not stored in the current archive rows.",
+    };
+  }
+
+  if (knownConfidenceBuckets.length === 1) {
+    return {
+      label: "Evidence Reliability",
+      status: "No Variation",
+      note: "Evidence reliability comparison needs more than one stored confidence bucket.",
+    };
+  }
+
+  if (!diagnostic || diagnostic.sampleWarning !== null) {
+    return {
+      label: "Evidence Reliability",
+      status: "Limited Sample",
+      note: "Evidence reliability comparison is present, but complete-window support is limited.",
+    };
+  }
+
+  return {
+    label: "Evidence Reliability",
+    status: "Available",
+    note: `Evidence reliability comparison is available. Current data support status: ${diagnostic.interpretationLabel}.`,
+  };
 }
 
 function buildRankingQualityFollowUpNotes({
   evaluation,
-  maturity,
+  windowCoverage,
   hasRows,
+  availability,
 }: {
   evaluation: RankingQualityEvaluation;
-  maturity: ArchiveRankingQualityMaturity;
+  windowCoverage: ArchiveWindowCoverage;
   hasRows: boolean;
+  availability: RankingQualityAvailabilityItem[];
 }) {
   const notes = [
     "Missing windows are tracked separately and are not treated as negative outcomes.",
+    "Research group, risk context, and evidence reliability diagnostics require stored archive fields with enough variation.",
   ];
 
   if (!hasRows) {
     notes.push("Diagnostics are unavailable until archive outcome rows are loaded.");
-  } else if (maturity.label !== "Data Mature") {
+  } else if (windowCoverage.label !== "Window Coverage Mature") {
     notes.push("Limited sample. More complete windows are needed before interpretation.");
+  }
+
+  if (availability.some((item) => item.status === "Unavailable")) {
+    notes.push("Unavailable diagnostics are reported conservatively from current archive fields.");
   }
 
   if (
@@ -2116,11 +2098,11 @@ function formatRankingQualityNotices(notices: RankingQualityNotice[]) {
   });
 }
 
-function getRankingQualityMaturityTone(
-  label: ArchiveRankingQualityMaturityLabel,
+function getWindowCoverageTone(
+  label: ArchiveWindowCoverageLabel,
 ): StatusTone {
   switch (label) {
-    case "Data Mature":
+    case "Window Coverage Mature":
       return "complete";
     case "Limited Sample":
       return "partial";
@@ -2129,23 +2111,19 @@ function getRankingQualityMaturityTone(
   }
 }
 
-function getRankingQualityInterpretationTone(
-  label: RankingQualitySeparationDiagnostic["interpretationLabel"],
+function getRankingQualityAvailabilityTone(
+  status: RankingQualityAvailabilityStatus,
 ): StatusTone {
-  switch (label) {
-    case "Clear Separation":
+  switch (status) {
+    case "Available":
       return "complete";
-    case "Weak Separation":
-      return "partial";
-    case "Contradictory Context":
-      return "warning";
     case "Limited Sample":
+    case "No Variation":
       return "partial";
-    case "Data Not Mature":
+    case "Unavailable":
+    case "Not Stored":
+    case "N/A":
       return "missing";
-    case "No Clear Separation":
-    default:
-      return "neutral";
   }
 }
 

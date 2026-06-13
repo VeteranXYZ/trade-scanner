@@ -55,20 +55,21 @@ It must not be described as win rate, success rate, profit, or prediction accura
 
 Ranking Quality Diagnostics is a secondary, collapsed Archive diagnostics panel inside Validation Details. It supports the Validate step by applying the internal ranking-quality evaluation helper to the currently loaded archive outcome rows when those rows are available.
 
-The panel is research-only. It is not a backtest, does not provide trading advice, and does not convert diagnostics into recommendations.
+The panel is research-only. It does not provide trading advice and does not convert diagnostics into recommendations.
 
-The panel reports:
+The panel is intentionally compact. It reports:
 
-- Data Maturity: Complete Windows, Partial Windows, Missing Windows, and Data Mature / Limited Sample / Data Not Mature state.
-- Score Bucket Separation: whether rank-score buckets show No Clear Separation, Weak Separation, Clear Separation, or Data Not Mature.
-- Research Group Comparison: complete, partial, and missing windows by research group.
-- Risk Context Summary: risk-context and no-risk-context diagnostics without treating risk context as a trade outcome.
-- Evidence Reliability: confidence-bucket diagnostics as data support, not probability.
-- Follow-up Notes: limited-sample, contradictory-context, and calibration-review notes.
+- Window Coverage: Complete Windows, Partial Windows, Missing Windows, Data Support, and Window Coverage Mature / Limited Sample / Data Not Mature state.
+- Diagnostic Availability: compact availability rows for Score Bucket Separation, Research Groups, Risk Context, and Evidence Reliability.
+- Follow-up Notes: limited-sample, unavailable-field, no-variation, contradictory-context, and calibration-review notes.
 
 Only complete outcome windows are used for primary diagnostics. Partial and missing windows are counted separately. Missing windows are not treated as negative outcomes.
 
-If Archive has maturity counts but no loaded outcome rows, the panel may show Data Not Mature or unavailable copy, but it must not fake score buckets, group summaries, risk-context summaries, or evidence reliability details.
+Window coverage maturity is separate from diagnostic availability. A selected run can have mature complete-window coverage while score separation, research-group, risk-context, or evidence-reliability comparisons remain Limited Sample, Unavailable, Not Stored, or No Variation.
+
+Research group, risk context, and evidence reliability diagnostics require stored archive fields with enough variation. Unknown-only research groups, only one research-group bucket, only No Risk Context rows, or missing confidence/evidence fields are reported conservatively instead of shown as full comparison tables.
+
+If Archive has window counts but no loaded outcome rows, the panel may show Data Not Mature or unavailable copy, but it must not fake score buckets, group summaries, risk-context summaries, or evidence reliability details.
 
 Ranking Quality Diagnostics does not modify scoring, automatically calibrate weights, change codebook meanings, change API response shape, change storage format, or require database schema changes.
 
