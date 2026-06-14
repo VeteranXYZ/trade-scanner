@@ -34,7 +34,7 @@ const MAX_PROVIDER_LIMIT = 1000;
 const DEFAULT_SCANNER_CANDLE_LIMIT = 500;
 const MIN_SCAN_CANDLES = 200;
 
-const supportedBackfillTimeframes = ["4h", "1d", "1w"] as const;
+const supportedBackfillTimeframes = ["1h", "4h", "1d", "1w"] as const;
 const supportedScannerTimeframes = ["4h", "1d"] as const;
 
 export type BatchBackfillTimeframe = (typeof supportedBackfillTimeframes)[number];
@@ -97,6 +97,13 @@ export type CoinbaseBatchBackfillSummary = {
   generated4h?: number;
   dailyCandlesRead?: number;
   weeklyCandlesGenerated?: number;
+  sourceTimeframe?: CoinbaseBackfillTimeframe;
+  sourceCandles?: number;
+  generatedCandles?: number;
+  missingSourceCandles?: number;
+  firstOpenTime?: number;
+  lastOpenTime?: number;
+  scannerEligible?: boolean;
   completeBuckets?: number;
   partialBuckets?: number;
   droppedPartialBuckets?: number;
@@ -154,6 +161,7 @@ export type CoinbaseSupplementalBatchReport = {
     gapsDetected: number;
     droppedPartialBuckets: number;
     droppedPartialWeeks: number;
+    missingSourceCandles: number;
     symbolsScanned: number;
     symbolsSkipped: number;
     signalsCreated: number;
@@ -254,6 +262,13 @@ export function parseCoinbaseSupplementalBatchOptions(
     timeframes: parseBackfillTimeframes(flags.timeframes),
     scannerTimeframes: parseScannerTimeframes(flags.scannerTimeframes),
     targetCandles: {
+      "1h": parseInteger({
+        value: flags.targetCandles1h,
+        fallback: 250,
+        min: 1,
+        max: 50_000,
+        name: "target-candles-1h",
+      }),
       "4h": parseInteger({
         value: flags.targetCandles4h,
         fallback: 250,
@@ -341,10 +356,7 @@ export async function runCoinbaseSupplementalBatch(
 
   try {
     if (!options.skipBackfill) {
-      const needsProvider = options.timeframes.some((timeframe) => timeframe !== "1w");
-      const provider = needsProvider
-        ? await resolveProvider(deps)
-        : createStoredDailyOnlyProvider();
+      const provider = await resolveProvider(deps);
 
       await runBackfillStage({
         options,
@@ -483,7 +495,7 @@ async function runBackfillStage({
         try {
           const result = await backfillSymbol({
             store: marketDataStore,
-            provider: timeframe === "1w" ? createStoredDailyOnlyProvider() : provider,
+            provider,
             symbol,
             timeframe: timeframe as CoinbaseBackfillTimeframe,
             targetCandles: options.targetCandles[timeframe],
@@ -503,6 +515,7 @@ async function runBackfillStage({
             result.fourHourDiagnostics?.droppedPartialBuckets ?? 0;
           report.totals.droppedPartialWeeks +=
             result.weeklyDiagnostics?.droppedPartialWeeks ?? 0;
+          report.totals.missingSourceCandles += result.missingSourceCandles;
           logger.info(
             `coinbase:batch backfill ${symbol.symbol} ${timeframe} status=success inserted=${result.inserted} updated=${result.updated}`,
           );
@@ -768,6 +781,13 @@ function summarizeBackfillResult(
       requestedWindows: result.requestedWindows,
       source1h: result.fetchedCandles,
       generated4h: result.normalizedCandles,
+      sourceTimeframe: result.sourceTimeframe,
+      sourceCandles: result.sourceCandles,
+      generatedCandles: result.generatedCandles,
+      missingSourceCandles: result.missingSourceCandles,
+      firstOpenTime: result.firstOpenTime,
+      lastOpenTime: result.lastOpenTime,
+      scannerEligible: result.scannerEligible,
       completeBuckets: result.fourHourDiagnostics?.completeBuckets,
       partialBuckets: result.fourHourDiagnostics?.partialBuckets,
       droppedPartialBuckets: result.fourHourDiagnostics?.droppedPartialBuckets,
@@ -783,6 +803,13 @@ function summarizeBackfillResult(
       timeframe: "1w",
       dailyCandlesRead: result.fetchedCandles,
       weeklyCandlesGenerated: result.normalizedCandles,
+      sourceTimeframe: result.sourceTimeframe,
+      sourceCandles: result.sourceCandles,
+      generatedCandles: result.generatedCandles,
+      missingSourceCandles: result.missingSourceCandles,
+      firstOpenTime: result.firstOpenTime,
+      lastOpenTime: result.lastOpenTime,
+      scannerEligible: result.scannerEligible,
       completeWeeks: result.weeklyDiagnostics?.completeWeeks,
       partialWeeks: result.weeklyDiagnostics?.partialWeeks,
       droppedPartialWeeks: result.weeklyDiagnostics?.droppedPartialWeeks,
@@ -794,10 +821,17 @@ function summarizeBackfillResult(
 
   return {
     status: "success",
-    timeframe: "1d",
+    timeframe: result.timeframe,
     requestedWindows: result.requestedWindows,
     fetched: result.fetchedCandles,
     normalized: result.normalizedCandles,
+    sourceTimeframe: result.sourceTimeframe,
+    sourceCandles: result.sourceCandles,
+    generatedCandles: result.generatedCandles,
+    missingSourceCandles: result.missingSourceCandles,
+    firstOpenTime: result.firstOpenTime,
+    lastOpenTime: result.lastOpenTime,
+    scannerEligible: result.scannerEligible,
     gapsDetected: result.gapCount,
     inserted: result.inserted,
     updated: result.updated,
@@ -920,6 +954,7 @@ function createInitialReport({
       gapsDetected: 0,
       droppedPartialBuckets: 0,
       droppedPartialWeeks: 0,
+      missingSourceCandles: 0,
       symbolsScanned: 0,
       symbolsSkipped: 0,
       signalsCreated: 0,
@@ -989,16 +1024,6 @@ async function resolveProvider(deps: CoinbaseSupplementalBatchDeps) {
 
   const client = await createCcxtCoinbaseClient();
   return createCcxtCoinbaseProvider(client);
-}
-
-function createStoredDailyOnlyProvider(): MarketDataProvider {
-  return {
-    provider: "ccxt",
-    listMarkets: async () => [],
-    fetchCandles: async () => {
-      throw new Error("Coinbase weekly aggregation reads stored daily candles.");
-    },
-  };
 }
 
 async function runWithConcurrency<T>(

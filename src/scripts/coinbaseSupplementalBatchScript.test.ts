@@ -142,7 +142,7 @@ describe("Coinbase supplemental batch script", () => {
     expect(rankingStore.createScanRun).not.toHaveBeenCalled();
   });
 
-  it("orchestrates 4h from 1h, 1d direct, and 1w from stored daily candles", async () => {
+  it("orchestrates 4h from CCXT 1h, 1d native, and 1w from CCXT 1d", async () => {
     const fetchCandles = vi.fn(
       async (
         request: Parameters<MarketDataProvider["fetchCandles"]>[0],
@@ -155,7 +155,7 @@ describe("Coinbase supplemental batch script", () => {
             rawSymbol: "AERO-USDC",
             providerSymbol: "AERO/USDC",
             timeframe: request.timeframe,
-            candles: makeHourlyCandles(0, 12),
+            candles: makeHourlyCandles(request.startTime ?? 0, request.limit ?? 12),
           };
         }
 
@@ -166,7 +166,10 @@ describe("Coinbase supplemental batch script", () => {
           rawSymbol: "AERO-USDC",
           providerSymbol: "AERO/USDC",
           timeframe: request.timeframe,
-          candles: [makeDailyCandle(monday)],
+          candles:
+            request.limit === 1
+              ? [makeDailyCandle(request.startTime ?? monday)]
+              : makeDailyCandles(monday, 7),
         };
       },
     );
@@ -187,8 +190,8 @@ describe("Coinbase supplemental batch script", () => {
         "--target-candles-4h=1",
         "--target-candles-1d=1",
         "--target-candles-1w=1",
-        "--max-candles-per-request=12",
-        `--end-time-ms=${11 * hourMs}`,
+        "--max-candles-per-request=14",
+        `--end-time-ms=${monday + 6 * dayMs + 23 * hourMs}`,
       ]),
       {
         marketDataStore: store,
@@ -203,10 +206,12 @@ describe("Coinbase supplemental batch script", () => {
     expect(fetchCandles.mock.calls.map(([request]) => request.timeframe)).toEqual([
       "1h",
       "1d",
+      "1d",
     ]);
     expect(fetchCandles.mock.calls.map(([request]) => request.timeframe)).not.toContain(
       "4h",
     );
+    expect(store.listCandles).not.toHaveBeenCalled();
     expect(upsertCandles.mock.calls.map(([input]) => input.timeframe)).toEqual([
       "4h",
       "1d",
@@ -217,12 +222,19 @@ describe("Coinbase supplemental batch script", () => {
       source1h: 12,
       generated4h: 1,
       droppedPartialBuckets: 0,
+      sourceTimeframe: "1h",
+      generatedCandles: 1,
+      scannerEligible: false,
     });
     expect(report.perSymbol[0]?.backfill["1w"]).toMatchObject({
       status: "success",
       dailyCandlesRead: 7,
       weeklyCandlesGenerated: 1,
       droppedPartialWeeks: 0,
+      sourceTimeframe: "1d",
+      sourceCandles: 7,
+      generatedCandles: 1,
+      scannerEligible: false,
     });
   });
 
