@@ -80,6 +80,40 @@ current native Binance adapter. Phase 32B does not add CCXT as a dependency.
 CoinGecko is better suited for asset discovery, metadata, enrichment, and cross-listing
 context. It should not replace a Coinbase exchange-specific candle source.
 
+## Phase 32K Provider Strategy Gate
+
+Phase 32K adds a static provider evaluation framework before any Coinbase
+production cron expansion. The current Coinbase manual pipeline works, but the
+manual rollout left coverage questions:
+
+- Coinbase `4h` manual scan: 179 total symbols, 89 scanned, 90 skipped.
+- Coinbase `1d` manual scan: 179 total symbols, 139 scanned, 40 skipped.
+
+Those skip counts should not be treated as acceptable production behavior without
+a provider capability audit. VegaRank should evaluate exchange-native APIs,
+third-party crypto data providers, and future multi-asset providers before
+deepening Coinbase production integration.
+
+Hand-aggregated `4h` candles from lower intervals are a fallback, not the ideal
+primary strategy. If VegaRank derives candles, provenance should eventually mark
+them as derived and include the source interval. Coin-level aggregated data must
+not be silently mixed into exchange-specific rankings.
+
+See `docs/market-data-source-strategy.md` for the provider matrix, evaluation
+criteria, and recommended Phase 32L audit direction.
+
+Phase 32L implements the first live read-only provider audit tool:
+
+```bash
+pnpm market-data:providers:live-audit -- --providers=coinbase_advanced_direct,cryptocompare,cryptodatadownload,coingecko --limit-symbols=10 --timeframes=1h,4h,1d,1w --lookback-days=365 --markdown
+```
+
+The audit probes actual candle availability but still does not write candles,
+run scanners, alter cron, or change ranking behavior. It keeps exchange-specific
+OHLCV separate from aggregated coin-level OHLCV and reports unsupported,
+auth-required, symbol-mapping, and insufficient-history cases explicitly. See
+`docs/live-crypto-ohlcv-provider-audit.md`.
+
 ## Deferred Work
 
 Coinbase runtime integration is deferred:

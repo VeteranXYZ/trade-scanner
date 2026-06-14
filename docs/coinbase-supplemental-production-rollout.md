@@ -16,6 +16,21 @@ The one-symbol Coinbase dry run succeeded on `AERO-USDC`:
 - exact Symbol Research lookup returned the Coinbase scan run.
 - Binance production API remained healthy.
 
+The later full manual Coinbase rollout covered 179 Coinbase-only USDC symbols.
+Manual scanner coverage remained incomplete:
+
+- `4h`: 179 total symbols, 89 scanned, 90 skipped.
+- `1d`: 179 total symbols, 139 scanned, 40 skipped.
+
+These coverage questions are not accepted as production-ready behavior. Before
+expanding production cron, VegaRank needs a provider strategy and capability audit
+for exchange-specific OHLCV coverage.
+
+Phase 32L adds a live read-only provider audit for Coinbase Advanced Direct,
+CryptoCompare, CryptoDataDownload, and CoinGecko. It can test Coinbase direct
+`4h` and `1d` availability without writing candles, running scanners, changing
+cron, or changing scoring. See `docs/live-crypto-ohlcv-provider-audit.md`.
+
 The first medium batch showed that Coinbase `BASE-USDC` rows were being
 classified from the raw dashed pair string. Phase 32H refines quality
 classification so Coinbase pairs are parsed as base and quote assets before
@@ -103,6 +118,12 @@ For each selected symbol:
 
 The report includes fetched source counts, generated candle counts, gaps,
 inserted/updated rows, dropped partial buckets, and dropped partial weeks.
+
+This aggregation path is a controlled fallback, not the preferred long-term data
+strategy. Native provider intervals should be preferred when they provide enough
+history, stable access, acceptable licensing, and clear exchange/pair provenance.
+Coin-level aggregated candles must not be silently mixed with Coinbase
+exchange-specific candles.
 
 ## Scanner Run
 
@@ -200,7 +221,14 @@ requested timeframe or a scanner data-quality guard.
 3. 50-symbol dry run.
 4. 50-symbol real manual batch.
 5. Full 179-symbol manual backfill and scanner validation.
-6. Production cron design only after manual batches are reviewed.
+6. Provider strategy and capability audit before production cron expansion.
+7. Production cron design only after manual batches and provider audit are reviewed.
+
+Useful live audit command:
+
+```bash
+pnpm market-data:providers:live-audit -- --providers=coinbase_advanced_direct,coingecko --symbols=AERO-USDC,CLANKER-USDC,BNKR-USDC,BTCUSDT,ETHUSDT --timeframes=1h,4h,1d,1w --lookback-days=365 --json
+```
 
 ## Deferred
 
@@ -210,3 +238,7 @@ requested timeframe or a scanner data-quality guard.
 - CoinGecko metadata layer
 - combined Binance/Coinbase latest rankings design
 - production-depth retry strategy
+- provider capability audit and data source selection
+
+See `docs/market-data-source-strategy.md` for the Phase 32K market data source
+evaluation framework.
